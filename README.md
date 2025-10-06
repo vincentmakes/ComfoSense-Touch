@@ -24,8 +24,8 @@ Prerequisites:
 * A 230V->12V DC mini power supply : this is needed as the 12V from ComfoAir supplies a max of 40mA which is not enough to power the screen + ESP32
 
 ### Very Important
-* Do not connect the 12V of the power supply to the one of the Unit.
-* Connect the Ground of the power supply to the one of the Unit.
+* Do not connect the 12V of the power supply to the one of the MVHR nor to the Waveshare ESP32
+* Connect the Ground of the power supply to the one of the MVHR.
 ### Wiring
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/901908b0-c0ff-4c94-a58b-7c68779ed00d" />
 
