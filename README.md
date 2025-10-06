@@ -2,7 +2,7 @@
 
 This software is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver. This new device is meant to not only replace the ComfoConnect but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir.
 
-<img width="150" alt="image" src="https://github.com/user-attachments/assets/686ae7ac-9415-4ca7-90f9-afdd3ad098ec" /> -> <img width="200" alt="PoC_UpgradeMVHRController" src="https://github.com/user-attachments/assets/7dcc618e-e5f9-48f5-9d06-f0de1fbaf3c0" />
+<img width="150" alt="image" src="https://github.com/user-attachments/assets/686ae7ac-9415-4ca7-90f9-afdd3ad098ec" /> ---> <img width="300" alt="PoC_UpgradeMVHRController" src="https://github.com/user-attachments/assets/7dcc618e-e5f9-48f5-9d06-f0de1fbaf3c0" />
 
 
 
