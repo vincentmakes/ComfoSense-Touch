@@ -1,6 +1,8 @@
 # Zehnder Comfoair Q350 MQTT bridge + Touch Screen
 
-This software is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver. This new device is meant to not only replace the ComfoConnect but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir.
+This software is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver, namely this one in particular : https://github.com/dardhal/comfoair-esp32
+
+This new device is meant to not only replace the ComfoConnect but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir.
 
 <img width="150" alt="image" src="https://github.com/user-attachments/assets/686ae7ac-9415-4ca7-90f9-afdd3ad098ec" /> ---> <img width="300" alt="PoC_MVHR_Touch" src="https://github.com/user-attachments/assets/66cf5a05-3d2b-431a-93be-b21755b78d61" />
 
