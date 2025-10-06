@@ -26,6 +26,8 @@ Prerequisites:
 ### Very Important
 * Do not connect the 12V of the power supply to the one of the Unit.
 * Connect the Ground of the power supply to the one of the Unit.
+### Wiring
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/901908b0-c0ff-4c94-a58b-7c68779ed00d" />
 
 
 ## Flashing the firmware in the ESP32 development board
