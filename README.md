@@ -6,10 +6,13 @@ This software is inspired by the work of many others who successfully managed to
 
 
 The purpose of this version addresses few other issues:
-1. Wifi connection close to the Comfoair can be limited, hence bringing the IoT device closer to a central area in the house (where the ComfoSense display controller normally sits) mitigate this.
+1. Wifi connection close to the Comfoair can be limited due to its location (typically the attic or the cellar), hence bringing the IoT device closer to a central area in the house (where the ComfoSense display controller normally sits) mitigate this.
 2. Better user interface than the one ComfoSense, with all basic functions exposed in one screen
-3. Provide exact number of days before filter change is needed (instead of the generic message Expect change of filter soon ... for 3 weeks)
-4. Provide integration with HomeAssistant via MQTT, similarly to the original ESP32 + CAN Transceiver program
+3. Provides exact number of days before filter change is needed (instead of the generic message Expect change of filter soon ... for 3 weeks)
+4. Provides additional sensor data coming from the MVHR (temperature, humidity)
+5. Provide integration with HomeAssistant via MQTT, similarly to the original ESP32 + CAN Transceiver program
+
+This means this display can be used also by people who are not interested in the HA integration but simply want a better UI/UX than the one provided by Zehnder
 
 ## Hardware Components
 
