@@ -5,16 +5,22 @@ This software is inspired by the work of many others who successfully managed to
 <img width="150" alt="image" src="https://github.com/user-attachments/assets/686ae7ac-9415-4ca7-90f9-afdd3ad098ec" /> ---> <img width="300" alt="PoC_MVHR_Touch" src="https://github.com/user-attachments/assets/66cf5a05-3d2b-431a-93be-b21755b78d61" />
 
 
+The high level requirements are:
+1. Make it as simple as possible for anyone to retrofit their unit
+2. Tackle connectivity, UI/UX in one go
+3. Keep MQTT integration capabilities
+4. Use ESP32 since this is one of the best IoT MCU in 2025 with an active community
 
 
 
 
-This version addresses few other issues and has the following features:
+
+This version has the following features:
 1. Wifi connection close to the Comfoair can be limited due to its location (typically the attic or the cellar), hence bringing the IoT device closer to a central area in the house (where the ComfoSense display controller normally sits) mitigate this.
 2. Better user interface than the one ComfoSense, with all basic functions exposed in one screen
 3. Provides exact number of days before filter change is needed (instead of the generic message Expect change of filter soon ... for 3 weeks)
 4. Provides additional sensor data coming from the MVHR (temperature, humidity)
-5. Provide integration with HomeAssistant via MQTT, similarly to the original ESP32 + CAN Transceiver program
+5. Provide same integration with HomeAssistant via MQTT, similarly to the original ESP32 + CAN Transceiver program
 
 This means this display can be used also by people who are not interested in the HA integration but simply want a better UI/UX than the one provided by Zehnder
 
