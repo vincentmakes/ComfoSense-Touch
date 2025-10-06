@@ -1,43 +1,26 @@
-# Zehnder Comfoair Q350 MQTT bridge
+# Zehnder Comfoair Q350 MQTT bridge + Touch Screen
 
-This software lets you use a ESP32 + CAN transceiver (and accesory components, total budget well under 20 € in parts) to interact with the Zehnder Comfoair Q350 (and probably any other Q-series) Mechanical Ventilation with Heat Recovery (MVHR) unit. Zehnder has an official hardware bridge called "Comfoconnect LAN C" which is not only dead expensive (over 250 €), but lacks most of the features this project provides.
+This software is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver. This new device is meant to not only replace the ComfoConnect but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir.
 
-Firmware running off the ESP32 does expose all known Zehnder Comfoair Q series metrics and status information through MQTT, and lets you control the air flow (and run other actions) via MQTT as well.
-
-As such, it allows for a very easy integration into Home Assistant (see example Lovelace card below, not included in this repository). Note the Particulate Matter (PM) values shown in the screenshot below are obtained outside the Comfoair Q device) :
-![Comfoair Q 350 Home Assistant](docs/homeassistant.png?raw=true "Comfoair Q 350 Home Assistant")
+<img width="150" alt="image" src="https://github.com/user-attachments/assets/686ae7ac-9415-4ca7-90f9-afdd3ad098ec" />
 
 
-You can find the YAML configuration files for Home Assistant in the `docs` folder, which should allow you to :
-- Have all metrics and MVHR unit state values published as sensors
-- Easily configure a "entities" Lovelace card after creating an "input_select" Helper to set the ventilation level from the HA GUI
-
-
-This repo is based off the original one ([vekexasia/comfoair-esp32](https://github.com/vekexasia/comfoair-esp32)) with a few changes, namely :
-  * [PR #41](https://github.com/vekexasia/comfoair-esp32/pull/41) has been merged (although later changes I did for the most part override this)
-  * Some original project issues (some of which are reported as Issues) have been fixed, ie [Issue #44](https://github.com/vekexasia/comfoair-esp32/issues/44)
-  * Completely revamped, extended and up-to-date configuration files for MQTT sensors, templates and automations for Home Assistant
-
-
-A huge thank you to the original author of this software, and to those who, in the first place, reversed-engineer the Zehnder Comfoair Q CAN bus protocol :
-
-  * [A protocol adapter for Zehnder ComfoAir Q series devices with CAN bus interface](https://github.com/marco-hoyer/zcan/issues/1).
-  * [ComfoControl CAN/RMI Protocol](https://github.com/michaelarnauts/comfoconnect/blob/master/PROTOCOL-RMI.md)
-  * [comfoconnect/PROTOCOL-PDO.md](https://github.com/michaelarnauts/comfoconnect/blob/master/PROTOCOL-PDO.md)
-
-
+The purpose of this version addresses few other issues:
+1. Wifi connection close to the Comfoair can be limited, hence bringing the IoT device closer to a central area in the house (where the ComfoSense display controller normally sits) mitigate this.
+2. Better user interface than the one ComfoSense, with all basic functions exposed in one screen
+3. Provide exact number of days before filter change is needed (instead of the generic message Expect change of filter soon ... for 3 weeks)
+4. Provide integration with HomeAssistant via MQTT, similarly to the original ESP32 + CAN Transceiver program
 
 ## Hardware Components
 
 Prerequisites:
 
-* Any ESP32 development board (of course, your abilities permitting, will work with a discrete ESP32 board) -> [example](https://amzn.to/3pe0XVP), although any ESP32 WROOM development board off Aliexpress or similar should work ([example](https://es.aliexpress.com/item/1005004285144170.html))
-* A DC-DC converter from 12 V to 3.3 V (fixed or configurable output voltage) -> [link](https://amzn.to/39ar22v)
-* A CAN transceiver board -> [Waveshare SN65HVD230](https://www.banggood.com/Waveshare-SN65HVD230-CAN-Bus-Module-Communication-CAN-Bus-Transceiver-Development-Board-p-1693712.html?rmmds=myorder&cur_warehouse=CN), also can easily be sourced from Aliexpress (I chose a [smaller form-factor version](https://www.aliexpress.com/item/1005001868558551.html))
-* Some ethernet cable (the lower the AWG, hence bigger the diameter, the better) or any other communications cable up to 0.75 mm2
-* Any enclosure with enough room for your components, to keep them safe and tidy
+* Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver)
+* A 230V->12V DC mini power supply : this is needed as the 12V from ComfoAir supplies a max of 40mA which is not enough to power the screen + ESP32
 
-The MVHR unit puts DC 12 V out which is to be fed to the DC / DC converter, which will provide 3.3 DC power to both the ESP32 development board and the CAN transceiver. Remaining two pins in the MVHR unit are for the CAN protocol, need be connected as described below to CAN transceiver, then to the corresponding GPIO ports in the ESP32 development board.
+### Very Important
+* Do not connect the 12V of the power supply to the one of the Unit.
+* Connect the Ground of the power supply to the one of the Unit.
 
 
 ## Flashing the firmware in the ESP32 development board
@@ -53,80 +36,6 @@ First, create a "secrets.h" file at the top of this repository, with the configu
 #define WIFI_SSID "YOUR_WIRELESS_NETWORK_SSID"
 #define WIFI_PASS "WIRELESS_PASSWORD"
 ```
-
-Next, connect the ESP32 development board to your PC using a USB cable, and it should be as easy as running the following command to get "platformio" to compile and upload the firmware (command output trimmed for brevity) :
-```bash
-# pio run --environment wemos_d1_mini32 --target upload
-Processing wemos_d1_mini32 (platform: platformio/espressif32@3.5.0; board: esp32dev; framework: arduino)
-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32dev.html
-PLATFORM: Espressif 32 (3.5.0) > Espressif ESP32 Dev Module
-HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash
-...
-Linking .pio/build/wemos_d1_mini32/firmware.elf
-Retrieving maximum program size .pio/build/wemos_d1_mini32/firmware.elf
-Checking size .pio/build/wemos_d1_mini32/firmware.elf
-Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
-RAM:   [=         ]  12.9% (used 42216 bytes from 327680 bytes)
-Flash: [======    ]  63.1% (used 826830 bytes from 1310720 bytes)
-Building .pio/build/wemos_d1_mini32/firmware.bin
-...
-CURRENT: upload_protocol = esptool
-Looking for upload port...
-Using manually specified: /dev/ttyUSB0
-Uploading .pio/build/wemos_d1_mini32/firmware.bin
-esptool.py v3.1
-Serial port /dev/ttyUSB0
-```
-
-You may now disconnect the ESP32 from the PC. The ESP32 should now be connected to WiFi (make sure it gets assigned a static IP address for convenience), but will not put any messages to MQTT until getting valid input signal from CAN transceiver. If in the future you want to upload an updated firmware version, this project supports OTA (over the air), so just :
-
-  * Make whatever the changes you need to the source code (ie the values in secrets.h)
-  * Recompile using the mentioned "pio" command above : no need to connect ESP32 board to USB
-  * "pio" will fail to upload the firmware, as the ESP32 is not connected to USB, but will have produced the "firmware.bin" file, see the command output for the file location
-  * Use a browser to navigate to the ESP32 web interface (such as http://CONFIGURED_IP_FOR_ESP32/), and use the form to select the "firmware.bin" file, then click the button. New firmware version should upload and be running within the ESP32 in a matter of a few seconds
-
-
-## Putting the hardware together
-
-Zehnder Comfoair Q puts CAN BUS protocol messages in the yellow (CAN_H) and white (CAN_L) pins in the two 4-pin headers at the front of the unit, on top of the display (protected by an sliding grey shelf). Pinout being :
-  * Red : DC +12 V
-  * Black : DC GND
-  * Yellow : CAN_H (CAN High)
-  * White : CAN_L (CAN Low)
-
-Both headers may be used in case you need to daisy-chain the MVHR unit into an existing CAN bus.
-
-As the MVHR puts DC 12 V out between Red and Black pins, you may be tempted to feed the ESP32 development board directly of it (and feed the CAN transceiver off the ESP32), however :
-  * You may still need a DC 12 V to DC 3.3 step down converter to power the CAN transceiver board
-  * ESP32 dev board may accept up to 15 V, but as it uses a linear voltage regulator, than means it will dissipate relatively high amounts of power (causing it to heat up probably too much in the long term)
-
-Physical connections will therefore be (note pin labels may vary slightly across different ESP32 and CAN transceiver boards) :
-  * Power
-    * MVHR Red (DC 12 V) OUT -> DC/DC converter IN+
-    * MVHR Black (DC GND) OUT -> DC/DC converter IN-
-    * DC/DC converter OUT+ -> ESP32 dev board 3V3 pin
-    * DC/DC converter OUT+ -> CAN transceiver 3V3 pin
-    * DC/DC converter OUT- -> ESP32 dev board GND pin
-    * DC/DC converter OUT- -> CAN transceiver GND pin
-
- * Data
-   * MVHR Yellow (CAN_H) OUT -> CAN transceiver CANH pin
-   * MVHR White (CAN_L) OUT -> CAN transceiver CANL pin
-   * CAN transceiver CAN TX (or CTX) pin -> ESP32 dev board pin 4 (GPIO4)
-   * CAN transceiver CAN RX (or CRX) pin -> ESP32 dev board pin 5 (GPIO5)
-
-Note the DC/DC converter chosen is a configurable one through the small screw on top of the blue block. It may take some effort and turning the screw back and forth a few times until being able to set a solid 3.3 V DC as output. If you happen to use a static 12 VDC to 3.3 VDC converter, you can save this pain yourself.
-
-For the connection with the Comfoair Q 4-pin CAN header you will need some cable. Ethernet cable may do, but in this case I would recommend soldering some pins on the MVHR unit end. Using more sturdy cable such as 2 x 2 0.75 mm2 data cable available for some sources (with solid copper core) will also work.
-
-
-After double checking connections for shorts and continuity, power down the Comfoair Q, and proceed to connect the wires to the CAN header on the left of the MVHR unit. There seems to be no way to get the cable routed internally out the Comfoair Q unit, and as a result the grey shelf can't be completely closed upon connecting any accesory (even if using the official Comfonnect LAN C).
-
-Upon powering up the MVHR unit and if everything goes well you should start seeing subtopics being created and messages being sent to the MQTT broker at the configured MQTT_PREFIX.
-
-Note some of the topics related to the fans are updated so very often that you will likely want to throttle those messages down in Home Assistant to avoid spamming your database too much with unnecessarily frequent updates. On the other hand, other topics are only published once they change state, so you may not see some of them for a while unless you manually change settings in the unit (ie changing fan speed or activating the bypass manually).
-
 
 ## MQTT commands to interact with the ventilation unit
 This software publishes lots of values to the MQTT broker (nearly 40 in total), but it is also subscribed to the configured MQTT broker listening for the following topics being published below the `${MQTT_PREFIX}/commands/${KEY}` path, the available commands (${KEY} value) being :
