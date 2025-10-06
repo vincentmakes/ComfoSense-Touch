@@ -1,0 +1,189 @@
+sensor:
+# Consumption
+-   name: "MVHR Power Consumption"
+    state_topic: "comfoair/power_consumption_current"
+    unit_of_measurement: W
+    icon: mdi:flash
+
+-   name: "MVHR Energy Consumption YTD"
+    state_topic: "comfoair/power_consumption_ytd"
+    unit_of_measurement: kWh
+    icon: mdi:flash
+
+-   name: "MVHR Energy Consumption Since Start"
+    state_topic: "comfoair/power_consumption_since_start"
+    unit_of_measurement: kWh
+    icon: mdi:flash
+
+# Fans
+-   name: "MVHR Exhaust Fan Speed"
+    state_topic: "comfoair/exhaust_fan_speed"
+    unit_of_measurement: rpm
+    icon: mdi:sine-wave
+
+-   name: "MVHR Supply Fan Speed"
+    state_topic: "comfoair/supply_fan_speed"
+    unit_of_measurement: rpm
+    icon: mdi:sine-wave
+
+-   name: "MVHR Exhaust Fan Duty"
+    state_topic: "comfoair/exhaust_fan_duty"
+    unit_of_measurement: "%"
+    icon: mdi:percent
+
+-   name: "MVHR Supply Fan Duty"
+    state_topic: "comfoair/supply_fan_duty"
+    unit_of_measurement: "%"
+    icon: mdi:percent
+
+-   name: "MVHR Supply Fan User Speed"
+    state_topic: "comfoair/fan_speed"
+    icon: mdi:pump
+
+# Flow
+-   name: "MVHR Exhaust Fan Flow"
+    state_topic: "comfoair/exhaust_fan_flow"
+    unit_of_measurement: "m³/h"
+    icon: mdi:pump
+
+-   name: "MVHR Supply Fan Flow"
+    state_topic: "comfoair/supply_fan_flow"
+    unit_of_measurement: "m³/h"
+    icon: mdi:pump
+
+# Temperatures
+-   name: "MVHR Outdoor Air Temperature"
+    state_topic: "comfoair/outdoor_air_temp"
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+
+-   name: "MVHR Exhaust Air Temperature"
+    state_topic: "comfoair/exhaust_air_temp"
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+
+-   name: "MVHR Extract Air Temperature"
+    state_topic: "comfoair/extract_air_temp"
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+
+-   name: "MVHR Pre Heater Temp Before"
+    state_topic: "comfoair/pre_heater_temp_before"
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+
+-   name: "MVHR Pre Heater Temp After"
+    state_topic: "comfoair/pre_heater_temp_after"
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+
+-   name: "MVHR Post Heater Temp Before"
+    state_topic: "comfoair/post_heater_temp_before"
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+
+-   name: "MVHR Post Heater Temp After"
+    state_topic: "comfoair/post_heater_temp_after"
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+
+-   name: "MVHR Target Temp"
+    state_topic: "comfoair/target_temp"
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+
+# Humidity
+-   name: "MVHR Outdoor Air Humidity"
+    state_topic: "comfoair/outdoor_air_humidity"
+    unit_of_measurement: "%"
+    icon: mdi:percent
+
+-   name: "MVHR Exhaust Air Humidity"
+    state_topic: "comfoair/exhaust_air_humidity"
+    unit_of_measurement: "%"
+    icon: mdi:percent
+
+-   name: "MVHR Extract Air Humidity"
+    state_topic: "comfoair/extract_air_humidity"
+    unit_of_measurement: "%"
+    icon: mdi:percent
+
+-   name: "MVHR Supply Air Humidity"
+    state_topic: "comfoair/supply_air_humidity"
+    unit_of_measurement: "%"
+    icon: mdi:percent
+
+-   name: "MVHR Pre Heater Humidity After"
+    state_topic: "comfoair/pre_heater_humidity_after"
+    unit_of_measurement: "%"
+    icon: mdi:percent
+
+# Avoided Energy Consumption
+-   name: "MVHR Avoided Heating Power"
+    state_topic: "comfoair/ah_actual"
+    unit_of_measurement: W
+    icon: mdi:flash
+
+-   name: "MVHR YTD Avoided Heating Energy"
+    state_topic: "comfoair/ah_ytd"
+    unit_of_measurement: kWh
+    icon: mdi:flash
+
+-   name: "MVHR Total Avoided Heating Energy"
+    state_topic: "comfoair/ah_total"
+    unit_of_measurement: kWh
+    icon: mdi:flash
+
+-   name: "MVHR Avoided Cooling Power"
+    state_topic: "comfoair/ac_actual"
+    unit_of_measurement: W
+    icon: mdi:flash
+
+-   name: "MVHR YTD Avoided Cooling Energy"
+    state_topic: "comfoair/ac_ytd"
+    unit_of_measurement: kWh
+    icon: mdi:flash
+
+-   name: "MVHR Total Avoided Cooling Energy"
+    state_topic: "comfoair/ac_total"
+    unit_of_measurement: kWh
+    icon: mdi:flash
+
+# Other
+-   name: "MVHR Bypass Open Factor"
+    state_topic: "comfoair/bypass_state"
+    unit_of_measurement: "%"
+    icon: mdi:percent
+
+-   name: "MVHR Running Mean Outdoor Temp (RMOT)"
+    state_topic: "comfoair/rmot"
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+
+-   name: "MVHR Remaining Days Filter Replacement"
+    state_topic: "comfoair/remaining_days_filter_replacement"
+    unit_of_measurement: "days"
+    icon: mdi:counter
+
+-   name: "MVHR Seconds To Next Fan Change"
+    state_topic: "comfoair/next_fan_change"
+    unit_of_measurement: "s"
+    icon: mdi:counter
+
+-   name: "MVHR Seconds To Next Bypass Change"
+    state_topic: "comfoair/next_bypass_change"
+    unit_of_measurement: "s"
+    icon: mdi:counter
+
+-   name: "MVHR Away Indicator"
+    state_topic: "comfoair/away_indicator"
+
+-   name: "MVHR Operating Mode"
+    state_topic: "comfoair/operating_mode"
+
+-   name: "MVHR Bypass Activation Mode"
+    state_topic: "comfoair/bypass_activation_mode"
+
+-   name: "MVHR Temp Profile"
+    state_topic: "comfoair/temp_profile"
+

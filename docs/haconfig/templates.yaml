@@ -1,0 +1,42 @@
+    sensors:
+      mvhr_fan_speed_text:
+        friendly_name: "MVHR Ventilation Speed Text"
+        value_template: >-
+          {% set mapper =  {
+            '0' : 'Speed 0 (Away)',
+            '1' : 'Speed 1',
+            '2' : 'Speed 2 (Default)',
+            '3' : 'Speed 3 (Boost)' } %}
+          {% set state = states('sensor.mvhr_supply_fan_user_speed') %}
+          {{ mapper[state] if state in mapper else 'Unknown' }}
+
+      mvhr_operating_mode_text:
+        friendly_name: "MVHR Operating Mode Text"
+        value_template: >-
+          {% set mapper =  {
+            'limited_manual' : 'Limited Manual',
+            'auto' : 'Auto',
+            'unlimited_manual' : 'Unlimited Manual' } %}
+          {% set state = states('sensor.mvhr_operating_mode') %}
+          {{ mapper[state] if state in mapper else 'Unknown' }}
+
+      mvhr_bypass_activation_mode_text:
+        friendly_name: "MVHR Bypass Activation Mode Text"
+        value_template: >-
+          {% set mapper =  {
+            'auto' : 'Auto',
+            'activated' : 'Manually Activated',
+            'deactivated' : 'Manually Deactivated' } %}
+          {% set state = states('sensor.mvhr_bypass_activation_mode') %}
+          {{ mapper[state] if state in mapper else 'Unknown' }}
+
+      mvhr_temperature_profile:
+        friendly_name: "MVHR Temperature Profile Text"
+        value_template: >-
+          {% set mapper =  {
+            'auto' : 'Normal (Auto)',
+            'cold' : 'Cold',
+            'warm' : 'Warm' } %}
+          {% set state = states('sensor.mvhr_temp_profile') %}
+          {{ mapper[state] if state in mapper else 'Unknown' }}
+

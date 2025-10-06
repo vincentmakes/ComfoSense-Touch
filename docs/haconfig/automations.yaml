@@ -1,0 +1,85 @@
+- id: "12345"
+  alias: "MVHR Speed Select Publish"
+  trigger:
+    platform: state
+    entity_id: sensor.mvhr_speed_select_state
+  action:
+    service: mqtt.publish
+    data_template:
+      topic: >
+        {% if states('sensor.mvhr_speed_select_state') == 'Speed 0 (Away)' %}
+          comfoair/commands/ventilation_level_0
+        {% elif states('sensor.mvhr_speed_select_state') == 'Speed 1' %}
+          comfoair/commands/ventilation_level_1
+        {% elif states('sensor.mvhr_speed_select_state') == 'Speed 2 (Default)' %}
+          comfoair/commands/ventilation_level_2
+        {% elif states('sensor.mvhr_speed_select_state') == 'Speed 3 (Boost)' %}
+          comfoair/commands/ventilation_level_3
+        {% else %}
+          comfoair/commands/ventilation_level_2
+        {% endif %}
+      payload: "on"
+
+- id: "12346"
+  alias: "MVHR Speed Select Update"
+  trigger:
+    platform: state
+    entity_id: sensor.mvhr_supply_fan_user_speed
+  action:
+    service: input_select.select_option
+    data_template:
+      entity_id: input_select.mvhr_ventilation_speed
+      option: >
+        {% if states('sensor.mvhr_supply_fan_user_speed') == "0" %}
+          Speed 0 (Away)
+        {% elif states('sensor.mvhr_supply_fan_user_speed') == "1" %}
+          Speed 1
+        {% elif states('sensor.mvhr_supply_fan_user_speed') == "2" %}
+          Speed 2 (Default)
+        {% elif states('sensor.mvhr_supply_fan_user_speed') == "3" %}
+          Speed 3 (Boost)
+        {% else %}
+          Speed 2 (Default)
+        {% endif %}
+
+- id: "12347"
+  alias: "MVHR Bypass Toggle Publish"
+  trigger:
+    platform: state
+    entity_id: sensor.mvhr_bypass_select_state
+  action:
+    service: mqtt.publish
+    data_template:
+      topic: >
+        {% if states('sensor.mvhr_bypass_select_state') == 'on' %}
+          comfoair/commands/bypass_activate_1h
+        {% elif states('sensor.mvhr_bypass_select_state') == 'off' %}
+          comfoair/commands/bypass_deactivate_1h
+        {% else %}
+          comfoair/commands/bypass_deactivate_1h
+        {% endif %}
+      payload: "on"
+
+
+- id: "12348"
+  alias: "MVHR Bypass Toggle Update"
+  trigger:
+    platform: state
+    entity_id: sensor.mvhr_bypass_open_factor
+  action:
+    - choose:
+      - conditions:
+        - condition: numeric_state
+          entity_id: sensor.mvhr_bypass_open_factor
+          above: 84
+        sequence:
+          - service: input_boolean.turn_on
+            entity_id: input_boolean.mvhr_bypass_on_off
+      - conditions:
+        - condition: numeric_state
+          entity_id: sensor.mvhr_bypass_open_factor
+          below: 85
+        sequence:
+          - service: input_boolean.turn_off
+            entity_id: input_boolean.mvhr_bypass_on_off
+
