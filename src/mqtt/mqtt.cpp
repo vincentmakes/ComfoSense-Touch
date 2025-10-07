@@ -11,7 +11,7 @@ WiFiClient wifiClient;
     this->client = PubSubClient(wifiClient);
   }
 
-  void MQTT::subscribeTo(char* const topic, MQTT_CALLBACK_SIGNATURE) {
+  void MQTT::subscribeTo(const char* topic, MQTT_CALLBACK_SIGNATURE) {
     this->callbackMap[topic] = callback;
     if (this->client.connected()) {
       this->subscribeToTopics();
@@ -20,7 +20,7 @@ WiFiClient wifiClient;
 
   void MQTT::setup() {
     this->client.setServer(MQTT_HOST, MQTT_PORT);
-    this->client.setCallback([this](char * topic, unsigned char* payload, unsigned int length){
+    this->client.setCallback([this](char* topic, unsigned char* payload, unsigned int length){
       Serial.println("-------new message from broker-----");
       Serial.print("channel:");
       Serial.println(topic);
@@ -36,7 +36,7 @@ WiFiClient wifiClient;
     client.loop();
   }
 
-  void MQTT::writeToTopic(char * topic, char * payload) {
+  void MQTT::writeToTopic(const char* topic,const char* payload) {
     this->ensureConnected();
     this->client.publish(topic, payload);
   }
