@@ -213,12 +213,8 @@ void setup() {
       Serial.println("✗ No touch detected during test");
     }
     
-    // Register with LVGL
-    lv_indev_t *touch_indev = lv_indev_create();
-    lv_indev_set_type(touch_indev, LV_INDEV_TYPE_POINTER);
-    lv_indev_set_read_cb(touch_indev, lvgl_touch_read_cb);
-    
-    Serial.println("Touch registered with LVGL");
+    // DON'T register with LVGL yet - do it after GUI_init()
+    Serial.println("Touch ready (will register after GUI init)");
   } else {
     Serial.println("ERROR: Touch initialization failed");
   }
@@ -231,6 +227,21 @@ void setup() {
   // Force initial render
   lv_timer_handler();
   delay(100);
+  
+  // NOW register touch AFTER GUI is loaded
+  Serial.println("Registering touch input device...");
+  lv_indev_t *touch_indev = lv_indev_create();
+  lv_indev_set_type(touch_indev, LV_INDEV_TYPE_POINTER);
+  lv_indev_set_read_cb(touch_indev, lvgl_touch_read_cb);
+  Serial.println("Touch registered with LVGL");
+  
+  // Force a few LVGL updates to initialize touch
+  for (int i = 0; i < 5; i++) {
+    lv_timer_handler();
+    delay(10);
+  }
+  
+  Serial.println("Touch should now be active - try touching the screen!");
   
   // 5. Initialize subsystems
   Serial.println("\nInitializing subsystems...");
