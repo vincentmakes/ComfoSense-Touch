@@ -154,6 +154,8 @@ void GUI_initGlobalStyles () {
     lv_style_set_text_letter_space( &GUI_Style__class_i65QyXalE1u3QM__, 0 );
     lv_style_set_text_line_space( &GUI_Style__class_i65QyXalE1u3QM__, 10 );
     lv_style_set_text_align( &GUI_Style__class_i65QyXalE1u3QM__, LV_TEXT_ALIGN_LEFT );
+    lv_style_set_pad_left( &GUI_Style__class_i65QyXalE1u3QM__, 15 );
+    lv_style_set_pad_right( &GUI_Style__class_i65QyXalE1u3QM__, 15 );
 
     lv_style_init( &GUI_Style__class_5qfkyxJclqQGgq__ );
     lv_style_set_bg_color( &GUI_Style__class_5qfkyxJclqQGgq__, lv_color_make(0,199,255) );

@@ -50,6 +50,7 @@ void GUI_initScreen__screen () {
       lv_obj_set_align( GUI_Button__screen__BSpeedMinus, LV_ALIGN_CENTER );
       lv_obj_set_pos( GUI_Button__screen__BSpeedMinus, 20, 20 );
       lv_obj_set_size( GUI_Button__screen__BSpeedMinus, 150, 66 );
+      lv_obj_add_event_cb( GUI_Button__screen__BSpeedMinus, GUI_event__Button__screen__BSpeedMinus__Clicked, LV_EVENT_CLICKED, NULL );
 
        GUI_Image__screen__minus = lv_img_create( GUI_Button__screen__BSpeedMinus );
        lv_obj_add_flag( GUI_Image__screen__minus, LV_OBJ_FLAG_ADV_HITTEST );

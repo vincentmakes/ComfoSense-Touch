@@ -64,6 +64,9 @@ comfoair::WiFi *wifi = nullptr;
 comfoair::MQTT *mqtt = nullptr;
 comfoair::OTA *ota = nullptr;
 
+// Global touch input device for manual polling
+static lv_indev_t *global_touch_indev = nullptr;
+
 // TCA9554 I2C expander control
 static void tca_write(uint8_t reg, uint8_t val) {
   Wire.beginTransmission(TCA9554_ADDR);
@@ -81,15 +84,13 @@ static void init_expander() {
   
   // Power-on sequence
   tca_write(TCA_REG_OUTPUT, 0x00);  // All low - reset INCLUDING touch
-  delay(50);  // Hold reset longer
+  delay(50);
   tca_write(TCA_REG_OUTPUT, 0x08);  // LCD reset high
   delay(50);
   tca_write(TCA_REG_OUTPUT, 0x0C);  // Backlight on
   delay(50);
   tca_write(TCA_REG_OUTPUT, 0x0E);  // Touch reset high - ENABLE TOUCH
-  delay(150);  // Longer delay for GT911 to fully initialize after reset
-  
-  // Keep Wire active - don't end it
+  delay(150);  // Delay for GT911 to initialize
 }
 
 // LVGL flush callback
@@ -105,17 +106,6 @@ static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px
 static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   static int16_t last_x = 0;
   static int16_t last_y = 0;
-  static uint32_t call_count = 0;
-  static uint32_t last_debug = 0;
-  
-  call_count++;
-  
-  // Debug: print call count every 2 seconds to verify callback is being called
-  if (millis() - last_debug > 2000) {
-    Serial.printf("Touch callback called %d times in 2s\n", call_count);
-    call_count = 0;
-    last_debug = millis();
-  }
   
   int16_t x[5], y[5];
   uint8_t touched = touch.getPoint(x, y, 5);
@@ -126,9 +116,6 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     last_y = y[0];
     data->point.x = last_x;
     data->point.y = last_y;
-    
-    // Always print when touch is detected
-    Serial.printf(">>> TOUCH PRESSED: X=%d, Y=%d <<<\n", last_x, last_y);
   } else {
     data->state = LV_INDEV_STATE_RELEASED;
     data->point.x = last_x;
@@ -179,71 +166,51 @@ void setup() {
                          LV_DISPLAY_RENDER_MODE_PARTIAL);
   lv_display_set_flush_cb(disp, lvgl_flush_cb);
   
-  // Initialize touch controller
+  // 4. Initialize touch controller
   Serial.println("Initializing touch...");
   
-  // Wire is already initialized by init_expander
-  // GT911 should be out of reset now (EXIO1 is HIGH)
-  
-  // Configure interrupt pin as input
   pinMode(TOUCH_INT, INPUT);
+  touch.setPins(-1, TOUCH_INT);
   
-  // Set pins for GT911
-  touch.setPins(-1, TOUCH_INT);  // No reset pin (controlled by expander), use interrupt pin
-  
-  // Initialize GT911 using the existing Wire instance
   if (touch.begin(Wire, GT911_SLAVE_ADDRESS_L, TOUCH_SDA, TOUCH_SCL)) {
-    Serial.println("Touch initialized");
+    Serial.println("Touch initialized successfully");
     touch.setMaxTouchPoint(5);
-    
-    // Test touch immediately
-    Serial.println("Testing touch - please touch screen for 3 seconds...");
-    bool touch_detected = false;
-    for (int i = 0; i < 15; i++) {
-      int16_t test_x[5], test_y[5];
-      uint8_t test_touched = touch.getPoint(test_x, test_y, 5);
-      if (test_touched > 0) {
-        Serial.printf("✓ Touch works! X=%d, Y=%d\n", test_x[0], test_y[0]);
-        touch_detected = true;
-      }
-      delay(200);
-    }
-    
-    if (!touch_detected) {
-      Serial.println("✗ No touch detected during test");
-    }
-    
-    // DON'T register with LVGL yet - do it after GUI_init()
-    Serial.println("Touch ready (will register after GUI init)");
   } else {
     Serial.println("ERROR: Touch initialization failed");
   }
   
-  // 4. Load GUI
+  // 5. Load GUI
   Serial.println("Loading GUI...");
   GUI_init();
   Serial.println("GUI loaded");
+  
+  // Initialize GUI displays (moved to GUI_Events.c)
+  GUI_init_fan_speed_display();
+  GUI_init_dropdown_styling();
   
   // Force initial render
   lv_timer_handler();
   delay(100);
   
-  // NOW register touch AFTER GUI is loaded
+  // 6. Register touch input device AFTER GUI is loaded
   Serial.println("Registering touch input device...");
+  lv_display_t *disp_touch = lv_display_get_default();
+  
   lv_indev_t *touch_indev = lv_indev_create();
   lv_indev_set_type(touch_indev, LV_INDEV_TYPE_POINTER);
   lv_indev_set_read_cb(touch_indev, lvgl_touch_read_cb);
+  lv_indev_set_display(touch_indev, disp_touch);
+  
+  global_touch_indev = touch_indev;
   Serial.println("Touch registered with LVGL");
   
-  // Force a few LVGL updates to initialize touch
+  // Force a few LVGL updates
   for (int i = 0; i < 5; i++) {
     lv_timer_handler();
     delay(10);
   }
   
-  Serial.println("Touch should now be active - try touching the screen!");
-  
-  // 5. Initialize subsystems
+  // 7. Initialize subsystems
   Serial.println("\nInitializing subsystems...");
   
   wifi = new comfoair::WiFi();
@@ -262,12 +229,28 @@ void setup() {
 }
 
 void loop() {
+  static uint32_t last_touch_read = 0;
+  
+  // Call lv_timer_handler() to process LVGL events
   lv_timer_handler();
   
+  // Process any pending display refreshes (from GUI event callbacks)
+  GUI_process_display_refresh();
+  
+  // Manually read touch input every 10ms (CRITICAL for touch to work)
+  if (millis() - last_touch_read >= 10) {
+    if (global_touch_indev) {
+      lv_indev_read(global_touch_indev);
+    }
+    last_touch_read = millis();
+  }
+  
+  // Process subsystems
   if (wifi) wifi->loop();
   if (mqtt) mqtt->loop();
   if (comfo) comfo->loop();
   if (ota) ota->loop();
   
-  delay(5);
+  // Small delay to allow other tasks
+  delay(1);
 }
