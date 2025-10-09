@@ -34,23 +34,16 @@ void TimeManager::setup() {
   tzset();
   
   Serial.println("NTP time sync configured for Paris timezone");
-  Serial.println("Waiting for time sync...");
+  Serial.println("Time will sync in background...");
   
-  // Initial sync attempt with retries
-  for (int i = 0; i < 10 && !time_synced; i++) {
-    syncTime();
-    if (!time_synced) {
-      Serial.printf("Retry %d/10...\n", i + 1);
-      delay(1000);
-    }
-  }
+  // Don't wait for sync in setup - let it happen in loop()
 }
 
 void TimeManager::loop() {
   unsigned long now = millis();
   
   // Update display every minute
-  if (now - last_update >= UPDATE_INTERVAL || last_update == 0) {
+  if (now - last_update >= UPDATE_INTERVAL) {
     last_update = now;
     
     // Try to sync if not already synced
