@@ -4,7 +4,7 @@
 #include "commands.h"
 
 #define min(a,b) ((a) < (b) ? (a): (b))
-#define DEBUG true
+#define DEBUG false
 void printFrame(CAN_FRAME *message)
 {
     Serial.print(message->id, HEX);
