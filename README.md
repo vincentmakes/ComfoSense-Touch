@@ -54,6 +54,55 @@ First, create a "secrets.h" file at the top of this repository, with the configu
 #define WIFI_PASS "WIRELESS_PASSWORD"
 ```
 
+
+
+### Advanced explanations and troubleshooting I went through
+Getting something displayed on those Waveshare devices was extremly challenging : 
+1. There's no examples using PlatformIO configuration, only Arduino ones 
+2. The documentation exists, but one has to dig through it thoroughly at hardware level in order to get the accurate information and in some cases below it's simply incorrect.
+
+The LCD screen is driven via I/O extender using a TCA9554 chip from TI. Looking at the schematic we can see that the Pin A0, A1 and A2 are at ground. From TI documentation of the chip we can deduct that the address is 0x20 (0x2Y where Y is the Hex conversion of A2/A1/A0 which in our case is 0b000)
+
+<img width="870" height="449" alt="image" src="https://github.com/user-attachments/assets/d7470f56-3d55-43a3-beb4-638132297861" />
+
+
+The schematics also displays a table with all the PINs which is different from the generic one on the Wiki page: https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-4/ESP32-S3-Touch-LCD-4_V3.0.pdf
+I have used the working Arduino examples as a reference as some PINs are not referenced correctly in the schematics nor in the Wiki Page (GX Pins seems correct but RX and BX are not) and this has caused me a lot of headaches.
+
+
+```yaml Arduino_DataBus *bus = new Arduino_SWSPI(
+    GFX_NOT_DEFINED /* DC */, 42 /* CS */,
+    2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
+
+Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(
+    40 /* DE */, 39 /* VSYNC */, 38 /* HSYNC */, 41 /* PCLK */,
+    46 /* R0 */, 3 /* R1 */, 8 /* R2 */, 18 /* R3 */, 17 /* R4 */,
+    14 /* G0 */, 13 /* G1 */, 12 /* G2 */, 11 /* G3 */, 10 /* G4 */, 9 /* G5 */,
+    5 /* B0 */, 45 /* B1 */, 48 /* B2 */, 47 /* B3 */, 21 /* B4 */,
+    1 /* hsync_polarity */, 10 /* hsync_front_porch */, 8 /* hsync_pulse_width */, 50 /* hsync_back_porch */,
+    1 /* vsync_polarity */, 10 /* vsync_front_porch */, 8 /* vsync_pulse_width */, 20 /* vsync_back_porch */);
+ ```
+
+If you have a different version, you would need to double check those items and adjust main.cpp if necessary.
+
+
+
+
+
+
+
+
+## TODO
+The screen is way to bright to be used permanently as a replacement of the ComfoTouch C67
+Dimming of the backlight is not possible in the current state and will require to wire physically the PIN IO42 (for instance) to the PIN EXIO2 (BL_EN) of the I2C chip. This is because it's also connected to the CTRL PIN of the chip driving the LCD (AP3032KTR) This means:
+1. The pin EXIO2 BL_EN of the I/O expander has to be switched to input instead of output (by default it is high level output to switch the backlight on)
+   ```yaml
+   tca_write(TCA_REG_CONFIG, 0xF5); // instead of 0xF1 (EXIO7-0 = 0b11110001 / 0xF1 -> 0b11110101 / 0xF5)
+   ```
+3. R28 and C25 have to be removed surgically
+4. We have to write some code to control the brightness of the screen via a PWM signal using IO42
+
+
 ## MQTT commands to interact with the ventilation unit
 This software publishes lots of values to the MQTT broker (nearly 40 in total), but it is also subscribed to the configured MQTT broker listening for the following topics being published below the `${MQTT_PREFIX}/commands/${KEY}` path, the available commands (${KEY} value) being :
 
@@ -145,10 +194,4 @@ Note I made the decision to consider the bypass on when open factor to be 85 % o
 
 
 Note, as it is also the case for the fan speed set through MQTT, after the two hours have passed since setting the fan speed manually (or one hour for the bypass state), the MVHR unit should automatically fall back to auto mode for the given function (fan or bypass) with no need for human intervention.
-
-
-## TODO
-
-Nothing I can think so far.
-
 
