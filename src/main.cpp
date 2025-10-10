@@ -8,6 +8,7 @@
 #include "comfoair/comfoair.h"
 #include "mqtt/mqtt.h"
 #include "ota/ota.h"
+#include "time/time_manager.h"
 #include "lvgl.h"
 #include "ui/GUI.h"
 
@@ -63,6 +64,7 @@ comfoair::ComfoAir *comfo = nullptr;
 comfoair::WiFi *wifi = nullptr;
 comfoair::MQTT *mqtt = nullptr;
 comfoair::OTA *ota = nullptr;
+comfoair::TimeManager *timeMgr = nullptr;
 
 // Global touch input device for manual polling
 static lv_indev_t *global_touch_indev = nullptr;
@@ -217,11 +219,13 @@ void setup() {
   mqtt = new comfoair::MQTT();
   comfo = new comfoair::ComfoAir();
   ota = new comfoair::OTA();
+  timeMgr = new comfoair::TimeManager();
   
   wifi->setup();
   mqtt->setup();
   comfo->setup();
   ota->setup();
+  timeMgr->setup();  // This will sync time and do initial display update
   
   Serial.println("\n=== System Ready ===");
   Serial.printf("Free heap: %d KB\n", ESP.getFreeHeap() / 1024);
@@ -250,6 +254,7 @@ void loop() {
   if (mqtt) mqtt->loop();
   if (comfo) comfo->loop();
   if (ota) ota->loop();
+  if (timeMgr) timeMgr->loop();  // This updates time display every second
   
   // Small delay to allow other tasks
   delay(1);

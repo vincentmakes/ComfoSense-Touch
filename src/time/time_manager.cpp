@@ -1,143 +1,133 @@
 #include "time_manager.h"
-#include <time.h>
-#include <sys/time.h>
-#include "lwip/apps/sntp.h"
 #include "../ui/GUI.h"
+#include "../secrets.h"
+#include <WiFi.h>
 
 namespace comfoair {
 
-TimeManager::TimeManager() {
-  time_synced = false;
-  last_update = 0;
+TimeManager::TimeManager() : time_synced(false), last_update(0) {
 }
 
 void TimeManager::setup() {
-  Serial.println("Setting up NTP time sync...");
-  
-  // Set initial placeholder values
-  if (GUI_Label__screen__time) {
-    lv_label_set_text(GUI_Label__screen__time, "12:00");
-  }
-  if (GUI_Label__screen__date) {
-    lv_label_set_text(GUI_Label__screen__date, "1 Jan. 2025");
-  }
-  
-  // Configure NTP with longer timeout
-  sntp_setoperatingmode(SNTP_OPMODE_POLL);
-  sntp_setservername(0, "pool.ntp.org");
-  sntp_setservername(1, "time.nist.gov");
-  sntp_setservername(2, "time.google.com");
-  sntp_init();
-  
-  // Set timezone to Paris (CET/CEST)
-  setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
-  tzset();
-  
-  Serial.println("NTP time sync configured for Paris timezone");
-  Serial.println("Time will sync in background...");
-  
-  // Don't wait for sync in setup - let it happen in loop()
-}
-
-void TimeManager::loop() {
-  unsigned long now = millis();
-  
-  // Update display every minute
-  if (now - last_update >= UPDATE_INTERVAL) {
-    last_update = now;
+    Serial.println("TimeManager: Initializing...");
     
-    // Try to sync if not already synced
-    if (!time_synced) {
-      syncTime();
+    // Wait for WiFi connection
+    int retries = 0;
+    while (WiFi.status() != WL_CONNECTED && retries < 20) {
+        delay(500);
+        Serial.print(".");
+        retries++;
     }
     
-    // Update display
-    updateDisplay();
-  }
+    if (WiFi.status() == WL_CONNECTED) {
+        syncTime();
+    } else {
+        Serial.println("\nTimeManager: WiFi not connected, skipping time sync");
+    }
 }
 
 void TimeManager::syncTime() {
-  struct tm timeinfo;
-  
-  // Wait for valid time (year > 2020)
-  time_t now = time(nullptr);
-  if (now > 1577836800) { // Jan 1, 2020
-    if (getLocalTime(&timeinfo, 1000)) { // 1000ms timeout
-      time_synced = true;
-      Serial.println("✓ Time synchronized with NTP server");
-      Serial.printf("Current time: %02d:%02d:%02d on %d/%d/%d\n", 
-                    timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
-                    timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900);
-      return;
+    Serial.println("TimeManager: Syncing time with NTP...");
+    
+    // Configure NTP
+    configTime(3600, 3600, "pool.ntp.org", "time.nist.gov");
+    
+    // Wait for time to be set (max 10 seconds)
+    int retries = 0;
+    time_t now = 0;
+    struct tm timeinfo;
+    
+    while (retries < 20) {
+        time(&now);
+        localtime_r(&now, &timeinfo);
+        
+        if (timeinfo.tm_year > (2020 - 1900)) {
+            time_synced = true;
+            Serial.println("✓ Time synchronized");
+            
+            // Log the current time
+            char time_str[64];
+            strftime(time_str, sizeof(time_str), "%H:%M on %d/%m/%Y", &timeinfo);
+            Serial.printf("Time: %s\n", time_str);
+            
+            // Do initial display update
+            updateDisplay();
+            break;
+        }
+        
+        delay(500);
+        retries++;
     }
-  }
-  
-  Serial.println("✗ Waiting for NTP sync...");
+    
+    if (!time_synced) {
+        Serial.println("✗ Time sync failed");
+    }
 }
 
 String TimeManager::getTimeString() {
-  if (!time_synced) {
-    return "12:00";
-  }
-  
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo, 100)) {
-    return "12:00";
-  }
-  
-  char timeStr[6];
-  sprintf(timeStr, "%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
-  return String(timeStr);
+    time_t now;
+    struct tm timeinfo;
+    
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    
+    char time_str[16];
+    strftime(time_str, sizeof(time_str), "%H:%M", &timeinfo);
+    
+    return String(time_str);
 }
 
 String TimeManager::getDateString() {
-  if (!time_synced) {
-    return "1 Jan. 2025";
-  }
-  
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo, 100)) {
-    return "1 Jan. 2025";
-  }
-  
-  // Month names in English
-  const char* months[] = {
-    "Jan.", "Feb.", "March", "April", "May", "June",
-    "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec."
-  };
-  
-  char dateStr[20];
-  sprintf(dateStr, "%d %s %d", 
-          timeinfo.tm_mday, 
-          months[timeinfo.tm_mon], 
-          timeinfo.tm_year + 1900);
-  
-  return String(dateStr);
-}
-
-bool TimeManager::isTimeSynced() {
-  return time_synced;
+    time_t now;
+    struct tm timeinfo;
+    
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    
+    char date_str[32];
+    strftime(date_str, sizeof(date_str), "%d %b. %Y", &timeinfo);
+    
+    return String(date_str);
 }
 
 void TimeManager::updateDisplay() {
-  // Get formatted strings (will return defaults if not synced)
-  String timeStr = getTimeString();
-  String dateStr = getDateString();
-  
-  // Update LVGL labels - use simple update without manual invalidation
-  if (GUI_Label__screen__time) {
+    if (!time_synced) {
+        return;
+    }
+    
+    String timeStr = getTimeString();
+    String dateStr = getDateString();
+    
+    Serial.printf("TimeManager: Updating display - %s - %s\n", 
+                  timeStr.c_str(), dateStr.c_str());
+    
+    // **Use Strategy 5 pattern that works:**
+    // 1. Set the text
     lv_label_set_text(GUI_Label__screen__time, timeStr.c_str());
-  }
-  
-  if (GUI_Label__screen__date) {
     lv_label_set_text(GUI_Label__screen__date, dateStr.c_str());
-  }
-  
-  // Don't call GUI_request_display_refresh() - let lv_timer_handler() do it naturally
-  
-  if (time_synced) {
-    Serial.printf("Display updated: %s - %s\n", timeStr.c_str(), dateStr.c_str());
-  }
+    
+    // 2. Request display refresh (this calls lv_refr_now())
+    GUI_request_display_refresh();
+    
+    // 3. Invalidate the objects
+    lv_obj_invalidate(GUI_Label__screen__time);
+    lv_obj_invalidate(GUI_Label__screen__date);
+    
+    Serial.println("TimeManager: Display update complete");
+}
+
+void TimeManager::loop() {
+    // Only update if time is synced
+    if (!time_synced) {
+        return;
+    }
+    
+    // Update display every second
+    unsigned long now = millis();
+    if (now - last_update >= UPDATE_INTERVAL) {
+        updateDisplay();
+        last_update = now;
+    }
 }
 
 } // namespace comfoair
