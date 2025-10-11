@@ -30,7 +30,7 @@ This means this display can be used also by people who are not interested in the
 
 Prerequisites:
 
-* Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver)
+* Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 
 Not tested yet but I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
 Our device consumes at best 1.2W so that should be plenty which means is can be connected directly in place of the ComfoSense C67
@@ -105,14 +105,11 @@ The schematics mentions the GPIO42 is connected to R40 but this is incorrect - t
 
 
 ## TODO
-The screen is way to bright to be used permanently as a replacement of the ComfoTouch C67
-Dimming of the backlight is not possible in the current state and will require to wire physically the PIN IO42 (for instance) to the PIN EXIO2 (BL_EN) of the I2C chip. This is because it's also connected to the CTRL PIN of the chip driving the LCD (AP3032KTR) This means:
-1. The pin EXIO2 BL_EN of the I/O expander has to be switched to input instead of output (by default it is high level output to switch the backlight on)
-   ```yaml
-   tca_write(TCA_REG_CONFIG, 0xF5); // instead of 0xF1 (EXIO7-0 = 0b11110001 / 0xF1 -> 0b11110101 / 0xF5)
-   ```
-3. R28 and C25 have to be removed surgically
-4. We have to write some code to control the brightness of the screen via a PWM signal using IO42
+1. Wifi Manager and MQTT Manager to set those up from a mobile
+2. Brightness
+3. Filter Warning style
+4. Sensors data fetching and styling
+5. Full CAN integration
 
 
 ## MQTT commands to interact with the ventilation unit
