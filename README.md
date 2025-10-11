@@ -88,7 +88,9 @@ If you have a different version, you would need to double check those items and 
 
 ### Dimming the screen
 Dimming of the screen is an option which can be enabled in main.cpp by switching the DIMMING flag to true:  #define DIMMING true
-Additionnally, it requires hardware modifications by adding a 91K resistor in the R36 location and bridging or putting a 0 ohm resistor in R40 location
+Additionnally, it requires hardware modifications by adding a size 0402 91K resistor in the R36 location and bridging or putting a 0 ohm resistor in R40 location.
+
+Those are really tiny resistors which might be challenging without a microscope
 
 **High level**
 <img width="540" height="545" alt="R40_R36_location_high" src="https://github.com/user-attachments/assets/8ae10025-3f91-47ae-b9f1-57c06bc5fbed" />
