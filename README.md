@@ -31,13 +31,10 @@ This means this display can be used also by people who are not interested in the
 Prerequisites:
 
 * Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver)
-* A 230V->12V DC mini power supply : this is needed as the 12V from ComfoAir supplies a max of 40mA which is not enough to power the screen + ESP32
 
-### Very Important
-* Do not connect the 12V of the power supply to the one of the MVHR nor to the Waveshare ESP32
-* Connect the Ground of the power supply to the one of the MVHR.
-### Wiring
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/901908b0-c0ff-4c94-a58b-7c68779ed00d" />
+Not tested yet but I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
+Our device consumes at best 1.2W so that should be plenty which means is can be connected directly in place of the ComfoSense C67
+<img width="902" height="309" alt="Screenshot 2025-10-11 at 14 16 59" src="https://github.com/user-attachments/assets/860e895b-08bd-40b6-a3f8-3b2253ed920b" />
 
 
 ## Flashing the firmware in the ESP32 development board
