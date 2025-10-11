@@ -16,7 +16,7 @@ public:
 private:
     bool time_synced;
     unsigned long last_update;
-    static const unsigned long UPDATE_INTERVAL = 1000; // Update every 1 second
+    static const unsigned long UPDATE_INTERVAL = 15000; // Update every 15 second
     
     void syncTime();
     String getTimeString();

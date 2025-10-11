@@ -12,6 +12,14 @@
 #include "lvgl.h"
 #include "ui/GUI.h"
 
+#define DIMMING false  //set to true to enable dimmming of the screen. 
+//Important to note this does require hardware modification which includes soldering of very tiny resistors
+// PWM dimming of AP3032 via FB injection (IO16 → R40(0R) → C27(100nF) → GND, R36=91k to FB)
+const int BL_PWM_PIN = 16;
+const int LEDC_CH     = 1;        // any free channel 0..7
+const int LEDC_BITS   = 8;        // 0..255
+const int LEDC_FREQ   = 2000;     // 1–5 kHz works well with 100 nF RC
+
 // Display configuration
 #define SCREEN_WIDTH   480
 #define SCREEN_HEIGHT  480
@@ -125,6 +133,15 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   }
 }
 
+// Brightness 0..100% (0% = backlight off/very dim, 100% = bright)
+void setBacklightPct(float pct) {
+  if (pct < 0)   pct = 0;
+  if (pct > 100) pct = 100;
+  // Inverted mapping: higher duty -> dimmer. Map 100% bright -> low duty.
+  int duty = (int)round((100.0f - pct) * ((1 << LEDC_BITS) - 1) / 100.0f);
+  ledcWrite(LEDC_CH, duty);
+}
+
 void setup() {
   Serial.begin(115200);
   delay(500);
@@ -194,6 +211,16 @@ void setup() {
   lv_timer_handler();
   delay(100);
   
+  //Dimming if enabled
+  #ifdef DIMMING
+  ledcSetup(LEDC_CH, LEDC_FREQ, LEDC_BITS);
+  ledcAttachPin(BL_PWM_PIN, LEDC_CH);
+
+  // Start “a bit dimmer” than full, say 70% brightness:
+  setBacklightPct(70);
+  #endif
+
+
   // 6. Register touch input device AFTER GUI is loaded
   Serial.println("Registering touch input device...");
   lv_display_t *disp_touch = lv_display_get_default();
