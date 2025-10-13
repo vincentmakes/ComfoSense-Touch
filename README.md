@@ -113,34 +113,34 @@ I've recorded a serie of steps (Fan speed 0->3; Temp Heat->Cool->Normal) and pla
 
 Here's how to set that up:
 1. Install CAN utils on the VM:
-    ```
+```shell
 sudo apt update
 sudo apt install can-utils
-   ```
+```
 
 
 Plug your USB to CAN device into your laptop and make sure it is passed to the VM
 
 Identify the CAN Interface: In the Linux terminal, list the network interfaces to see if your CAN device is recognized. It will likely appear as can0.
-  ```
+```shell
 ip link show
-  ```
+```
 
 Configure and Bring Up the CAN Interface: You'll need to set the bitrate for your CAN bus. For example, for a 125kbps bus:
-  ```
+```shell
 sudo ip link set can0 type can bitrate 125000
 sudo ip link set up can0
-  ```
+```
 
 Capture CAN Signals: Use the candump command to capture CAN traffic and save it to a log file.
-  ```
+```shell
 candump can0 -l my_can_capture.log
-  ```
+```
 
 Replay CAN Signals: Use the canplayer command to replay the captured signals from the log file.
-  ```
+```shell
 canplayer -I my_can_capture.log
-  ```
+```
 
 ## TODO
 1. Wifi Manager and MQTT Manager to set those up from a mobile
