@@ -155,6 +155,25 @@ canplayer -I my_can_capture.log
 5. Full CAN integration, including error messages
 6. Automated testing / Comfoair emulation
 
+## Physical Mounting on the wall
+
+The mounting consists of 3 main part : two oversized (150%) Garmin style mount (male and female) and a decorative frame fixed by friction fit (to be improved)
+There are also 4 spacers which I couldn't print in one block with the rest.
+
+### Exploded View
+<img width="630" height="427" alt="Screenshot 2025-10-13 at 21 13 38" src="https://github.com/user-attachments/assets/bc6cec2d-78e7-4756-b521-b968adbb318a" />
+<img width="616" height="444" alt="Screenshot 2025-10-13 at 21 13 54" src="https://github.com/user-attachments/assets/d7627883-ff95-4f8a-a9a3-e4513db0246c" />
+
+
+
+### Partially installed View
+<img width="401" height="505" alt="Screenshot 2025-10-13 at 21 03 39" src="https://github.com/user-attachments/assets/d05f1e82-8608-4693-9c84-68b03b4bfe2a" />
+<img width="452" height="532" alt="Screenshot 2025-10-13 at 21 04 36" src="https://github.com/user-attachments/assets/c397266f-36fe-41c8-ada1-e499f48246b9" />
+<img width="406" height="470" alt="Screenshot 2025-10-13 at 21 04 50" src="https://github.com/user-attachments/assets/19eaab50-7157-47e3-8a91-93aab00d5241" />
+<img width="462" height="487" alt="Screenshot 2025-10-13 at 21 05 23" src="https://github.com/user-attachments/assets/361ac999-a9c5-406a-a605-eae045d39541" />
+
+It will fit into the existing standard junction box (Swiss size, 81mm diam / 57mm in between mounting screws, 4 sides)
+
 
 ## MQTT commands to interact with the ventilation unit
 This software publishes lots of values to the MQTT broker (nearly 40 in total), but it is also subscribed to the configured MQTT broker listening for the following topics being published below the `${MQTT_PREFIX}/commands/${KEY}` path, the available commands (${KEY} value) being :
