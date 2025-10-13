@@ -4,7 +4,8 @@ This software is inspired by the work of many others who successfully managed to
 
 This new device is meant to not only replace the ComfoConnect but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir.
 
-<img width="150" alt="image" src="https://github.com/user-attachments/assets/686ae7ac-9415-4ca7-90f9-afdd3ad098ec" /> ---> <img width="300" alt="PoC_MVHR_Touch" src="https://github.com/user-attachments/assets/66cf5a05-3d2b-431a-93be-b21755b78d61" />
+<img width="300" alt="PoC_MVHR_Touch" src="https://github.com/user-attachments/assets/7fb632ff-633f-4125-abdc-4f15b32e9081" />
+
 
 
 The high level requirements are:
@@ -60,7 +61,8 @@ Getting something displayed on those Waveshare devices was extremly challenging 
 
 The LCD screen is driven via I/O extender using a TCA9554 chip from TI. Looking at the schematic we can see that the Pin A0, A1 and A2 are at ground. From TI documentation of the chip we can deduct that the address is 0x20 (0x2Y where Y is the Hex conversion of A2/A1/A0 which in our case is 0b000)
 
-<img width="870" height="449" alt="image" src="https://github.com/user-attachments/assets/d7470f56-3d55-43a3-beb4-638132297861" />
+<img width="527" height="275" alt="Screenshot 2025-10-09 095513" src="https://github.com/user-attachments/assets/e492b7da-d0ac-4080-be31-0fbfc6d7e133" />
+
 
 
 The schematics also displays a table with all the PINs which is different from the generic one on the Wiki page: https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-4/ESP32-S3-Touch-LCD-4_V3.0.pdf
