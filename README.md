@@ -97,8 +97,9 @@ Those are really tiny resistors which might be challenging without a microscope
 
 **High level**  
 
+![ESP32-S3-LCD-4-details-intro](https://github.com/user-attachments/assets/a9e630cc-98de-408f-b94d-9fdce430dc17)
 
-<img width="540" height="545" alt="R40_R36_location_high" src="https://github.com/user-attachments/assets/8ae10025-3f91-47ae-b9f1-57c06bc5fbed" />
+
 
 
 **Detailed location**  
