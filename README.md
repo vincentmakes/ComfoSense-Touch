@@ -91,11 +91,11 @@ Additionnally, it requires hardware modifications by adding a size 0402 91K resi
 
 Those are really tiny resistors which might be challenging without a microscope
 
-**High level**
+**High level**  
 <img width="540" height="545" alt="R40_R36_location_high" src="https://github.com/user-attachments/assets/8ae10025-3f91-47ae-b9f1-57c06bc5fbed" />
 
 
-**Detailed location**
+**Detailed location**  
 <img width="806" height="605" alt="R40_R36_location" src="https://github.com/user-attachments/assets/417e30bd-949f-44fe-9e23-f38e1de8ca89" />
 
 The schematics mentions the GPIO42 is connected to R40 but this is incorrect - tracing it back, I've found that it's GPIO16 which is connected. Going through the documentation of the AP3032, we can drive it via PWM which is basically converted into a good enough DC signal to dim the screen
