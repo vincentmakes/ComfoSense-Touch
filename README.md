@@ -18,7 +18,7 @@ The high level requirements are:
 
 
 
-This version has the following features:
+This version has the following features and tackle the issues below:
 1. Wifi connection close to the Comfoair can be limited due to its location (typically the attic or the cellar), hence bringing the IoT device closer to a central area in the house (where the ComfoSense display controller normally sits) mitigate this.
 2. Better user interface than the one ComfoSense, with all basic functions exposed in one screen
 3. Provides exact number of days before filter change is needed (instead of the generic message Expect change of filter soon ... for 3 weeks)
@@ -54,7 +54,7 @@ First, create a "secrets.h" file at the top of this repository, with the configu
 
 
 
-### Advanced explanations and troubleshooting I went through
+## Advanced explanations and troubleshooting I went through
 Getting something displayed on those Waveshare devices was extremly challenging : 
 1. There's no examples using PlatformIO configuration, only Arduino ones 
 2. The documentation exists, but one has to dig through it thoroughly at hardware level in order to get the accurate information and in some cases below it's simply incorrect.
@@ -107,15 +107,48 @@ The schematics mentions the GPIO42 is connected to R40 but this is incorrect - t
 <img width="567" height="557" alt="Schematics_dimming" src="https://github.com/user-attachments/assets/feb8c6c6-6ca6-43b5-bcb8-9f7dacb31753" />
 
 
+### SIT 1 : ComfoAir emulation (0ne way)
+Testing is crucial for the CAN integration and since I didn't feel like debugging in the attic, nor hooking up and playing directly with the MVHR, I'm using a USB to CAN analyzer together with the CAN Utils suite on a VM.
+I've recorded a serie of steps (Fan speed 0->3; Temp Heat->Cool->Normal) and playing it back. Additionnally, the recording also capture sensor data from the ComfoAir which I can feed back into the ESP32.
+
+Here's how to set that up:
+1. Install CAN utils on the VM:
+    ```
+sudo apt update
+sudo apt install can-utils
+   ```
 
 
+Plug your USB to CAN device into your laptop and make sure it is passed to the VM
+
+Identify the CAN Interface: In the Linux terminal, list the network interfaces to see if your CAN device is recognized. It will likely appear as can0.
+  ```
+ip link show
+  ```
+
+Configure and Bring Up the CAN Interface: You'll need to set the bitrate for your CAN bus. For example, for a 125kbps bus:
+  ```
+sudo ip link set can0 type can bitrate 125000
+sudo ip link set up can0
+  ```
+
+Capture CAN Signals: Use the candump command to capture CAN traffic and save it to a log file.
+  ```
+candump can0 -l my_can_capture.log
+  ```
+
+Replay CAN Signals: Use the canplayer command to replay the captured signals from the log file.
+  ```
+canplayer -I my_can_capture.log
+  ```
 
 ## TODO
 1. Wifi Manager and MQTT Manager to set those up from a mobile
 2. Brightness
 3. Filter Warning style
 4. Sensors data fetching and styling
-5. Full CAN integration
+5. Full CAN integration, including error messages
+6. Automated testing / Comfoair emulation
 
 
 ## MQTT commands to interact with the ventilation unit
