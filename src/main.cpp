@@ -211,16 +211,6 @@ void setup() {
   lv_timer_handler();
   delay(100);
   
-  //Dimming if enabled
-  #ifdef DIMMING
-  ledcSetup(LEDC_CH, LEDC_FREQ, LEDC_BITS);
-  ledcAttachPin(BL_PWM_PIN, LEDC_CH);
-
-  // Start “a bit dimmer” than full, say 70% brightness:
-  setBacklightPct(70);
-  #endif
-
-
   // 6. Register touch input device AFTER GUI is loaded
   Serial.println("Registering touch input device...");
   lv_display_t *disp_touch = lv_display_get_default();
@@ -239,6 +229,15 @@ void setup() {
     delay(10);
   }
   
+  //Dimming if enabled
+  #ifdef DIMMING
+  ledcSetup(LEDC_CH, LEDC_FREQ, LEDC_BITS);
+  ledcAttachPin(BL_PWM_PIN, LEDC_CH);
+
+  // Start "a bit dimmer" than full, say 70% brightness:
+  setBacklightPct(70);
+  #endif
+
   // 7. Initialize subsystems
   Serial.println("\nInitializing subsystems...");
   
@@ -248,11 +247,20 @@ void setup() {
   ota = new comfoair::OTA();
   timeMgr = new comfoair::TimeManager();
   
+  // Start WiFi connection (non-blocking, max 20 sec)
+  // Note: WiFi icon will be initialized in first wifi->loop() call
   wifi->setup();
-  mqtt->setup();
-  comfo->setup();
-  ota->setup();
-  timeMgr->setup();  // This will sync time and do initial display update
+  
+  // Only initialize network-dependent services if WiFi connected
+  if (wifi->isConnected()) {
+    mqtt->setup();
+    ota->setup();
+    timeMgr->setup();  // This will sync time and do initial display update
+  } else {
+    Serial.println("Skipping MQTT, OTA, and time sync (no WiFi connection)");
+  }
+  
+  comfo->setup();  // CAN bus works without WiFi
   
   Serial.println("\n=== System Ready ===");
   Serial.printf("Free heap: %d KB\n", ESP.getFreeHeap() / 1024);
@@ -278,10 +286,14 @@ void loop() {
   
   // Process subsystems
   if (wifi) wifi->loop();
-  if (mqtt) mqtt->loop();
   if (comfo) comfo->loop();
-  if (ota) ota->loop();
-  if (timeMgr) timeMgr->loop();  // This updates time display every second
+  
+  // Only process network services if WiFi is connected
+  if (wifi && wifi->isConnected()) {
+    if (mqtt) mqtt->loop();
+    if (ota) ota->loop();
+    if (timeMgr) timeMgr->loop();
+  }
   
   // Small delay to allow other tasks
   delay(1);

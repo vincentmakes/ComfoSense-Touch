@@ -39,6 +39,8 @@ void GUI_initScreen__screen () {
       lv_obj_set_align( GUI_Image__screen__wifi, LV_ALIGN_CENTER );
       lv_obj_set_pos( GUI_Image__screen__wifi, -40, 19 );
       lv_obj_set_size( GUI_Image__screen__wifi, LV_SIZE_CONTENT, LV_SIZE_CONTENT );
+      // Set default WiFi icon opacity to 50% (disconnected state)
+      lv_obj_set_style_opa( GUI_Image__screen__wifi, LV_OPA_50, 0 );
 
      GUI_Panel__screen__panel_1 = lv_obj_create( GUI_Screen__screen );
      lv_obj_remove_flag( GUI_Panel__screen__panel_1, LV_OBJ_FLAG_SCROLLABLE );
@@ -190,6 +192,7 @@ void GUI_initScreenStyles__screen () {
       lv_img_set_src( GUI_Image__screen__wifi, &upload_wifioutline_1922d60a08324fb58b6286008444cc13_png );
 
       lv_obj_add_style( GUI_Image__screen__wifi, &GUI_Style__class_5up8hpXSh7ZNGY__, LV_PART_MAIN | LV_STATE_DEFAULT );
+      // Note: Default 50% opacity is set during object creation above, styles won't override it
 
      lv_obj_add_style( GUI_Panel__screen__panel_1, &GUI_Style__class_1v6NR7CCKSOY1p__, LV_PART_MAIN | LV_STATE_DEFAULT );
 
@@ -233,5 +236,3 @@ void GUI_initScreenStyles__screen () {
      lv_obj_add_style( GUI_Button__screen__centerfan, &GUI_Style__class_V1ohqLxZAM4F0a__, LV_PART_MAIN | LV_STATE_DEFAULT );
 
 }
-
-

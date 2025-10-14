@@ -122,7 +122,7 @@ void TimeManager::loop() {
         return;
     }
     
-    // Update display every second
+    // Update display every 15 second
     unsigned long now = millis();
     if (now - last_update >= UPDATE_INTERVAL) {
         updateDisplay();

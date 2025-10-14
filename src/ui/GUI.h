@@ -17,7 +17,7 @@ LV_FONT_DECLARE( defaultsmall_1 );
 extern lv_obj_t*   GUI_Label__screen__date;
 extern lv_obj_t*   GUI_Label__screen__filter;
 extern lv_obj_t*   GUI_Image__screen__image;
-extern lv_obj_t*   GUI_Image__screen__wifi;
+extern lv_obj_t*   GUI_Image__screen__wifi;  // WiFi icon - already declared
 extern lv_obj_t*  GUI_Panel__screen__panel_1;
 extern lv_obj_t*   GUI_Button__screen__BSpeedMinus;
 extern lv_obj_t*    GUI_Image__screen__minus;
@@ -118,9 +118,7 @@ void GUI_event__Dropdown__screen__modedropdown__Value_Changed (lv_event_t* event
 void GUI_init_fan_speed_display(void);
 void GUI_init_dropdown_styling(void);
 
-// Custom initialization functions
-void GUI_init_fan_speed_display(void);
-void GUI_init_dropdown_styling(void);
+// Display refresh functions (for Strategy 5 pattern)
 void GUI_request_display_refresh(void);
 void GUI_process_display_refresh(void);
 
