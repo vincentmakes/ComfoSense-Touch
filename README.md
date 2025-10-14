@@ -4,7 +4,8 @@ This software is inspired by the work of many others who successfully managed to
 
 This new device is meant to not only replace the ComfoConnect but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir.
 
-<img width="150" alt="image" src="https://github.com/user-attachments/assets/686ae7ac-9415-4ca7-90f9-afdd3ad098ec" /> ---> <img width="300" alt="PoC_MVHR_Touch" src="https://github.com/user-attachments/assets/66cf5a05-3d2b-431a-93be-b21755b78d61" />
+<img width="300" alt="PoC_MVHR_Touch" src="https://github.com/user-attachments/assets/7fb632ff-633f-4125-abdc-4f15b32e9081" />
+
 
 
 The high level requirements are:
@@ -17,7 +18,7 @@ The high level requirements are:
 
 
 
-This version has the following features:
+This version has the following features and tackle the issues below:
 1. Wifi connection close to the Comfoair can be limited due to its location (typically the attic or the cellar), hence bringing the IoT device closer to a central area in the house (where the ComfoSense display controller normally sits) mitigate this.
 2. Better user interface than the one ComfoSense, with all basic functions exposed in one screen
 3. Provides exact number of days before filter change is needed (instead of the generic message Expect change of filter soon ... for 3 weeks)
@@ -30,12 +31,16 @@ This means this display can be used also by people who are not interested in the
 
 Prerequisites:
 
-* Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver)
+* Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 
 Not tested yet but I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
-Our device consumes at best 1.2W so that should be plenty which means is can be connected directly in place of the ComfoSense C67
+Our device consumes at best 1.2W (measured) so that should be plenty which means is can be connected directly in place of the ComfoSense C67
 <img width="902" height="309" alt="Screenshot 2025-10-11 at 14 16 59" src="https://github.com/user-attachments/assets/860e895b-08bd-40b6-a3f8-3b2253ed920b" />
+(source: https://zehnderamerica.com/resources/comfoair-q-installer-manual/)
+Another manual mentions 150mA max which means 1.8W and is a bit close to the limit but would still work,especially with the screen a bit dimmed
 
+<img width="696" height="116" alt="image" src="https://github.com/user-attachments/assets/8721c505-c25d-41b7-895a-ea2db5fcfd09" />
+(source: https://www.phstore.co.uk/PDF/Zehnder/Install_Manual_ComfoAir_Q.pdf)
 
 ## Flashing the firmware in the ESP32 development board
 
@@ -53,14 +58,15 @@ First, create a "secrets.h" file at the top of this repository, with the configu
 
 
 
-### Advanced explanations and troubleshooting I went through
+## Advanced explanations and troubleshooting I went through
 Getting something displayed on those Waveshare devices was extremly challenging : 
 1. There's no examples using PlatformIO configuration, only Arduino ones 
 2. The documentation exists, but one has to dig through it thoroughly at hardware level in order to get the accurate information and in some cases below it's simply incorrect.
 
 The LCD screen is driven via I/O extender using a TCA9554 chip from TI. Looking at the schematic we can see that the Pin A0, A1 and A2 are at ground. From TI documentation of the chip we can deduct that the address is 0x20 (0x2Y where Y is the Hex conversion of A2/A1/A0 which in our case is 0b000)
 
-<img width="870" height="449" alt="image" src="https://github.com/user-attachments/assets/d7470f56-3d55-43a3-beb4-638132297861" />
+<img width="527" height="275" alt="Screenshot 2025-10-09 095513" src="https://github.com/user-attachments/assets/e492b7da-d0ac-4080-be31-0fbfc6d7e133" />
+
 
 
 The schematics also displays a table with all the PINs which is different from the generic one on the Wiki page: https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-4/ESP32-S3-Touch-LCD-4_V3.0.pdf
@@ -89,11 +95,16 @@ Additionnally, it requires hardware modifications by adding a size 0402 91K resi
 
 Those are really tiny resistors which might be challenging without a microscope
 
-**High level**
-<img width="540" height="545" alt="R40_R36_location_high" src="https://github.com/user-attachments/assets/8ae10025-3f91-47ae-b9f1-57c06bc5fbed" />
+**High level**  
+
+![ESP32-S3-LCD-4-details-intro](https://github.com/user-attachments/assets/a9e630cc-98de-408f-b94d-9fdce430dc17)
 
 
-**Detailed location**
+
+
+**Detailed location**  
+
+
 <img width="806" height="605" alt="R40_R36_location" src="https://github.com/user-attachments/assets/417e30bd-949f-44fe-9e23-f38e1de8ca89" />
 
 The schematics mentions the GPIO42 is connected to R40 but this is incorrect - tracing it back, I've found that it's GPIO16 which is connected. Going through the documentation of the AP3032, we can drive it via PWM which is basically converted into a good enough DC signal to dim the screen
@@ -101,18 +112,67 @@ The schematics mentions the GPIO42 is connected to R40 but this is incorrect - t
 <img width="567" height="557" alt="Schematics_dimming" src="https://github.com/user-attachments/assets/feb8c6c6-6ca6-43b5-bcb8-9f7dacb31753" />
 
 
+### SIT 1 : ComfoAir emulation (0ne way)
+Testing is crucial for the CAN integration and since I didn't feel like debugging in the attic, nor hooking up and playing directly with the MVHR, I'm using a USB to CAN analyzer together with the CAN Utils suite on a VM.
+I've recorded a serie of steps (Fan speed 0->3; Temp Heat->Cool->Normal) and playing it back. Additionnally, the recording also capture sensor data from the ComfoAir which I can feed back into the ESP32.
+
+Here's how to set that up:
+1. Install CAN utils on the VM:
+```shell
+sudo apt update
+sudo apt install can-utils
+```
 
 
+Plug your USB to CAN device into your laptop and make sure it is passed to the VM
+
+Identify the CAN Interface: In the Linux terminal, list the network interfaces to see if your CAN device is recognized. It will likely appear as can0.
+```shell
+ip link show
+```
+
+Configure and Bring Up the CAN Interface: You'll need to set the bitrate for your CAN bus. For example, for a 125kbps bus:
+```shell
+sudo ip link set can0 type can bitrate 125000
+sudo ip link set up can0
+```
+
+Capture CAN Signals: Use the candump command to capture CAN traffic and save it to a log file.
+```shell
+candump can0 -l my_can_capture.log
+```
+
+Replay CAN Signals: Use the canplayer command to replay the captured signals from the log file.
+```shell
+canplayer -I my_can_capture.log
+```
 
 ## TODO
-The screen is way to bright to be used permanently as a replacement of the ComfoTouch C67
-Dimming of the backlight is not possible in the current state and will require to wire physically the PIN IO42 (for instance) to the PIN EXIO2 (BL_EN) of the I2C chip. This is because it's also connected to the CTRL PIN of the chip driving the LCD (AP3032KTR) This means:
-1. The pin EXIO2 BL_EN of the I/O expander has to be switched to input instead of output (by default it is high level output to switch the backlight on)
-   ```yaml
-   tca_write(TCA_REG_CONFIG, 0xF5); // instead of 0xF1 (EXIO7-0 = 0b11110001 / 0xF1 -> 0b11110101 / 0xF5)
-   ```
-3. R28 and C25 have to be removed surgically
-4. We have to write some code to control the brightness of the screen via a PWM signal using IO42
+1. Wifi Manager and MQTT Manager to set those up from a mobile
+2. Brightness
+3. Filter Warning style
+4. Sensors data fetching and styling
+5. Full CAN integration, including error messages
+6. Automated testing / Comfoair emulation
+
+## Physical Mounting on the wall
+
+The mounting consists of 3 main part : two oversized (150%) Garmin style mount (male and female) and a decorative frame fixed by friction fit (to be improved)
+There are also 4 spacers which I couldn't print in one block with the rest.
+
+### Exploded View
+<img width="630" height="427" alt="Screenshot 2025-10-13 at 21 13 38" src="https://github.com/user-attachments/assets/bc6cec2d-78e7-4756-b521-b968adbb318a" />
+<img width="616" height="444" alt="Screenshot 2025-10-13 at 21 13 54" src="https://github.com/user-attachments/assets/d7627883-ff95-4f8a-a9a3-e4513db0246c" />
+
+
+
+### Partially installed View
+<img width="401" height="505" alt="Screenshot 2025-10-13 at 21 03 39" src="https://github.com/user-attachments/assets/d05f1e82-8608-4693-9c84-68b03b4bfe2a" />
+<img width="452" height="532" alt="Screenshot 2025-10-13 at 21 04 36" src="https://github.com/user-attachments/assets/c397266f-36fe-41c8-ada1-e499f48246b9" />
+<img width="406" height="470" alt="Screenshot 2025-10-13 at 21 04 50" src="https://github.com/user-attachments/assets/19eaab50-7157-47e3-8a91-93aab00d5241" />
+<img width="462" height="487" alt="Screenshot 2025-10-13 at 21 05 23" src="https://github.com/user-attachments/assets/361ac999-a9c5-406a-a605-eae045d39541" />
+
+It will fit into the existing standard junction box (Swiss size, 81mm diam / 57mm in between mounting screws, 4 sides)
 
 
 ## MQTT commands to interact with the ventilation unit
