@@ -6,6 +6,8 @@
 // Your app modules
 #include "wifi/wifi.h"
 #include "comfoair/comfoair.h"
+#include "comfoair/sensor_data.h"
+#include "comfoair/filter_data.h"
 #include "mqtt/mqtt.h"
 #include "ota/ota.h"
 #include "time/time_manager.h"
@@ -14,11 +16,11 @@
 
 #define DIMMING false  //set to true to enable dimmming of the screen. 
 //Important to note this does require hardware modification which includes soldering of very tiny resistors
-// PWM dimming of AP3032 via FB injection (IO16 → R40(0R) → C27(100nF) → GND, R36=91k to FB)
+// PWM dimming of AP3032 via FB injection (IO16 â†' R40(0R) â†' C27(100nF) â†' GND, R36=91k to FB)
 const int BL_PWM_PIN = 16;
 const int LEDC_CH     = 1;        // any free channel 0..7
 const int LEDC_BITS   = 8;        // 0..255
-const int LEDC_FREQ   = 2000;     // 1–5 kHz works well with 100 nF RC
+const int LEDC_FREQ   = 2000;     // 1â€"5 kHz works well with 100 nF RC
 
 // Display configuration
 #define SCREEN_WIDTH   480
@@ -73,6 +75,8 @@ comfoair::WiFi *wifi = nullptr;
 comfoair::MQTT *mqtt = nullptr;
 comfoair::OTA *ota = nullptr;
 comfoair::TimeManager *timeMgr = nullptr;
+comfoair::SensorDataManager *sensorData = nullptr;
+comfoair::FilterDataManager *filterData = nullptr;
 
 // Global touch input device for manual polling
 static lv_indev_t *global_touch_indev = nullptr;
@@ -147,7 +151,8 @@ void setup() {
   delay(500);
   
   Serial.println("\n========================================");
-  Serial.println("ESP32-S3 ComfoAir Control");
+  Serial.println("ESP32-S3 ComfoAir Control v2.0");
+  Serial.println("+ Sensor Data Display");
   Serial.println("========================================");
   
   setCpuFrequencyMhz(240);
@@ -246,9 +251,20 @@ void setup() {
   comfo = new comfoair::ComfoAir();
   ota = new comfoair::OTA();
   timeMgr = new comfoair::TimeManager();
+  sensorData = new comfoair::SensorDataManager();
+  filterData = new comfoair::FilterDataManager();
+  
+  // Link managers to CAN handler
+  comfo->setSensorDataManager(sensorData);
+  comfo->setFilterDataManager(filterData);
+  
+  // Initialize sensor data (will show dummy data initially)
+  sensorData->setup();
+  
+  // Initialize filter data (will show 99 days initially)
+  filterData->setup();
   
   // Start WiFi connection (non-blocking, max 20 sec)
-  // Note: WiFi icon will be initialized in first wifi->loop() call
   wifi->setup();
   
   // Only initialize network-dependent services if WiFi connected
@@ -287,6 +303,8 @@ void loop() {
   // Process subsystems
   if (wifi) wifi->loop();
   if (comfo) comfo->loop();
+  if (sensorData) sensorData->loop();
+  if (filterData) filterData->loop();
   
   // Only process network services if WiFi is connected
   if (wifi && wifi->isConnected()) {

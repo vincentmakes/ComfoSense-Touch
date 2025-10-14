@@ -1,5 +1,7 @@
 #include "comfoair.h"
 #include "commands.h"
+#include "sensor_data.h"
+#include "filter_data.h"
 #include "../mqtt/mqtt.h"
 #include "../secrets.h"
 #include <esp32_can.h>
@@ -17,11 +19,13 @@ void printFrame2(CAN_FRAME *message)
   }
   Serial.println();
 }
+
 #define subscribe(command) mqtt->subscribeTo(MQTT_PREFIX "/commands/" command, [this](char const * _1,uint8_t const * _2, int _3) { \
     Serial.print("Received: "); \
     Serial.println(command); \
     this->comfoMessage.sendCommand(command); \
   });
+
 extern comfoair::MQTT *mqtt;
 char mqttTopicMsgBuf[30];
 char mqttTopicValBuf[30];
@@ -29,7 +33,17 @@ char otherBuf[30];
 
 
 namespace comfoair {
-  ComfoAir::ComfoAir() {}
+  ComfoAir::ComfoAir() : sensorManager(nullptr), filterManager(nullptr) {}
+
+  void ComfoAir::setSensorDataManager(SensorDataManager* manager) {
+    sensorManager = manager;
+    Serial.println("ComfoAir: SensorDataManager linked");
+  }
+
+  void ComfoAir::setFilterDataManager(FilterDataManager* manager) {
+    filterManager = manager;
+    Serial.println("ComfoAir: FilterDataManager linked");
+  }
 
   void ComfoAir::setup() {
     Serial.println("ESP_SMT init");
@@ -38,7 +52,6 @@ namespace comfoair {
     CAN0.begin(50000);
     CAN0.watchFor();
   
-
     subscribe("ventilation_level_0");
     subscribe("ventilation_level_1");
     subscribe("ventilation_level_2");
@@ -78,7 +91,6 @@ namespace comfoair {
         return this->comfoMessage.sendCommand("manual");
       }
     });
-    
   }
 
   void ComfoAir::loop() {
@@ -89,12 +101,45 @@ namespace comfoair {
         Serial.print(decodedMessage.name);
         Serial.print(" - ");
         Serial.print(decodedMessage.val);
+        
+        // Publish to MQTT
         sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decodedMessage.name);
         sprintf(mqttTopicValBuf, "%s", decodedMessage.val);
         mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf);
+        
+        // **NEW: Route sensor data to GUI via SensorDataManager**
+        if (sensorManager) {
+          // Extract air temp (inside)
+          if (strcmp(decodedMessage.name, "extract_air_temp") == 0) {
+            float temp = atof(decodedMessage.val);
+            sensorManager->updateInsideTemp(temp);
+          }
+          // Outdoor air temp (outside)
+          else if (strcmp(decodedMessage.name, "outdoor_air_temp") == 0) {
+            float temp = atof(decodedMessage.val);
+            sensorManager->updateOutsideTemp(temp);
+          }
+          // Extract air humidity (inside)
+          else if (strcmp(decodedMessage.name, "extract_air_humidity") == 0) {
+            float humidity = atof(decodedMessage.val);
+            sensorManager->updateInsideHumidity(humidity);
+          }
+          // Outdoor air humidity (outside)
+          else if (strcmp(decodedMessage.name, "outdoor_air_humidity") == 0) {
+            float humidity = atof(decodedMessage.val);
+            sensorManager->updateOutsideHumidity(humidity);
+          }
+        }
+        
+        // **NEW: Route filter data to GUI via FilterDataManager**
+        if (filterManager) {
+          // Filter days remaining (PDOID 192)
+          if (strcmp(decodedMessage.name, "remaining_days_filter_replacement") == 0) {
+            int days = atoi(decodedMessage.val);
+            filterManager->updateFilterDays(days);
+          }
+        }
       }
     }
   }
 }
-
-
