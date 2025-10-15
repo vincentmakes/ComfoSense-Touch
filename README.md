@@ -122,7 +122,7 @@ The schematics mentions the GPIO42 is connected to R40 but this is incorrect - t
 <img width="567" height="557" alt="Schematics_dimming" src="https://github.com/user-attachments/assets/feb8c6c6-6ca6-43b5-bcb8-9f7dacb31753" />
 
 
-### SIT 1 : ComfoAir emulation (0ne way)
+### SIT 1 : ComfoAir emulation (One way)
 Testing is crucial for the CAN integration and since I didn't feel like debugging in the attic, nor hooking up and playing directly with the MVHR, I'm using a USB to CAN analyzer together with the CAN Utils suite on a VM.
 I've recorded a serie of steps (Fan speed 0->3; Temp Heat->Cool->Normal) and playing it back. Additionnally, the recording also capture sensor data from the ComfoAir which I can feed back into the ESP32.
 
@@ -149,7 +149,7 @@ sudo ip link set up can0
 
 Capture CAN Signals: Use the candump command to capture CAN traffic and save it to a log file.
 ```shell
-candump can0 -l my_can_capture.log
+candump can0 -l 
 ```
 
 Replay CAN Signals: Use the canplayer command to replay the captured signals from the log file.
