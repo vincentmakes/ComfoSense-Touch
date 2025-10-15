@@ -1,8 +1,8 @@
 # Zehnder Comfoair Q350 MQTT bridge + Touch Screen
 
-This software is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver, namely this one in particular : https://github.com/dardhal/comfoair-esp32
+This software is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver, namely this one in particular : https://github.com/dardhal/comfoair-esp32 and leveraging the excellent work from Michael Arnauts on mapping the CAN frames : https://github.com/michaelarnauts/aiocomfoconnect
 
-This new device is meant to not only replace the ComfoConnect but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir.
+This new device is meant to not only replace the ComfoConnect LAN but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir.
 
 <img width="300" alt="PoC_MVHR_Touch" src="https://github.com/user-attachments/assets/7fb632ff-633f-4125-abdc-4f15b32e9081" />
 
@@ -56,7 +56,17 @@ First, create a "secrets.h" file at the top of this repository, with the configu
 #define WIFI_PASS "WIRELESS_PASSWORD"
 ```
 
+## Features and logic
+### Time Management
+Time is fetched from NTP servers. If there's more than 1 min difference between the time of the MVHR and the NTP one, we set the time of the device to the one of the NTP.
 
+### Filter and other Sensor Data
+Filter and sensor data are fetched using the CAN command directly (so we don't rely on a MQTT broker which could fail - we keep MQTT only for HA integration and associated usage from a mobile device)
+A warning icon appears if the filters needs to be changed within 21 days. This can be changed in src/comfoair/filter_data.h through WARNING_THRESHOLD
+
+### Controls
+Controls are interacting via CAN command directly as well. They are limited for now to : Fan Increase, Fan Decrease, Boost (20min) and Change of Temperature profile (normal, cool, heat). To access any other advanced features, one would need to go to the MVHR itself. I may include a second screen at a later stage to implement additional control (Bypass, etc) but those firs basic control are reflecting my usage of the unit thus far. 
+Additional automation should be done through Home Assistant (such as changing fan speed depending on sensor data, time of the day, etc)
 
 ## Advanced explanations and troubleshooting I went through
 Getting something displayed on those Waveshare devices was extremly challenging : 
@@ -112,7 +122,7 @@ The schematics mentions the GPIO42 is connected to R40 but this is incorrect - t
 <img width="567" height="557" alt="Schematics_dimming" src="https://github.com/user-attachments/assets/feb8c6c6-6ca6-43b5-bcb8-9f7dacb31753" />
 
 
-### SIT 1 : ComfoAir emulation (0ne way)
+### SIT 1 : ComfoAir emulation (One way)
 Testing is crucial for the CAN integration and since I didn't feel like debugging in the attic, nor hooking up and playing directly with the MVHR, I'm using a USB to CAN analyzer together with the CAN Utils suite on a VM.
 I've recorded a serie of steps (Fan speed 0->3; Temp Heat->Cool->Normal) and playing it back. Additionnally, the recording also capture sensor data from the ComfoAir which I can feed back into the ESP32.
 
@@ -139,7 +149,7 @@ sudo ip link set up can0
 
 Capture CAN Signals: Use the candump command to capture CAN traffic and save it to a log file.
 ```shell
-candump can0 -l my_can_capture.log
+candump can0 -l 
 ```
 
 Replay CAN Signals: Use the canplayer command to replay the captured signals from the log file.
@@ -175,7 +185,7 @@ There are also 4 spacers which I couldn't print in one block with the rest.
 It will fit into the existing standard junction box (Swiss size, 81mm diam / 57mm in between mounting screws, 4 sides)
 
 
-## MQTT commands to interact with the ventilation unit
+## MQTT commands to interact with the ventilation unit (copy / paste from repo mentionned at the top)
 This software publishes lots of values to the MQTT broker (nearly 40 in total), but it is also subscribed to the configured MQTT broker listening for the following topics being published below the `${MQTT_PREFIX}/commands/${KEY}` path, the available commands (${KEY} value) being :
 
   * ventilation_level_0
