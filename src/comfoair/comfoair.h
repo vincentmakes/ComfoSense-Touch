@@ -6,6 +6,7 @@
 namespace comfoair {
   class SensorDataManager;
   class FilterDataManager;
+  class ControlManager;
 }
 
 namespace comfoair {
@@ -16,12 +17,18 @@ namespace comfoair {
       void loop();
       void setSensorDataManager(SensorDataManager* manager);
       void setFilterDataManager(FilterDataManager* manager);
+      void setControlManager(ControlManager* manager);
+      
+      // Send CAN command
+      bool sendCommand(const char* command);
+      
     private:
       CAN_FRAME canMessage;
       ComfoMessage comfoMessage;
       DecodedMessage decodedMessage;
       SensorDataManager* sensorManager;
       FilterDataManager* filterManager;
+      ControlManager* controlManager;
   };
 }
 

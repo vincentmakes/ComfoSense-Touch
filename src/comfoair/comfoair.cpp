@@ -2,6 +2,7 @@
 #include "commands.h"
 #include "sensor_data.h"
 #include "filter_data.h"
+#include "control_manager.h"
 #include "../mqtt/mqtt.h"
 #include "../secrets.h"
 #include <esp32_can.h>
@@ -33,7 +34,7 @@ char otherBuf[30];
 
 
 namespace comfoair {
-  ComfoAir::ComfoAir() : sensorManager(nullptr), filterManager(nullptr) {}
+  ComfoAir::ComfoAir() : sensorManager(nullptr), filterManager(nullptr), controlManager(nullptr) {}
 
   void ComfoAir::setSensorDataManager(SensorDataManager* manager) {
     sensorManager = manager;
@@ -43,6 +44,16 @@ namespace comfoair {
   void ComfoAir::setFilterDataManager(FilterDataManager* manager) {
     filterManager = manager;
     Serial.println("ComfoAir: FilterDataManager linked");
+  }
+
+  void ComfoAir::setControlManager(ControlManager* manager) {
+    controlManager = manager;
+    Serial.println("ComfoAir: ControlManager linked");
+  }
+
+  bool ComfoAir::sendCommand(const char* command) {
+    Serial.printf("ComfoAir: Sending command: %s\n", command);
+    return this->comfoMessage.sendCommand(command);
   }
 
   void ComfoAir::setup() {
@@ -137,6 +148,27 @@ namespace comfoair {
           if (strcmp(decodedMessage.name, "remaining_days_filter_replacement") == 0) {
             int days = atoi(decodedMessage.val);
             filterManager->updateFilterDays(days);
+          }
+        }
+        
+        // **NEW: Route control feedback to ControlManager**
+        if (controlManager) {
+          // Fan speed (PDOID 65)
+          if (strcmp(decodedMessage.name, "fan_speed") == 0) {
+            uint8_t speed = atoi(decodedMessage.val);
+            controlManager->updateFanSpeedFromCAN(speed);
+          }
+          // Temperature profile (PDOID 67)
+          else if (strcmp(decodedMessage.name, "temp_profile") == 0) {
+            // CAN values: 0=auto, 1=cold, 2=warm
+            // Map to GUI: 0=NORMAL, 1=HEATING, 2=COOLING
+            uint8_t profile = 0; // default NORMAL
+            if (strcmp(decodedMessage.val, "cold") == 0) {
+              profile = 1; // HEATING
+            } else if (strcmp(decodedMessage.val, "warm") == 0) {
+              profile = 2; // COOLING
+            }
+            controlManager->updateTempProfileFromCAN(profile);
           }
         }
       }

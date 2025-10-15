@@ -8,6 +8,7 @@
 #include "comfoair/comfoair.h"
 #include "comfoair/sensor_data.h"
 #include "comfoair/filter_data.h"
+#include "comfoair/control_manager.h"
 #include "mqtt/mqtt.h"
 #include "ota/ota.h"
 #include "time/time_manager.h"
@@ -77,6 +78,26 @@ comfoair::OTA *ota = nullptr;
 comfoair::TimeManager *timeMgr = nullptr;
 comfoair::SensorDataManager *sensorData = nullptr;
 comfoair::FilterDataManager *filterData = nullptr;
+comfoair::ControlManager *controlMgr = nullptr;
+
+// C interface functions for GUI to call control manager
+extern "C" {
+  void control_manager_increase_fan_speed() {
+    if (controlMgr) controlMgr->increaseFanSpeed();
+  }
+  
+  void control_manager_decrease_fan_speed() {
+    if (controlMgr) controlMgr->decreaseFanSpeed();
+  }
+  
+  void control_manager_activate_boost() {
+    if (controlMgr) controlMgr->activateBoost();
+  }
+  
+  void control_manager_set_temp_profile(uint8_t profile) {
+    if (controlMgr) controlMgr->setTempProfile(profile);
+  }
+}
 
 // Global touch input device for manual polling
 static lv_indev_t *global_touch_indev = nullptr;
@@ -253,16 +274,20 @@ void setup() {
   timeMgr = new comfoair::TimeManager();
   sensorData = new comfoair::SensorDataManager();
   filterData = new comfoair::FilterDataManager();
+  controlMgr = new comfoair::ControlManager();
   
   // Link managers to CAN handler
   comfo->setSensorDataManager(sensorData);
   comfo->setFilterDataManager(filterData);
+  comfo->setControlManager(controlMgr);
   
-  // Initialize sensor data (will show dummy data initially)
+  // Link ComfoAir to control manager (for sending commands)
+  controlMgr->setComfoAir(comfo);
+  
+  // Initialize managers
   sensorData->setup();
-  
-  // Initialize filter data (will show 99 days initially)
   filterData->setup();
+  controlMgr->setup();
   
   // Start WiFi connection (non-blocking, max 20 sec)
   wifi->setup();
