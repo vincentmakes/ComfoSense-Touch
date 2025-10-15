@@ -56,7 +56,17 @@ First, create a "secrets.h" file at the top of this repository, with the configu
 #define WIFI_PASS "WIRELESS_PASSWORD"
 ```
 
+## Features and logic
+### Time Management
+Time is fetched from NTP servers. If there's more than 1 min difference between the time of the MVHR and the NTP one, we set the time of the device to the one of the NTP.
 
+### Filter and other Sensor Data
+Filter and sensor data are fetched using the CAN command directly (so we don't rely on a MQTT broker which could fail - we keep MQTT only for HA integration and associated usage from a mobile device)
+A warning icon appears if the filters needs to be changed within 21 days. This can be changed in src/comfoair/filter_data.h through WARNING_THRESHOLD
+
+### Controls
+Controls are interacting via CAN command directly as well. They are limited for now to : Fan Increase, Fan Decrease, Boost (20min) and Change of Temperature profile (normal, cool, heat). To access any other advanced features, one would need to go to the MVHR itself. I may include a second screen at a later stage to implement additional control (Bypass, etc) but those firs basic control are reflecting my usage of the unit thus far. 
+Additional automation should be done through Home Assistant (such as changing fan speed depending on sensor data, time of the day, etc)
 
 ## Advanced explanations and troubleshooting I went through
 Getting something displayed on those Waveshare devices was extremly challenging : 
@@ -175,7 +185,7 @@ There are also 4 spacers which I couldn't print in one block with the rest.
 It will fit into the existing standard junction box (Swiss size, 81mm diam / 57mm in between mounting screws, 4 sides)
 
 
-## MQTT commands to interact with the ventilation unit
+## MQTT commands to interact with the ventilation unit (copy / paste from repo mentionned at the top)
 This software publishes lots of values to the MQTT broker (nearly 40 in total), but it is also subscribed to the configured MQTT broker listening for the following topics being published below the `${MQTT_PREFIX}/commands/${KEY}` path, the available commands (${KEY} value) being :
 
   * ventilation_level_0
