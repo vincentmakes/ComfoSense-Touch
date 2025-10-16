@@ -143,18 +143,25 @@ ip link show
 
 Configure and Bring Up the CAN Interface: You'll need to set the bitrate for your CAN bus. For example, for a 125kbps bus:
 ```shell
-sudo ip link set can0 type can bitrate 125000
-sudo ip link set up can0
+sudo ip link set can0 type can bitrate 50000
+sudo ip link set can0 up
+ip -details link show can0
+```
+Interface should be up
+
+Send one CAN Signal (in that case the temperature extracted - e.g inside temperature)
+```shell
+cansend can0 00448041#E100
 ```
 
-Capture CAN Signals: Use the candump command to capture CAN traffic and save it to a log file.
+Capture CAN Signals from the MVHR: Use the candump command to capture CAN traffic and save it to a log file.
 ```shell
 candump can0 -l 
 ```
 
 Replay CAN Signals: Use the canplayer command to replay the captured signals from the log file.
 ```shell
-canplayer -I my_can_capture.log
+canplayer -v -I candump-2025-10-14_163157.log can0=can0
 ```
 
 ## TODO
