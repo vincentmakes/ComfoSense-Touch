@@ -1,10 +1,10 @@
 #include "message.h"
-#include <esp32_can.h>
+#include "twai_wrapper.h"
 #include "CanAddress.h"
 #include "commands.h"
 
 #define min(a,b) ((a) < (b) ? (a): (b))
-#define DEBUG false
+#define DEBUG true
 void printFrame(CAN_FRAME *message)
 {
     Serial.print(message->id, HEX);
@@ -133,14 +133,18 @@ namespace comfoair {
   }
 
   bool ComfoMessage::decode(CAN_FRAME *frame, DecodedMessage *message) {
+    // Clear the message structure to prevent garbage data
+    memset(message, 0, sizeof(DecodedMessage));
+    
     uint16_t PDOID = (frame->id & 0x01fff000) >> 14;
     uint8_t *vals = &frame->data.uint8[0];
     #define uint16 (vals[0] + (vals[1]<<8))
     #define int16 (vals[1] < 0x80 ? (vals[0] + (vals[1] << 8)) : - ((vals[0] ^ 0xFF) + ((vals[1] ^ 0xFF) << 8) + 1))
     #define uint32 (uint16 + ((vals[2] + (vals[3]<<8))<<16))
     #define LAZYSWITCH(id, key, format, transformation) case id: \
-                                                  strcpy(message->name, key); \
-                                                  sprintf(message->val, format, transformation); \
+                                                  snprintf(message->val, 15, format, transformation); \
+                                                  strncpy(message->name, key, 39); \
+                                                  message->name[39] = '\0'; \
                                                   return true;
 
 // For documentation on PDOID's see: https://github.com/michaelarnauts/comfoconnect/blob/master/PROTOCOL-PDO.md
@@ -247,4 +251,91 @@ namespace comfoair {
     return true;
   }
 
-} 
+  // Time synchronization methods
+  bool ComfoMessage::requestTime() {
+    Serial.println("ComfoMessage: Sending time request (RTR frame)");
+    
+    // Create RTR (Remote Transmission Request) frame
+    // CAN ID: 0x10040028 (time request)
+    message.id = 0x10040028;
+    message.extended = true;
+    message.rtr = true;  // This is a request frame
+    message.length = 0;  // RTR frames have no data
+    
+    bool success = CAN0.sendFrame(message);
+    
+    if (success) {
+      Serial.println("ComfoMessage: Time request sent successfully");
+    } else {
+      Serial.println("ComfoMessage: Failed to send time request");
+    }
+    
+    return success;
+  }
+
+  bool ComfoMessage::setTime(uint32_t secondsSince2000) {
+    Serial.printf("ComfoMessage: Setting device time to %u seconds since 2000-01-01\n", secondsSince2000);
+    
+    // Create time set message
+    // CAN ID: 0x10040001 (time set)
+    message.id = 0x10040001;
+    message.extended = true;
+    message.rtr = false;
+    message.length = 4;
+    
+    // Pack seconds as little-endian 32-bit value
+    message.data.uint8[0] = (secondsSince2000) & 0xFF;
+    message.data.uint8[1] = (secondsSince2000 >> 8) & 0xFF;
+    message.data.uint8[2] = (secondsSince2000 >> 16) & 0xFF;
+    message.data.uint8[3] = (secondsSince2000 >> 24) & 0xFF;
+    
+    bool success = CAN0.sendFrame(message);
+    
+    if (success) {
+      Serial.println("ComfoMessage: Time set command sent successfully");
+    } else {
+      Serial.println("ComfoMessage: Failed to send time set command");
+    }
+    
+    return success;
+  }
+
+  bool ComfoMessage::setTimeFromDateTime(uint16_t year, uint8_t month, uint8_t day,
+                                         uint8_t hour, uint8_t minute, uint8_t second) {
+    uint32_t seconds = dateTimeToSeconds(year, month, day, hour, minute, second);
+    return setTime(seconds);
+  }
+
+  uint32_t ComfoMessage::dateTimeToSeconds(uint16_t year, uint8_t month, uint8_t day,
+                                           uint8_t hour, uint8_t minute, uint8_t second) {
+    // Calculate days since 2000-01-01
+    uint32_t days = 0;
+    
+    // Add days for complete years
+    for (uint16_t y = 2000; y < year; y++) {
+      days += isLeapYear(y) ? 366 : 365;
+    }
+    
+    // Add days for complete months in current year
+    const uint8_t daysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    for (uint8_t m = 1; m < month; m++) {
+      days += daysInMonth[m - 1];
+      if (m == 2 && isLeapYear(year)) {
+        days++; // Add leap day
+      }
+    }
+    
+    // Add remaining days
+    days += day - 1;  // day is 1-indexed
+    
+    // Convert to seconds
+    uint32_t totalSeconds = days * 86400UL + hour * 3600UL + minute * 60UL + second;
+    
+    return totalSeconds;
+  }
+
+  bool ComfoMessage::isLeapYear(uint16_t year) {
+    return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+  }
+
+}

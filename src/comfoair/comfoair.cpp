@@ -3,9 +3,10 @@
 #include "sensor_data.h"
 #include "filter_data.h"
 #include "control_manager.h"
+#include "../time/time_manager.h"
 #include "../mqtt/mqtt.h"
 #include "../secrets.h"
-#include <esp32_can.h>
+#include "twai_wrapper.h"
 
 
 void printFrame2(CAN_FRAME *message)
@@ -15,8 +16,9 @@ void printFrame2(CAN_FRAME *message)
   else Serial.print(" S ");   
   Serial.print(message->length, DEC);
   for (int i = 0; i < message->length; i++) {
-    Serial.print(message->data.byte[i], HEX);
     Serial.print(" ");
+    if (message->data.byte[i] < 0x10) Serial.print("0");
+    Serial.print(message->data.byte[i], HEX);
   }
   Serial.println();
 }
@@ -34,35 +36,71 @@ char otherBuf[30];
 
 
 namespace comfoair {
-  ComfoAir::ComfoAir() : sensorManager(nullptr), filterManager(nullptr), controlManager(nullptr) {}
+  ComfoAir::ComfoAir() : 
+    sensorManager(nullptr), 
+    filterManager(nullptr), 
+    controlManager(nullptr),
+    timeManager(nullptr) {}
 
   void ComfoAir::setSensorDataManager(SensorDataManager* manager) {
     sensorManager = manager;
-    Serial.println("ComfoAir: SensorDataManager linked");
+    Serial.println("ComfoAir: SensorDataManager linked ✓");
   }
 
   void ComfoAir::setFilterDataManager(FilterDataManager* manager) {
     filterManager = manager;
-    Serial.println("ComfoAir: FilterDataManager linked");
+    Serial.println("ComfoAir: FilterDataManager linked ✓");
   }
 
   void ComfoAir::setControlManager(ControlManager* manager) {
     controlManager = manager;
-    Serial.println("ComfoAir: ControlManager linked");
+    Serial.println("ComfoAir: ControlManager linked ✓");
+  }
+
+  void ComfoAir::setTimeManager(TimeManager* manager) {
+    timeManager = manager;
+    Serial.println("ComfoAir: TimeManager linked ✓");
   }
 
   bool ComfoAir::sendCommand(const char* command) {
-    Serial.printf("ComfoAir: Sending command: %s\n", command);
-    return this->comfoMessage.sendCommand(command);
+    return comfoMessage.sendCommand(command);
+  }
+
+  void ComfoAir::requestDeviceTime() {
+    Serial.println("ComfoAir: Requesting device time via CAN...");
+    comfoMessage.requestTime();
+  }
+
+  void ComfoAir::setDeviceTime(uint32_t device_seconds) {
+    Serial.printf("ComfoAir: Setting device time to %u seconds since 2000-01-01\n", 
+                  device_seconds);
+    comfoMessage.setTime(device_seconds);
+  }
+
+  void ComfoAir::handleDeviceTimeResponse(uint32_t device_seconds) {
+    if (timeManager) {
+      timeManager->onDeviceTimeReceived(device_seconds);
+    } else {
+      Serial.println("ComfoAir: Received device time but TimeManager not linked!");
+    }
   }
 
   void ComfoAir::setup() {
-    Serial.println("ESP_SMT init");
-    CAN0.setCANPins(GPIO_NUM_5, GPIO_NUM_4);
-    // CAN0.setDebuggingMode(true);
-    CAN0.begin(50000);
+    Serial.println("\n=== CAN Bus Initialization ===");
+    Serial.println("Board: Waveshare ESP32-S3-Touch-LCD-4");
+    Serial.println("Using native TWAI driver");
+    
+    // CAN pins set in twai_wrapper.h (GPIO6 TX, GPIO0 RX)
+    if (!CAN0.begin(50000)) {
+      Serial.println("❌ CAN init FAILED!");
+      return;
+    }
     CAN0.watchFor();
-  
+    
+    Serial.println("✓ CAN initialized at 50 kbps");
+    Serial.println("=== CAN Bus Ready ===\n");
+    
+    // Subscribe to MQTT commands
     subscribe("ventilation_level_0");
     subscribe("ventilation_level_1");
     subscribe("ventilation_level_2");
@@ -87,87 +125,143 @@ namespace comfoair {
 
     mqtt->subscribeTo(MQTT_PREFIX "/commands/" "ventilation_level", [this](char const * _1,uint8_t const * _2, int _3) {
       sprintf(otherBuf, "ventilation_level_%d", _2[0] - 48);
-      Serial.print("Received: "); 
-      Serial.println(_1); 
-      Serial.println(otherBuf); 
+      Serial.print("Received: ");
+      Serial.println(_1);
+      Serial.println(otherBuf);
       return this->comfoMessage.sendCommand(otherBuf);
     });
     
     mqtt->subscribeTo(MQTT_PREFIX "/commands/" "set_mode", [this](char const * _1,uint8_t const * _2, int _3) {
       if (memcmp("auto", _2, 4) == 0) {
-        Serial.print("Received: "); 
-        Serial.println(_1); 
+        Serial.print("Received: ");
+        Serial.println(_1);
         return this->comfoMessage.sendCommand("auto");
       } else {
         return this->comfoMessage.sendCommand("manual");
       }
     });
   }
-
+  
   void ComfoAir::loop() {
-    if (CAN0.read(this->canMessage)) {
+    static bool first_message = true;
+    static unsigned long last_can_rx_report = 0;
+    static int can_rx_count = 0;
+    
+    CAN_FRAME incoming;
+    while (CAN0.read(incoming)) {
+      can_rx_count++;
+      
+      // Report CAN RX rate every 10 seconds
+      if (millis() - last_can_rx_report >= 10000) {
+        Serial.printf("[CAN] ✓ Received %d frames in last 10s (%.1f/sec)\n", 
+                      can_rx_count, can_rx_count / 10.0);
+        can_rx_count = 0;
+        last_can_rx_report = millis();
+      }
+      
+      this->canMessage = incoming;
+      
+      if (first_message) {
+        Serial.println("\n✓✓✓ FIRST CAN FRAME RECEIVED! ✓✓✓");
+        first_message = false;
+      }
+      
       printFrame2(&this->canMessage);
+      
+      // ✅ CRITICAL: Zero out the decoded message structure before decoding
+      memset(&this->decodedMessage, 0, sizeof(DecodedMessage));
+      
       if (this->comfoMessage.decode(&this->canMessage, &this->decodedMessage)) {
-        Serial.println("Decoded :)");
-        Serial.print(decodedMessage.name);
-        Serial.print(" - ");
-        Serial.print(decodedMessage.val);
+        // ✅ Make local copies IMMEDIATELY after decode to prevent corruption
+        char decoded_name[40];
+        char decoded_val[15];
+        strncpy(decoded_name, this->decodedMessage.name, 39);
+        decoded_name[39] = '\0';
+        strncpy(decoded_val, this->decodedMessage.val, 14);
+        decoded_val[14] = '\0';
         
-        // Publish to MQTT
-        sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decodedMessage.name);
-        sprintf(mqttTopicValBuf, "%s", decodedMessage.val);
+        Serial.print("  → ");
+        Serial.print(decoded_name);
+        Serial.print(" = ");
+        Serial.println(decoded_val);
+        
+        // ✅ DEBUG: Print manager status and message details
+        Serial.printf("  → Manager status: sensorManager=%s, filterManager=%s, controlManager=%s\n",
+                      sensorManager ? "LINKED" : "NULL",
+                      filterManager ? "LINKED" : "NULL",
+                      controlManager ? "LINKED" : "NULL");
+        Serial.printf("  → Message name: '%s' (length=%d)\n", 
+                      this->decodedMessage.name, 
+                      strlen(this->decodedMessage.name));
+        
+        // **Check for device time response**
+        if (strcmp(decoded_name, "device_time") == 0) {
+          uint32_t device_seconds = strtoul(decoded_val, NULL, 10);
+          Serial.printf("  → Device time: %u seconds since 2000\n", device_seconds);
+          handleDeviceTimeResponse(device_seconds);
+        }
+        
+        // ✅ DEBUG: Print manager status and message details
+        Serial.printf("  → Manager status: sensorManager=%s, filterManager=%s, controlManager=%s\n",
+                      sensorManager ? "LINKED" : "NULL",
+                      filterManager ? "LINKED" : "NULL",
+                      controlManager ? "LINKED" : "NULL");
+        Serial.printf("  → Message name: '%s' (length=%d)\n", 
+                      decoded_name, 
+                      strlen(decoded_name));
+        
+        // Publish to MQTT - use local copies
+        sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decoded_name);
+        sprintf(mqttTopicValBuf, "%s", decoded_val);
         mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf);
         
-        // **NEW: Route sensor data to GUI via SensorDataManager**
+        // ✅ DEBUG: Check routing logic
+        Serial.println("  → Checking sensor data routing...");
+        
+        // Route sensor data
         if (sensorManager) {
-          // Extract air temp (inside)
-          if (strcmp(decodedMessage.name, "extract_air_temp") == 0) {
-            float temp = atof(decodedMessage.val);
-            sensorManager->updateInsideTemp(temp);
+          if (strcmp(decoded_name, "extract_air_temp") == 0) {
+            Serial.println("  ✓ MATCH: extract_air_temp - calling updateInsideTemp()");
+            sensorManager->updateInsideTemp(atof(decoded_val));
           }
-          // Outdoor air temp (outside)
-          else if (strcmp(decodedMessage.name, "outdoor_air_temp") == 0) {
-            float temp = atof(decodedMessage.val);
-            sensorManager->updateOutsideTemp(temp);
+          else if (strcmp(decoded_name, "outdoor_air_temp") == 0) {
+            Serial.println("  ✓ MATCH: outdoor_air_temp - calling updateOutsideTemp()");
+            sensorManager->updateOutsideTemp(atof(decoded_val));
           }
-          // Extract air humidity (inside)
-          else if (strcmp(decodedMessage.name, "extract_air_humidity") == 0) {
-            float humidity = atof(decodedMessage.val);
-            sensorManager->updateInsideHumidity(humidity);
+          else if (strcmp(decoded_name, "extract_air_humidity") == 0) {
+            Serial.println("  ✓ MATCH: extract_air_humidity - calling updateInsideHumidity()");
+            sensorManager->updateInsideHumidity(atof(decoded_val));
           }
-          // Outdoor air humidity (outside)
-          else if (strcmp(decodedMessage.name, "outdoor_air_humidity") == 0) {
-            float humidity = atof(decodedMessage.val);
-            sensorManager->updateOutsideHumidity(humidity);
+          else if (strcmp(decoded_name, "outdoor_air_humidity") == 0) {
+            Serial.println("  ✓ MATCH: outdoor_air_humidity - calling updateOutsideHumidity()");
+            sensorManager->updateOutsideHumidity(atof(decoded_val));
           }
+          else {
+            Serial.printf("  ✗ NO MATCH: '%s' is not a sensor data message\n", decoded_name);
+          }
+        } else {
+          Serial.println("  ✗ sensorManager is NULL!");
         }
         
-        // **NEW: Route filter data to GUI via FilterDataManager**
+        // Route filter data
         if (filterManager) {
-          // Filter days remaining (PDOID 192)
-          if (strcmp(decodedMessage.name, "remaining_days_filter_replacement") == 0) {
-            int days = atoi(decodedMessage.val);
-            filterManager->updateFilterDays(days);
+          if (strcmp(decoded_name, "remaining_days_filter_replacement") == 0) {
+            Serial.println("  ✓ MATCH: remaining_days_filter_replacement - calling updateFilterDays()");
+            filterManager->updateFilterDays(atoi(decoded_val));
           }
         }
         
-        // **NEW: Route control feedback to ControlManager**
+        // Route control feedback
         if (controlManager) {
-          // Fan speed (PDOID 65)
-          if (strcmp(decodedMessage.name, "fan_speed") == 0) {
-            uint8_t speed = atoi(decodedMessage.val);
-            controlManager->updateFanSpeedFromCAN(speed);
+          if (strcmp(decoded_name, "fan_speed") == 0) {
+            Serial.println("  ✓ MATCH: fan_speed - calling updateFanSpeedFromCAN()");
+            controlManager->updateFanSpeedFromCAN(atoi(decoded_val));
           }
-          // Temperature profile (PDOID 67)
-          else if (strcmp(decodedMessage.name, "temp_profile") == 0) {
-            // CAN values: 0=auto, 1=cold, 2=warm
-            // Map to GUI: 0=NORMAL, 1=HEATING, 2=COOLING
-            uint8_t profile = 0; // default NORMAL
-            if (strcmp(decodedMessage.val, "cold") == 0) {
-              profile = 1; // HEATING
-            } else if (strcmp(decodedMessage.val, "warm") == 0) {
-              profile = 2; // COOLING
-            }
+          else if (strcmp(decoded_name, "temp_profile") == 0) {
+            Serial.println("  ✓ MATCH: temp_profile - calling updateTempProfileFromCAN()");
+            uint8_t profile = 0;
+            if (strcmp(decoded_val, "cold") == 0) profile = 1;
+            else if (strcmp(decoded_val, "warm") == 0) profile = 2;
             controlManager->updateTempProfileFromCAN(profile);
           }
         }

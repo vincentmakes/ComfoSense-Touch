@@ -7,8 +7,8 @@ namespace comfoair {
 
 // Sensor data structure
 struct SensorData {
-    float inside_temp;      // Extract air temp (CÂ°)
-    float outside_temp;     // Outdoor air temp (CÂ°)
+    float inside_temp;      // Extract air temp (°C)
+    float outside_temp;     // Outdoor air temp (°C)
     float inside_humidity;  // Extract air humidity (%)
     float outside_humidity; // Outdoor air humidity (%)
     bool valid;             // Data validity flag
@@ -37,6 +37,13 @@ public:
 private:
     SensorData current_data;
     
+    // Track if we've ever received CAN data (disables demo mode)
+    bool can_data_ever_received;
+    
+    // Batching for display updates
+    bool display_update_pending;
+    unsigned long last_can_update;
+    
     // Update GUI display with current data
     void updateDisplay();
     
@@ -45,8 +52,9 @@ private:
     
     // Timing
     unsigned long last_display_update;
-    static const unsigned long DISPLAY_UPDATE_INTERVAL = 2000; // Update display every 2 seconds
-    static const unsigned long DATA_STALE_TIMEOUT = 30000; // Consider data stale after 30 seconds
+    
+    // OPTIMIZED: Update display every 10 seconds for sensor data (low priority)
+    static const unsigned long DISPLAY_UPDATE_INTERVAL = 10000; // 10 seconds
 };
 
 } // namespace comfoair
