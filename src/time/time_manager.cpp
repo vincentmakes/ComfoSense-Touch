@@ -28,7 +28,11 @@ void TimeManager::setup() {
 
 void TimeManager::syncTime() {
     // Configure NTP with timezone offset (adjust for your timezone)
-    configTime(3600, 0, "pool.ntp.org", "time.nist.gov");
+   // configTime(3600, 0, "pool.ntp.org", "time.nist.gov");
+
+    setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
+tzset();
+configTime(7200, 0, "pool.ntp.org", "time.nist.gov");  // UTC+2 (Zurich summer time)
     
     Serial.print("TimeManager: Waiting for NTP sync");
     

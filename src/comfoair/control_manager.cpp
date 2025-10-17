@@ -174,6 +174,12 @@ void ControlManager::sendFanSpeedCommand(uint8_t speed) {
         return;
     }
     
+    // ✅ NEW: Check if we're in demo mode (no CAN device connected)
+    if (demo_mode) {
+        Serial.println("ControlManager: ⭕ Skipping CAN send (demo mode - no device connected)");
+        return;  // Don't send CAN frames when no device!
+    }
+    
     const char* commands[] = {
         "ventilation_level_0",
         "ventilation_level_1",
@@ -193,6 +199,12 @@ void ControlManager::sendBoostCommand() {
         return;
     }
     
+    // ✅ NEW: Check demo mode
+    if (demo_mode) {
+        Serial.println("ControlManager: ⭕ Skipping CAN send (demo mode - no device connected)");
+        return;
+    }
+    
     Serial.println("ControlManager: 📡 Sending CAN command: boost_20_min");
     comfoair->sendCommand("boost_20_min");
 }
@@ -203,9 +215,15 @@ void ControlManager::sendTempProfileCommand(uint8_t profile) {
         return;
     }
     
+    // ✅ NEW: Check demo mode
+    if (demo_mode) {
+        Serial.println("ControlManager: ⭕ Skipping CAN send (demo mode - no device connected)");
+        return;
+    }
+    
     const char* commands[] = {
         "temp_profile_normal",
-        "temp_profile_cool",  // Note: cold=1, but command is "cool"
+        "temp_profile_cool",
         "temp_profile_warm"
     };
     
@@ -214,6 +232,7 @@ void ControlManager::sendTempProfileCommand(uint8_t profile) {
         comfoair->sendCommand(commands[profile]);
     }
 }
+
 
 } // namespace comfoair
 

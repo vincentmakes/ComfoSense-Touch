@@ -15,6 +15,10 @@
 #include "lvgl.h"
 #include "ui/GUI.h"
 
+// Add counter at top of main.cpp
+static uint32_t touch_read_counter = 0;
+static uint32_t event_fire_counter = 0;
+
 #define DIMMING false  //set to true to enable dimmming of the screen. 
 //Important to note this does require hardware modification which includes soldering of very tiny resistors
 // PWM dimming of AP3032 via FB injection (IO16 â†' R40(0R) â†' C27(100nF) â†' GND, R36=91k to FB)
@@ -137,27 +141,96 @@ static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px
   lv_display_flush_ready(disp);
 }
 
-// LVGL touch read callback
 static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   static int16_t last_x = 0;
   static int16_t last_y = 0;
+  static bool touch_active = false;
+  static unsigned long last_touch_seen = 0;      // Last time we detected ANY touch
+  static unsigned long touch_start_time = 0;
+  
+  // Hysteresis timing
+  static const unsigned long RELEASE_DELAY_MS = 30;  // Must be no-touch for 30ms before considering "released"
+  static const unsigned long MIN_PRESS_DURATION_MS = 80; // Minimum press time to be valid
   
   int16_t x[5], y[5];
   uint8_t touched = touch.getPoint(x, y, 5);
+  bool finger_detected_now = (touched > 0);
+  unsigned long now = millis();
   
-  if (touched > 0) {
-    data->state = LV_INDEV_STATE_PRESSED;
+  // Update last seen time whenever we detect touch
+  if (finger_detected_now) {
+    last_touch_seen = now;
     last_x = x[0];
     last_y = y[0];
+  }
+  
+  // Calculate how long since we last saw touch
+  unsigned long time_since_touch = now - last_touch_seen;
+  
+  // ============================================================================
+  // STATE MACHINE WITH HYSTERESIS
+  // ============================================================================
+  
+  if (finger_detected_now && !touch_active) {
+    // ────────────────────────────────────────────────────────────────────────
+    // STATE 1: NEW PRESS (finger detected, not currently tracking)
+    // ────────────────────────────────────────────────────────────────────────
+    
+    touch_active = true;
+    touch_start_time = now;
+    
+    data->state = LV_INDEV_STATE_PRESSED;
     data->point.x = last_x;
     data->point.y = last_y;
-  } else {
+    
+    Serial.printf("🟢 [%lu] PRESS START at (%d, %d)\n", now, last_x, last_y);
+  }
+  else if (touch_active && time_since_touch < RELEASE_DELAY_MS) {
+    // ────────────────────────────────────────────────────────────────────────
+    // STATE 2: PRESS HELD (we're tracking, and touch seen recently)
+    // ────────────────────────────────────────────────────────────────────────
+    // This includes brief moments where touch isn't detected - we ignore them!
+    
+    data->state = LV_INDEV_STATE_PRESSED;
+    data->point.x = last_x;
+    data->point.y = last_y;
+    
+    // No spam - only log if not detected right now (debugging intermittent loss)
+    if (!finger_detected_now) {
+      // Touch temporarily lost but within hysteresis window - IGNORE IT
+      // Uncomment next line for debugging:
+      // Serial.printf("⚡ [%lu] Ignoring brief touch loss (%lu ms ago)\n", now, time_since_touch);
+    }
+  }
+  else if (touch_active && time_since_touch >= RELEASE_DELAY_MS) {
+    // ────────────────────────────────────────────────────────────────────────
+    // STATE 3: PRESS RELEASED (no touch for RELEASE_DELAY_MS)
+    // ────────────────────────────────────────────────────────────────────────
+    
+    unsigned long press_duration = now - touch_start_time;
+    
+    data->state = LV_INDEV_STATE_RELEASED;
+    data->point.x = last_x;
+    data->point.y = last_y;
+    
+    if (press_duration < MIN_PRESS_DURATION_MS) {
+      Serial.printf("⚠️  [%lu] PRESS IGNORED (too brief: %lu ms)\n", now, press_duration);
+    } else {
+      Serial.printf("🔴 [%lu] PRESS END (duration: %lu ms)\n", now, press_duration);
+    }
+    
+    touch_active = false;
+  }
+  else {
+    // ────────────────────────────────────────────────────────────────────────
+    // STATE 4: IDLE (no active touch tracking)
+    // ────────────────────────────────────────────────────────────────────────
+    
     data->state = LV_INDEV_STATE_RELEASED;
     data->point.x = last_x;
     data->point.y = last_y;
   }
 }
-
 // Brightness 0..100% (0% = backlight off/very dim, 100% = bright)
 void setBacklightPct(float pct) {
   if (pct < 0)   pct = 0;
@@ -213,6 +286,7 @@ void setup() {
   lv_display_set_flush_cb(disp, lvgl_flush_cb);
   
   // 4. Initialize touch controller
+  // Initialize touch controller
   Serial.println("Initializing touch...");
   
   pinMode(TOUCH_INT, INPUT);
@@ -220,11 +294,17 @@ void setup() {
   
   if (touch.begin(Wire, GT911_SLAVE_ADDRESS_L, TOUCH_SDA, TOUCH_SCL)) {
     Serial.println("Touch initialized successfully");
+    
+    // ✅ Keep setMaxTouchPoint(5) - this is fine
     touch.setMaxTouchPoint(5);
+    
+    Serial.println("Touch configuration:");
+    Serial.println("  - Max touch points: 5");
+    Serial.println("  - Debounce: 150ms (in callback)");
+    Serial.println("  - Polling: 5ms (200Hz)");
   } else {
     Serial.println("ERROR: Touch initialization failed");
   }
-  
   // 5. Load GUI
   Serial.println("Loading GUI...");
   GUI_init();

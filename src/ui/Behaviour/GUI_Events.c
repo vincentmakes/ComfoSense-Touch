@@ -5,34 +5,43 @@
 #endif
 
 #include <stdio.h>
+#include <Arduino.h>
 
-// External control manager instance (defined in main.cpp)
-extern void* global_control_manager;
-
-// C interface to C++ control manager
+// External control manager interface
 extern void control_manager_increase_fan_speed();
 extern void control_manager_decrease_fan_speed();
 extern void control_manager_activate_boost();
 extern void control_manager_set_temp_profile(uint8_t profile);
 
-// Deferred refresh flag - set by events, processed in main loop
+// Deferred refresh flag
 static volatile bool refresh_requested = false;
 
-// ==================================================
-//  TOUCH DEBOUNCING - Prevent double button presses
-// ==================================================
+// ============================================================================
+// MINIMAL DEBOUNCE - For Protection Only
+// ============================================================================
+// With proper touch state machine, we only need minimal debounce protection
+// against potential LVGL quirks. The touch callback handles the real work.
 
-static unsigned long last_button_press_time = 0;
-static const unsigned long BUTTON_DEBOUNCE_MS = 300;  // 300ms debounce
+static unsigned long last_plus_press = 0;
+static unsigned long last_minus_press = 0;
+static unsigned long last_boost_press = 0;
+static unsigned long last_dropdown_change = 0;
 
-static bool is_button_debounced() {
+// Very short debounce - just enough to catch any potential double-firing
+static const unsigned long BUTTON_DEBOUNCE_MS = 50;  // Reduced from 100ms!
+
+static bool is_too_soon(unsigned long* last_press_time) {
     unsigned long now = millis();
-    if (now - last_button_press_time < BUTTON_DEBOUNCE_MS) {
-        printf("Button press ignored (debounce)\n");
-        return true;  // Still in debounce period
+    unsigned long elapsed = now - *last_press_time;
+    
+    if (elapsed < BUTTON_DEBOUNCE_MS) {
+        // This should rarely happen with proper touch state
+        printf("⚠️  Button debounce triggered (safety catch: %lu ms)\n", elapsed);
+        return true;
     }
-    last_button_press_time = now;
-    return false;  // Allow press
+    
+    *last_press_time = now;
+    return false;
 }
 
 // ============================================================================
@@ -51,50 +60,51 @@ void GUI_process_display_refresh(void) {
 }
 
 // ============================================================================
-// BUTTON EVENT HANDLERS - WITH DEBOUNCING
+// BUTTON EVENT HANDLERS - Simplified!
 // ============================================================================
 
 void GUI_event__Button__screen__BSpeedPlus__Clicked (lv_event_t* event) {
-    if (is_button_debounced()) return;  // ✅ DEBOUNCE CHECK
+    if (is_too_soon(&last_plus_press)) return;
     
-    printf("BSpeedPlus button clicked!\n");
+    printf("✅ [+] Fan Speed Increase\n");
     control_manager_increase_fan_speed();
 }
 
 void GUI_event__Button__screen__BSpeedMinus__Clicked (lv_event_t* event) {
-    if (is_button_debounced()) return;  // ✅ DEBOUNCE CHECK
+    if (is_too_soon(&last_minus_press)) return;
     
-    printf("BSpeedMinus button clicked!\n");
+    printf("✅ [-] Fan Speed Decrease\n");
     control_manager_decrease_fan_speed();
 }
 
 void GUI_event__Button__screen__buttonspeedboost__Clicked (lv_event_t* event) {
-    if (is_button_debounced()) return;  // ✅ DEBOUNCE CHECK
+    if (is_too_soon(&last_boost_press)) return;
     
-    printf("Boost button clicked!\n");
+    printf("✅ [BOOST] Activated\n");
     control_manager_activate_boost();
 }
 
 // ============================================================================
-// DROPDOWN EVENT HANDLER - IMPROVED
+// DROPDOWN EVENT HANDLER
 // ============================================================================
 
 void GUI_event__Dropdown__screen__modedropdown__Value_Changed (lv_event_t* event) {
+    if (is_too_soon(&last_dropdown_change)) return;
+    
     lv_obj_t *dropdown = lv_event_get_target(event);
     uint16_t selected = lv_dropdown_get_selected(dropdown);
     
-    printf("Dropdown value changed to: %d\n", selected);
+    printf("✅ [DROPDOWN] Profile changed to: %d\n", selected);
     
     control_manager_set_temp_profile((uint8_t)selected);
     
-    // ✅ Force dropdown to update immediately
     lv_obj_invalidate(dropdown);
     GUI_request_display_refresh();
 }
 
-// ==================================================
-// DROPDOWN STYLING CALLBACK
-// ==================================================
+// ============================================================================
+// DROPDOWN STYLING
+// ============================================================================
 
 static void dropdown_list_styling_cb(lv_event_t *e) {
     lv_obj_t *list = lv_event_get_target(e);
@@ -122,5 +132,50 @@ void GUI_init_fan_speed_display(void) {
     printf("Fan speed display initialization handled by control manager\n");
 }
 
-// NOTE: GUI_update_fan_speed_display_from_cpp() and GUI_update_temp_profile_display_from_cpp()
-// are defined in control_manager.cpp, NOT here, to avoid multiple definition errors
+// ============================================================================
+// HOW THIS WORKS WITH THE NEW TOUCH CALLBACK
+// ============================================================================
+//
+// Scenario 1: Press and HOLD button
+// -----------------------------------
+// Time 0ms:   Touch callback detects finger down
+//             → Sets touch_active=true, reports PRESSED
+// Time 5ms:   LVGL processes touch, button detects press
+//             → Fires CLICKED event
+//             → This handler runs, increments fan speed
+// Time 10ms:  Touch callback still reports PRESSED (finger held)
+//             → LVGL sees button is still pressed
+//             → NO new CLICKED event (button is in PRESSED state)
+// Time 500ms: Still holding...
+//             → Still PRESSED state
+//             → Still NO new CLICKED events
+// Time 1000ms: Finger lifts
+//             → Touch callback reports RELEASED
+//             → Button returns to normal state
+//
+// Result: ONE button press, ONE speed change ✅
+//
+//
+// Scenario 2: Quick double tap
+// ------------------------------
+// Time 0ms:   First tap - finger down
+//             → CLICKED event → Speed increases
+// Time 100ms: Finger up
+//             → touch_active=false
+// Time 150ms: Second tap - finger down again
+//             → touch_active=true (NEW press detected!)
+//             → CLICKED event → Speed increases again
+// Time 250ms: Finger up
+//
+// Result: TWO button presses, TWO speed changes ✅
+//
+//
+// Why minimal debounce (50ms)?
+// ----------------------------
+// - Main protection is in touch callback state machine
+// - This 50ms is just a safety net for any LVGL quirks
+// - Short enough to allow rapid tapping (~20 taps/second)
+// - Long enough to catch potential glitches
+//
+// Old debounce (100-500ms) was fighting against the touch system.
+// New approach: touch callback does state detection, GUI events just add safety.

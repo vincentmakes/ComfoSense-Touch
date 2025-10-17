@@ -103,9 +103,8 @@ namespace comfoair {
   }
 
   bool ComfoMessage::sendCommand(char const * command) {
+    // ✅ FIXED: Send command only ONCE (removed duplicate send and 1-second delay)
     #define CMDIF(name) if (strcmp(command, #name) == 0) { \
-                          this->send(new std::vector<uint8_t>( CMD_ ## name )); \
-                          delay(1000); \
                           return this->send(new std::vector<uint8_t>( CMD_ ## name )); \
                         } else 
     CMDIF(ventilation_level_0)
