@@ -98,7 +98,7 @@ void ControlManager::setTempProfile(uint8_t profile) {
     
     current_temp_profile = profile;
     
-    const char* profile_names[] = {"NORMAL", "HEATING", "COOLING"};
+    const char* profile_names[] = {"NORMAL", "COOLING", "HEATING"};
     Serial.printf("ControlManager: Temperature profile set to %s\n", profile_names[profile]);
     
     // ✅ Update display (NO Strategy 5 - user triggered!)
@@ -155,7 +155,7 @@ void ControlManager::updateTempProfileFromCAN(uint8_t profile) {
     if (profile != current_temp_profile) {
         current_temp_profile = profile;
         
-        const char* profile_names[] = {"NORMAL", "HEATING", "COOLING"};
+        const char* profile_names[] = {"NORMAL", "COOLING", "HEATING"};
         Serial.printf("ControlManager: Temperature profile updated from CAN: %s\n",
                       profile_names[profile]);
         

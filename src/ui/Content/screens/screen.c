@@ -172,7 +172,7 @@ void GUI_initScreenTexts__screen () {
      lv_label_set_text( GUI_Label__screen__insideHum, "45%" );
      lv_label_set_text( GUI_Label__screen__outsideHum, "85%" );
      lv_label_set_text( GUI_Label__screen__auto, "Auto" );
-     lv_dropdown_set_options( GUI_Dropdown__screen__modedropdown, "NORMAL\nHEATING\nCOOLING" );
+     lv_dropdown_set_options( GUI_Dropdown__screen__modedropdown, "NORMAL\nCOOLING\nHEATING" );
 }
 
 
