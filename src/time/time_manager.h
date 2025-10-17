@@ -26,7 +26,7 @@ private:
     unsigned long last_sync_check;
     
     // OPTIMIZED: Display updates every 1 second (fast, no NTP calls)
-    static const unsigned long UPDATE_INTERVAL = 1000; // 1 second
+    static const unsigned long UPDATE_INTERVAL = 10000; // 10 second
     
     // OPTIMIZED: NTP sync every 8 hours instead of every hour
     static const unsigned long SYNC_CHECK_INTERVAL = 28800000; // 8 hours (8 * 60 * 60 * 1000)

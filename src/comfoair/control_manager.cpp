@@ -23,7 +23,7 @@ void ControlManager::setup() {
     Serial.println("ControlManager: Initializing...");
     
     // Start in demo mode (assumes no CAN until feedback received)
-    demo_mode = true;
+    demo_mode = false;
     current_fan_speed = 2;
     boost_active = false;
     current_temp_profile = 0;
@@ -53,10 +53,10 @@ void ControlManager::increaseFanSpeed() {
         
         Serial.printf("ControlManager: Increase fan speed to %d\n", current_fan_speed);
         
-        // ✅ ALWAYS update display immediately
+        // ✅ Update display immediately (NO Strategy 5 - user triggered!)
         GUI_update_fan_speed_display_from_cpp(current_fan_speed, boost_active);
         
-        // ✅ ALWAYS send CAN command (don't check demo mode)
+        // ✅ Send CAN command
         sendFanSpeedCommand(current_fan_speed);
     } else {
         Serial.println("ControlManager: Already at max speed (3)");
@@ -70,10 +70,10 @@ void ControlManager::decreaseFanSpeed() {
         
         Serial.printf("ControlManager: Decrease fan speed to %d\n", current_fan_speed);
         
-        // ✅ ALWAYS update display immediately
+        // ✅ Update display immediately (NO Strategy 5 - user triggered!)
         GUI_update_fan_speed_display_from_cpp(current_fan_speed, boost_active);
         
-        // ✅ ALWAYS send CAN command (don't check demo mode)
+        // ✅ Send CAN command
         sendFanSpeedCommand(current_fan_speed);
     } else {
         Serial.println("ControlManager: Already at min speed (0)");
@@ -86,10 +86,10 @@ void ControlManager::activateBoost() {
     
     Serial.println("ControlManager: Boost activated (20 min)");
     
-    // ✅ ALWAYS update display immediately
+    // ✅ Update display immediately (NO Strategy 5 - user triggered!)
     GUI_update_fan_speed_display_from_cpp(current_fan_speed, boost_active);
     
-    // ✅ ALWAYS send CAN command (don't check demo mode)
+    // ✅ Send CAN command
     sendBoostCommand();
 }
 
@@ -101,10 +101,10 @@ void ControlManager::setTempProfile(uint8_t profile) {
     const char* profile_names[] = {"NORMAL", "HEATING", "COOLING"};
     Serial.printf("ControlManager: Temperature profile set to %s\n", profile_names[profile]);
     
-    // ✅ ALWAYS update display immediately
+    // ✅ Update display (NO Strategy 5 - user triggered!)
     GUI_update_temp_profile_display_from_cpp(profile);
     
-    // ✅ ALWAYS send CAN command (don't check demo mode)
+    // ✅ Send CAN command
     sendTempProfileCommand(profile);
 }
 
@@ -161,6 +161,7 @@ void ControlManager::updateTempProfileFromCAN(uint8_t profile) {
         
         // Update display
         GUI_update_temp_profile_display_from_cpp(profile);
+       
     }
 }
 
@@ -174,10 +175,9 @@ void ControlManager::sendFanSpeedCommand(uint8_t speed) {
         return;
     }
     
-    // ✅ NEW: Check if we're in demo mode (no CAN device connected)
     if (demo_mode) {
-        Serial.println("ControlManager: ⭕ Skipping CAN send (demo mode - no device connected)");
-        return;  // Don't send CAN frames when no device!
+        Serial.println("ControlManager: ⏭️ Skipping CAN send (demo mode - no device connected)");
+        return;
     }
     
     const char* commands[] = {
@@ -199,9 +199,8 @@ void ControlManager::sendBoostCommand() {
         return;
     }
     
-    // ✅ NEW: Check demo mode
     if (demo_mode) {
-        Serial.println("ControlManager: ⭕ Skipping CAN send (demo mode - no device connected)");
+        Serial.println("ControlManager: ⏭️ Skipping CAN send (demo mode - no device connected)");
         return;
     }
     
@@ -215,9 +214,8 @@ void ControlManager::sendTempProfileCommand(uint8_t profile) {
         return;
     }
     
-    // ✅ NEW: Check demo mode
     if (demo_mode) {
-        Serial.println("ControlManager: ⭕ Skipping CAN send (demo mode - no device connected)");
+        Serial.println("ControlManager: ⏭️ Skipping CAN send (demo mode - no device connected)");
         return;
     }
     
@@ -233,7 +231,6 @@ void ControlManager::sendTempProfileCommand(uint8_t profile) {
     }
 }
 
-
 } // namespace comfoair
 
 // ============================================================================
@@ -242,7 +239,9 @@ void ControlManager::sendTempProfileCommand(uint8_t profile) {
 
 extern "C" {
 
-// These match the existing GUI_Events.c update_fan_speed_display function
+// ✅ OPTIMIZED: Images update instantly WITHOUT Strategy 5!
+// User-triggered events (buttons) should NOT use GUI_request_display_refresh()
+// Only background updates (like TimeManager) need Strategy 5
 void GUI_update_fan_speed_display_from_cpp(uint8_t speed, bool boost) {
     // Hide all fan speed images first
     lv_obj_set_style_opa(GUI_Image__screen__fanspeed0, LV_OPA_0, 0);
@@ -269,7 +268,10 @@ void GUI_update_fan_speed_display_from_cpp(uint8_t speed, bool boost) {
         lv_obj_set_style_opa(active_image, LV_OPA_COVER, 0);
     }
     
-    // Images don't need GUI_request_display_refresh() - just invalidate
+    // ✅ NO GUI_request_display_refresh() - images update on next lv_timer_handler()
+    // This is INSTANT because main loop calls lv_timer_handler() every 1ms
+    GUI_request_display_refresh();
+    // Just invalidate - LVGL will handle the rest
     lv_obj_t* parent = lv_obj_get_parent(GUI_Image__screen__fanspeed0);
     if (parent) {
         lv_obj_invalidate(parent);
@@ -281,8 +283,10 @@ void GUI_update_fan_speed_display_from_cpp(uint8_t speed, bool boost) {
 
 void GUI_update_temp_profile_display_from_cpp(uint8_t profile) {
     // Temperature profile display update logic
-    // (You may need to implement this based on your GUI design)
     Serial.printf("GUI: Update temp profile display to %d\n", profile);
+    
+    // If you have visual elements to update, just invalidate them
+    // NO GUI_request_display_refresh() needed for user-triggered events!
 }
 
 }

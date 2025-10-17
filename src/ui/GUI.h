@@ -113,6 +113,7 @@ void GUI_event__Button__screen__BSpeedMinus__Clicked (lv_event_t* event);
 void GUI_event__Button__screen__BSpeedPlus__Clicked (lv_event_t* event);
 void GUI_event__Button__screen__buttonspeedboost__Clicked (lv_event_t* event);
 void GUI_event__Dropdown__screen__modedropdown__Value_Changed (lv_event_t* event);
+void GUI_event__Dropdown__screen__modedropdown__Ready(lv_event_t* e);
 
 // Custom initialization functions
 void GUI_init_fan_speed_display(void);

@@ -7,36 +7,32 @@
 #include <stdio.h>
 #include <Arduino.h>
 
-// External control manager interface
 extern void control_manager_increase_fan_speed();
 extern void control_manager_decrease_fan_speed();
 extern void control_manager_activate_boost();
 extern void control_manager_set_temp_profile(uint8_t profile);
 
-// Deferred refresh flag
 static volatile bool refresh_requested = false;
 
+
 // ============================================================================
-// MINIMAL DEBOUNCE - For Protection Only
+// OPTIMIZED DEBOUNCE - Faster double-tap capability
 // ============================================================================
-// With proper touch state machine, we only need minimal debounce protection
-// against potential LVGL quirks. The touch callback handles the real work.
 
 static unsigned long last_plus_press = 0;
 static unsigned long last_minus_press = 0;
 static unsigned long last_boost_press = 0;
 static unsigned long last_dropdown_change = 0;
 
-// Very short debounce - just enough to catch any potential double-firing
-static const unsigned long BUTTON_DEBOUNCE_MS = 50;  // Reduced from 100ms!
+// ⚡ OPTIMIZED: 100ms debounce
+static const unsigned long BUTTON_DEBOUNCE_MS = 50;
 
 static bool is_too_soon(unsigned long* last_press_time) {
     unsigned long now = millis();
     unsigned long elapsed = now - *last_press_time;
     
     if (elapsed < BUTTON_DEBOUNCE_MS) {
-        // This should rarely happen with proper touch state
-        printf("⚠️  Button debounce triggered (safety catch: %lu ms)\n", elapsed);
+        printf("⚠️  Button debounce (%lu ms since last)\n", elapsed);
         return true;
     }
     
@@ -45,7 +41,7 @@ static bool is_too_soon(unsigned long* last_press_time) {
 }
 
 // ============================================================================
-// DISPLAY REFRESH MANAGEMENT
+// DISPLAY REFRESH - ONLY FOR BACKGROUND UPDATES (like TimeManager)
 // ============================================================================
 
 void GUI_request_display_refresh(void) {
@@ -60,32 +56,54 @@ void GUI_process_display_refresh(void) {
 }
 
 // ============================================================================
-// BUTTON EVENT HANDLERS - Simplified!
+// BUTTON HANDLERS - Fast and responsive WITHOUT forced refresh!
 // ============================================================================
 
 void GUI_event__Button__screen__BSpeedPlus__Clicked (lv_event_t* event) {
     if (is_too_soon(&last_plus_press)) return;
     
-    printf("✅ [+] Fan Speed Increase\n");
+    printf("✅ [+] Fan Speed\n");
     control_manager_increase_fan_speed();
+    GUI_request_display_refresh();
+    // ✅ NO GUI_request_display_refresh() - images update on next timer cycle
+    // This happens in < 1ms because main loop calls lv_timer_handler() constantly
 }
 
 void GUI_event__Button__screen__BSpeedMinus__Clicked (lv_event_t* event) {
     if (is_too_soon(&last_minus_press)) return;
     
-    printf("✅ [-] Fan Speed Decrease\n");
+    printf("✅ [-] Fan Speed\n");
     control_manager_decrease_fan_speed();
+    GUI_request_display_refresh();
+    // ✅ NO forced refresh needed
 }
 
 void GUI_event__Button__screen__buttonspeedboost__Clicked (lv_event_t* event) {
     if (is_too_soon(&last_boost_press)) return;
     
-    printf("✅ [BOOST] Activated\n");
+    printf("✅ [BOOST]\n");
     control_manager_activate_boost();
+    GUI_request_display_refresh();
+    // ✅ NO forced refresh needed
 }
 
+//==============TEST=============
+// Called on LV_EVENT_PRESSED to make sure the dropdown list gets drawn immediately
+
+
+
+void GUI_event__Dropdown__screen__modedropdown__Ready(lv_event_t* e) {
+    lv_obj_t *dropdown= lv_event_get_target(e);
+//essential for the list to display instantly
+    GUI_request_display_refresh();   
+
+}
+
+//============================
+
+
 // ============================================================================
-// DROPDOWN EVENT HANDLER
+// DROPDOWN HANDLER - Closes dropdown WITHOUT blocking refresh
 // ============================================================================
 
 void GUI_event__Dropdown__screen__modedropdown__Value_Changed (lv_event_t* event) {
@@ -94,12 +112,17 @@ void GUI_event__Dropdown__screen__modedropdown__Value_Changed (lv_event_t* event
     lv_obj_t *dropdown = lv_event_get_target(event);
     uint16_t selected = lv_dropdown_get_selected(dropdown);
     
-    printf("✅ [DROPDOWN] Profile changed to: %d\n", selected);
-    
+    printf("✅ [DROPDOWN] %d\n", selected);
+        // ✅ Close dropdown and invalidate - NO forced refresh!
+    lv_dropdown_close(dropdown);
+    GUI_request_display_refresh();   
+    lv_obj_invalidate(dropdown);
+
     control_manager_set_temp_profile((uint8_t)selected);
     
-    lv_obj_invalidate(dropdown);
-    GUI_request_display_refresh();
+
+    
+    // Dropdown will close on next lv_timer_handler() cycle (< 1ms)
 }
 
 // ============================================================================
@@ -124,58 +147,31 @@ void GUI_init_dropdown_styling(void) {
         
         lv_obj_add_event_cb(list, dropdown_list_styling_cb, LV_EVENT_CLICKED, NULL);
         
-        printf("Dropdown list styled\n");
+        printf("Dropdown styled\n");
     }
 }
 
 void GUI_init_fan_speed_display(void) {
-    printf("Fan speed display initialization handled by control manager\n");
+    printf("Fan speed display handled by control manager\n");
 }
 
 // ============================================================================
-// HOW THIS WORKS WITH THE NEW TOUCH CALLBACK
+// KEY INSIGHT: Strategy 5 is ONLY for background updates!
 // ============================================================================
+// 
+// USE Strategy 5 (GUI_request_display_refresh) for:
+//   ✅ TimeManager updating time/date labels every second
+//   ✅ Sensor data updating in background
+//   ✅ Any non-user-triggered label text updates
 //
-// Scenario 1: Press and HOLD button
-// -----------------------------------
-// Time 0ms:   Touch callback detects finger down
-//             → Sets touch_active=true, reports PRESSED
-// Time 5ms:   LVGL processes touch, button detects press
-//             → Fires CLICKED event
-//             → This handler runs, increments fan speed
-// Time 10ms:  Touch callback still reports PRESSED (finger held)
-//             → LVGL sees button is still pressed
-//             → NO new CLICKED event (button is in PRESSED state)
-// Time 500ms: Still holding...
-//             → Still PRESSED state
-//             → Still NO new CLICKED events
-// Time 1000ms: Finger lifts
-//             → Touch callback reports RELEASED
-//             → Button returns to normal state
+// DON'T USE Strategy 5 for:
+//   ❌ Button presses (user-triggered)
+//   ❌ Dropdown (user-triggered)
+//   ❌ Touch events
+//   ❌ Image updates (these are fast enough with just invalidate)
 //
-// Result: ONE button press, ONE speed change ✅
+// Why? lv_refr_now() blocks for 50-200ms. When you stack multiple calls,
+// you get multi-second delays. User-triggered events should rely on the
+// main loop's lv_timer_handler() which is called every ~1ms.
 //
-//
-// Scenario 2: Quick double tap
-// ------------------------------
-// Time 0ms:   First tap - finger down
-//             → CLICKED event → Speed increases
-// Time 100ms: Finger up
-//             → touch_active=false
-// Time 150ms: Second tap - finger down again
-//             → touch_active=true (NEW press detected!)
-//             → CLICKED event → Speed increases again
-// Time 250ms: Finger up
-//
-// Result: TWO button presses, TWO speed changes ✅
-//
-//
-// Why minimal debounce (50ms)?
-// ----------------------------
-// - Main protection is in touch callback state machine
-// - This 50ms is just a safety net for any LVGL quirks
-// - Short enough to allow rapid tapping (~20 taps/second)
-// - Long enough to catch potential glitches
-//
-// Old debounce (100-500ms) was fighting against the touch system.
-// New approach: touch callback does state detection, GUI events just add safety.
+// ============================================================================

@@ -261,8 +261,8 @@ namespace comfoair {
     message.rtr = true;  // This is a request frame
     message.length = 0;  // RTR frames have no data
     
-    bool success = CAN0.sendFrame(message);
-    
+   // bool success = CAN0.sendFrame(message);
+    bool success = false;
     if (success) {
       Serial.println("ComfoMessage: Time request sent successfully");
     } else {
@@ -288,8 +288,8 @@ namespace comfoair {
     message.data.uint8[2] = (secondsSince2000 >> 16) & 0xFF;
     message.data.uint8[3] = (secondsSince2000 >> 24) & 0xFF;
     
-    bool success = CAN0.sendFrame(message);
-    
+    //bool success = CAN0.sendFrame(message);
+    bool success = false;
     if (success) {
       Serial.println("ComfoMessage: Time set command sent successfully");
     } else {

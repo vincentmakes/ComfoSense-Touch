@@ -148,7 +148,9 @@ void GUI_initScreen__screen () {
      lv_obj_set_pos( GUI_Dropdown__screen__modedropdown, 159, -131 );
      lv_obj_set_size( GUI_Dropdown__screen__modedropdown, 110, 39 );
      lv_obj_add_event_cb( GUI_Dropdown__screen__modedropdown, GUI_event__Dropdown__screen__modedropdown__Value_Changed, LV_EVENT_VALUE_CHANGED, NULL );
-
+//TEST
+     lv_obj_add_event_cb(GUI_Dropdown__screen__modedropdown,GUI_event__Dropdown__screen__modedropdown__Ready,LV_EVENT_READY,NULL);
+//TEST
      GUI_Button__screen__centerfan = lv_button_create( GUI_Screen__screen );
      lv_obj_set_align( GUI_Button__screen__centerfan, LV_ALIGN_CENTER );
      lv_obj_set_pos( GUI_Button__screen__centerfan, -91, 11 );

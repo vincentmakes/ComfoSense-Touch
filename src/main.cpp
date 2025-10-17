@@ -145,12 +145,12 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   static int16_t last_x = 0;
   static int16_t last_y = 0;
   static bool touch_active = false;
-  static unsigned long last_touch_seen = 0;      // Last time we detected ANY touch
+  static unsigned long last_touch_seen = 0;
   static unsigned long touch_start_time = 0;
   
-  // Hysteresis timing
-  static const unsigned long RELEASE_DELAY_MS = 30;  // Must be no-touch for 30ms before considering "released"
-  static const unsigned long MIN_PRESS_DURATION_MS = 80; // Minimum press time to be valid
+  // ⚡ OPTIMIZED TIMING - Faster response!
+  static const unsigned long RELEASE_DELAY_MS = 20;      // Reduced from 30ms
+  static const unsigned long MIN_PRESS_DURATION_MS = 50; // Reduced from 80ms
   
   int16_t x[5], y[5];
   uint8_t touched = touch.getPoint(x, y, 5);
@@ -164,16 +164,15 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     last_y = y[0];
   }
   
-  // Calculate how long since we last saw touch
   unsigned long time_since_touch = now - last_touch_seen;
   
   // ============================================================================
-  // STATE MACHINE WITH HYSTERESIS
+  // STATE MACHINE WITH FAST HYSTERESIS
   // ============================================================================
   
   if (finger_detected_now && !touch_active) {
     // ────────────────────────────────────────────────────────────────────────
-    // STATE 1: NEW PRESS (finger detected, not currently tracking)
+    // NEW PRESS - Report immediately!
     // ────────────────────────────────────────────────────────────────────────
     
     touch_active = true;
@@ -187,24 +186,16 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   }
   else if (touch_active && time_since_touch < RELEASE_DELAY_MS) {
     // ────────────────────────────────────────────────────────────────────────
-    // STATE 2: PRESS HELD (we're tracking, and touch seen recently)
+    // PRESS HELD - Keep reporting pressed
     // ────────────────────────────────────────────────────────────────────────
-    // This includes brief moments where touch isn't detected - we ignore them!
     
     data->state = LV_INDEV_STATE_PRESSED;
     data->point.x = last_x;
     data->point.y = last_y;
-    
-    // No spam - only log if not detected right now (debugging intermittent loss)
-    if (!finger_detected_now) {
-      // Touch temporarily lost but within hysteresis window - IGNORE IT
-      // Uncomment next line for debugging:
-      // Serial.printf("⚡ [%lu] Ignoring brief touch loss (%lu ms ago)\n", now, time_since_touch);
-    }
   }
   else if (touch_active && time_since_touch >= RELEASE_DELAY_MS) {
     // ────────────────────────────────────────────────────────────────────────
-    // STATE 3: PRESS RELEASED (no touch for RELEASE_DELAY_MS)
+    // PRESS RELEASED - Faster release detection!
     // ────────────────────────────────────────────────────────────────────────
     
     unsigned long press_duration = now - touch_start_time;
@@ -223,7 +214,7 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   }
   else {
     // ────────────────────────────────────────────────────────────────────────
-    // STATE 4: IDLE (no active touch tracking)
+    // IDLE
     // ────────────────────────────────────────────────────────────────────────
     
     data->state = LV_INDEV_STATE_RELEASED;
@@ -362,6 +353,7 @@ void setup() {
   comfo->setFilterDataManager(filterData);
   comfo->setControlManager(controlMgr);
   
+
   // CRITICAL: Link TimeManager to ComfoAir for time sync
   timeMgr->setComfoAir(comfo);
   comfo->setTimeManager(timeMgr);

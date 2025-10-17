@@ -45,7 +45,7 @@ void SensorDataManager::loop() {
     }
     
     // Demo mode: periodically update display with dummy data
-    if (now - last_display_update >= 10000) {
+    if (now - last_display_update >= 10000) { //changed from 10000 to 100
         updateDisplay();
         last_display_update = now;
     }
