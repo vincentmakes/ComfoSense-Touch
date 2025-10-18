@@ -57,22 +57,17 @@ public:
         // Accept all messages
         twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
         
-        // General configuration
-      //  twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(
-      //      TX_GPIO_NUM, 
-      //      RX_GPIO_NUM, 
-      //      TWAI_MODE_NORMAL
-      //  );
-      twai_general_config_t g_config = {
-    .mode = TWAI_MODE_NORMAL,
-    .tx_io = TX_GPIO_NUM,
-    .rx_io = RX_GPIO_NUM,
-    .clkout_io = (gpio_num_t)TWAI_IO_UNUSED,
-    .bus_off_io = (gpio_num_t)TWAI_IO_UNUSED,
-    .tx_queue_len = 32,
-    .rx_queue_len = 32,
-    .alerts_enabled = TWAI_ALERT_RX_DATA | TWAI_ALERT_TX_SUCCESS | TWAI_ALERT_TX_FAILED | TWAI_ALERT_BUS_OFF,
-    .clkout_divider = 0
+
+    twai_general_config_t g_config = {
+        .mode = TWAI_MODE_NORMAL,
+        .tx_io = TX_GPIO_NUM,
+        .rx_io = RX_GPIO_NUM,
+        .clkout_io = (gpio_num_t)TWAI_IO_UNUSED,
+        .bus_off_io = (gpio_num_t)TWAI_IO_UNUSED,
+        .tx_queue_len = 32,
+        .rx_queue_len = 32,
+        .alerts_enabled = TWAI_ALERT_RX_DATA | TWAI_ALERT_TX_SUCCESS | TWAI_ALERT_TX_FAILED | TWAI_ALERT_BUS_OFF,
+        .clkout_divider = 0
 };
         
         // Enable all alerts
