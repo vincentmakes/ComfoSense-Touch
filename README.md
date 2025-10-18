@@ -2,32 +2,32 @@
 
 This software is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver, namely this one in particular : https://github.com/dardhal/comfoair-esp32 and leveraging the excellent work from Michael Arnauts on mapping the CAN frames : https://github.com/michaelarnauts/aiocomfoconnect
 
-This new device is meant to not only replace the ComfoConnect LAN but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir.
+This new device is meant to not only replace the ComfoConnect LAN but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir. On top of having a much better UI, it's been optimized to be very snappy and responsive - in contrast to the slowness of the ComfoSense C67.
 
 <img width="300" alt="PoC_MVHR_Touch" src="https://github.com/user-attachments/assets/7fb632ff-633f-4125-abdc-4f15b32e9081" />
 
 
 
 The high level requirements are:
-1. Make it as simple as possible for anyone to retrofit their unit
-2. Tackle connectivity, UI/UX in one go
-3. Keep MQTT integration capabilities
-4. Use ESP32 since this is one of the best IoT MCU in 2025 with an active community
+    1. Make it as simple as possible for anyone to retrofit their unit
+    2. Tackle connectivity, UI/UX in one go
+    3. Keep MQTT integration capabilities for Home Assistant integration
+    4. Use ESP32 since this is one of the best IoT MCU in 2025 with an active community
 
 
 
 
 
 This version has the following features and tackle the issues below:
-1. Wifi connection close to the Comfoair can be limited due to its location (typically the attic or the cellar), hence bringing the IoT device closer to a central area in the house (where the ComfoSense display controller normally sits) mitigate this.
-2. Better user interface than the one ComfoSense, with all basic functions exposed in one screen
-3. Provides exact number of days before filter change is needed (instead of the generic message Expect change of filter soon ... for 3 weeks)
-4. Provides additional sensor data coming from the MVHR (temperature, humidity)
-5. Provide same integration with HomeAssistant via MQTT, similarly to the original ESP32 + CAN Transceiver program
+    1. Wifi connection close to the Comfoair can be limited due to its location (typically the attic or the cellar), hence bringing the IoT device closer to a central area in the house (where the ComfoSense display controller normally sits) mitigate this.
+    2. Better user interface than the one ComfoSense, with all basic functions exposed in one screen
+    3. Provides exact number of days before filter change is needed (instead of the generic message Expect change of filter soon ... for 3 weeks)
+    4. Provides additional sensor data coming from the MVHR (temperature, humidity)
+    5. Provide same integration with HomeAssistant via MQTT, similarly to the original ESP32 + CAN Transceiver program
 
 This means this display can be used also by people who are not interested in the HA integration but simply want a better UI/UX than the one provided by Zehnder
 
-## Hardware Components
+## What to use : Hardware Components
 
 Prerequisites:
 
@@ -42,7 +42,7 @@ Another manual mentions 150mA max which means 1.8W and is a bit close to the lim
 <img width="696" height="116" alt="image" src="https://github.com/user-attachments/assets/8721c505-c25d-41b7-895a-ea2db5fcfd09" />
 (source: https://www.phstore.co.uk/PDF/Zehnder/Install_Manual_ComfoAir_Q.pdf)
 
-## Flashing the firmware in the ESP32 development board
+## How to use : Flashing the firmware in the ESP32 development board
 
 First, create a "secrets.h" file at the top of this repository, with the configuration values below adapted to your environment (in summary, MQTT server and topic details and wireless SSID and passphrase) :
 
@@ -55,6 +55,16 @@ First, create a "secrets.h" file at the top of this repository, with the configu
 #define WIFI_SSID "YOUR_WIRELESS_NETWORK_SSID"
 #define WIFI_PASS "WIRELESS_PASSWORD"
 ```
+
+Then compile the code using PlatformIO:
+
+```shell
+pio run -t clean
+pio run -e esp32s3
+pio run -t upload -e esp32s3
+pio device monitor -b 115200
+```
+That's it ! Check further below for the mounting bracket to install it on the wall and options for dimming the screen (requires hardware changes)
 
 ## Features and logic
 ### Time Management
