@@ -69,6 +69,8 @@ Controls are interacting via CAN command directly as well. They are limited for 
 Additional automation should be done through Home Assistant (such as changing fan speed depending on sensor data, time of the day, etc)
 
 ## Advanced explanations and troubleshooting I went through
+
+### Display & Touch
 Getting something displayed on those Waveshare devices was extremly challenging : 
 1. There's no examples using PlatformIO configuration, only Arduino ones 
 2. The documentation exists, but one has to dig through it thoroughly at hardware level in order to get the accurate information and in some cases below it's simply incorrect.
@@ -83,7 +85,7 @@ The schematics also displays a table with all the PINs which is different from t
 I have used the working Arduino examples as a reference as some PINs are not referenced correctly in the schematics nor in the Wiki Page (GX Pins seems correct but RX and BX are not) and this has caused me a lot of headaches.
 
 
-```yaml Arduino_DataBus *bus = new Arduino_SWSPI(
+```cpp Arduino_DataBus *bus = new Arduino_SWSPI(
     GFX_NOT_DEFINED /* DC */, 42 /* CS */,
     2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
 
@@ -98,6 +100,19 @@ Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(
 
 If you have a different version, you would need to double check those items and adjust main.cpp if necessary.
 
+From a refreshing of sensor data and dropdown menu, only this exact pattern works and make the display refresh the screen properly
+
+```cpp
+// 1. Set the text
+lv_label_set_text(GUI_Label__screen__time, new_text);
+
+// 2. Request display refresh (calls lv_refr_now())
+GUI_request_display_refresh();
+
+// 3. Invalidate the objects
+lv_obj_invalidate(GUI_Label__screen__time);
+```
+Same principle applies for the dropdown menu with associated events (VALUE_CHANGED, READY)
 
 ### Dimming the screen
 Dimming of the screen is an option which can be enabled in main.cpp by switching the DIMMING flag to true:  #define DIMMING true
@@ -121,8 +136,24 @@ The schematics mentions the GPIO42 is connected to R40 but this is incorrect - t
 
 <img width="567" height="557" alt="Schematics_dimming" src="https://github.com/user-attachments/assets/feb8c6c6-6ca6-43b5-bcb8-9f7dacb31753" />
 
+### CAN drivers
+One must use the default TWAI drivers for CAN communication. Beside the baud rate and PINS, the default general configuration needs to be changed to the following
+```cpp
+    twai_general_config_t g_config = {
+        .mode = TWAI_MODE_NORMAL,
+        .tx_io = TX_GPIO_NUM,
+        .rx_io = RX_GPIO_NUM,
+        .clkout_io = (gpio_num_t)TWAI_IO_UNUSED,
+        .bus_off_io = (gpio_num_t)TWAI_IO_UNUSED,
+        .tx_queue_len = 32,
+        .rx_queue_len = 32,
+        .alerts_enabled = TWAI_ALERT_RX_DATA | TWAI_ALERT_TX_SUCCESS | TWAI_ALERT_TX_FAILED | TWAI_ALERT_BUS_OFF,
+        .clkout_divider = 0
+ ```
 
-### SIT 1 : ComfoAir emulation (One way)
+Changing the queue length is key: not changing it results in the driver splitting the CAN frames with a delay. This results in the frame not being read by the ComfoAir unit on top of making the display being very unresponsive
+ 
+## SIT 1 : ComfoAir emulation (One way)
 Testing is crucial for the CAN integration and since I didn't feel like debugging in the attic, nor hooking up and playing directly with the MVHR, I'm using a USB to CAN analyzer together with the CAN Utils suite on a VM.
 I've recorded a serie of steps (Fan speed 0->3; Temp Heat->Cool->Normal) and playing it back. Additionnally, the recording also capture sensor data from the ComfoAir which I can feed back into the ESP32.
 
