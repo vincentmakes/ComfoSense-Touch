@@ -125,10 +125,7 @@ lv_obj_invalidate(GUI_Label__screen__time);
 Same principle applies for the dropdown menu with associated events (VALUE_CHANGED, READY)
 
 ### Dimming the screen
-Dimming of the screen is an option which can be enabled in main.cpp by switching the DIMMING flag to true:  #define DIMMING true
-Additionnally, it requires hardware modifications by adding a size 0402 91K resistor in the R36 location and bridging or putting a 0 ohm resistor in R40 location.
-
-Those are really tiny resistors which might be challenging without a microscope
+Dimming of the screen is extremly challenging. Permanent dimming is the "easiest" option: replace the R27(5.1ohms) with a 10 or 12 ohms to reduce the brightness to an acceptable level for a permanent display at home. Look at the high level view, this is the largest resistor with the inscription 5R1. It's a 0603 in SMD size.
 
 **High level**  
 
@@ -140,11 +137,6 @@ Those are really tiny resistors which might be challenging without a microscope
 **Detailed location**  
 
 
-<img width="806" height="605" alt="R40_R36_location" src="https://github.com/user-attachments/assets/417e30bd-949f-44fe-9e23-f38e1de8ca89" />
-
-The schematics mentions the GPIO42 is connected to R40 but this is incorrect - tracing it back, I've found that it's GPIO16 which is connected. Going through the documentation of the AP3032, we can drive it via PWM which is basically converted into a good enough DC signal to dim the screen
-
-<img width="567" height="557" alt="Schematics_dimming" src="https://github.com/user-attachments/assets/feb8c6c6-6ca6-43b5-bcb8-9f7dacb31753" />
 
 ### CAN drivers
 One must use the default TWAI drivers for CAN communication. Beside the baud rate and PINS, the default general configuration needs to be changed to the following
