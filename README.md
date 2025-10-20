@@ -127,7 +127,13 @@ Same principle applies for the dropdown menu with associated events (VALUE_CHANG
 Dimming of the screen is an option which can be enabled in main.cpp by switching the DIMMING flag to true:  #define DIMMING true
 Additionnally, it requires hardware modifications by adding a size 0402 100K resistor in the R36 location and bridging or putting a 220k resistor in R40 location.
 
-Those are really tiny resistors which might be challenging without a microscope
+Those are really tiny resistors which might be challenging without a microscope. More details on the location in the two pictures below
+
+Note: The schematics from waveshare shows few things which I think are not correct. 
+1. It shows this can be controlled via a PWM from GPIO42. Tracing it physically, I can confirm that my board which is a v3.0 uses EXIO5 instead just like v1 and v2.
+2. We are supposed to feed that into a RC circuit but the schematics suggest a 0R resistor, making that a decoupling capacitor only which will probably result in flickering issues if working at all. The datasheet from the AP3032 even suggest a 10k/100nF RC low pass filter but they are using a much higher frequency (25kHz) which might not work with the I2C expander - or would impact the performance of the whole system. We are running the PWM at 200Hz in our case.
+
+
 
 **High level**  
 
