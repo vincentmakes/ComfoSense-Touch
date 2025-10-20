@@ -133,21 +133,22 @@ Note: The schematics from waveshare shows few things which I think are not corre
 1. It shows this can be controlled via a PWM from GPIO42. Tracing it physically, I can confirm that my board which is a v3.0 uses EXIO5 instead just like v1 and v2.
 2. We are supposed to feed that into a RC circuit but the schematics suggest a 0R resistor, making that a decoupling capacitor only which will probably result in flickering issues if working at all. The datasheet from the AP3032 even suggest a 10k/100nF RC low pass filter but they are using a much higher frequency (25kHz) which might not work with the I2C expander - or would impact the performance of the whole system. We are running the PWM at 200Hz in our case.
 
+**RC filter simulation**
+![IMG_0104](https://github.com/user-attachments/assets/829b432c-18a2-4438-b887-d28418d635f9)
 
 
-**High level**  
+**High level view**  
 
 ![ESP32-S3-LCD-4-details-intro](https://github.com/user-attachments/assets/a9e630cc-98de-408f-b94d-9fdce430dc17)
 
 
 
 
-**Detailed location**  
+**Detailed location for installing new resistors**  
 
 
 <img width="806" height="605" alt="R40_R36_location" src="https://github.com/user-attachments/assets/417e30bd-949f-44fe-9e23-f38e1de8ca89" />
 
-The schematics mentions the GPIO42 is connected to R40 but this is incorrect - tracing it back, I've found that it's EXIO5 fron the I2C expander TCA9554 which is connected. Going through the documentation of the AP3032, we can drive it via PWM which is basically converted into a good enough DC signal to dim the screen. However the expander can't natively generate the PWM so we have to create via code - fortunately 200Hz is enough. The reason behind the 220k resistor instead of the precognized 0R by Waveshare is to limit the current.
 
 <img width="567" height="557" alt="Schematics_dimming" src="https://github.com/user-attachments/assets/feb8c6c6-6ca6-43b5-bcb8-9f7dacb31753" />
 
