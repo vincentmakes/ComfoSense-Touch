@@ -180,12 +180,13 @@ namespace comfoair {
         strncpy(decoded_val, this->decodedMessage.val, 14);
         decoded_val[14] = '\0';
         
+        /*
         Serial.print("  → ");
         Serial.print(decoded_name);
         Serial.print(" = ");
         Serial.println(decoded_val);
-        
-        // ✅ DEBUG: Print manager status and message details
+        */
+        /* ✅ DEBUG: Print manager status and message details
         Serial.printf("  → Manager status: sensorManager=%s, filterManager=%s, controlManager=%s\n",
                       sensorManager ? "LINKED" : "NULL",
                       filterManager ? "LINKED" : "NULL",
@@ -193,7 +194,7 @@ namespace comfoair {
         Serial.printf("  → Message name: '%s' (length=%d)\n", 
                       this->decodedMessage.name, 
                       strlen(this->decodedMessage.name));
-        
+        */
         // **Check for device time response**
         if (strcmp(decoded_name, "device_time") == 0) {
           uint32_t device_seconds = strtoul(decoded_val, NULL, 10);
@@ -201,7 +202,7 @@ namespace comfoair {
           handleDeviceTimeResponse(device_seconds);
         }
         
-        // ✅ DEBUG: Print manager status and message details
+        /*✅ DEBUG: Print manager status and message details 
         Serial.printf("  → Manager status: sensorManager=%s, filterManager=%s, controlManager=%s\n",
                       sensorManager ? "LINKED" : "NULL",
                       filterManager ? "LINKED" : "NULL",
@@ -209,6 +210,7 @@ namespace comfoair {
         Serial.printf("  → Message name: '%s' (length=%d)\n", 
                       decoded_name, 
                       strlen(decoded_name));
+                      */
         
         // Publish to MQTT - use local copies
         sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decoded_name);
@@ -216,7 +218,7 @@ namespace comfoair {
         mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf);
         
         // ✅ DEBUG: Check routing logic
-        Serial.println("  → Checking sensor data routing...");
+       // Serial.println("  → Checking sensor data routing...");
         
         // Route sensor data
         if (sensorManager) {
@@ -237,7 +239,7 @@ namespace comfoair {
             sensorManager->updateOutsideHumidity(atof(decoded_val));
           }
           else {
-            Serial.printf("  ✗ NO MATCH: '%s' is not a sensor data message\n", decoded_name);
+            //Serial.printf("  ✗ NO MATCH: '%s' is not a sensor data message\n", decoded_name);
           }
         } else {
           Serial.println("  ✗ sensorManager is NULL!");

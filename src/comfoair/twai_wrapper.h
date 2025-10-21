@@ -128,7 +128,7 @@ public:
                     frame.length = rx_msg.data_length_code;
                     memcpy(frame.data.byte, rx_msg.data, rx_msg.data_length_code);
                     
-                    Serial.println("Alerts reconfigured");  // For compatibility with your logs
+   //                 Serial.println("Alerts reconfigured");  // For compatibility with your logs
                     return true;
                 }
             }

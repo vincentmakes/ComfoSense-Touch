@@ -80,7 +80,7 @@ void TimeManager::checkAndSyncDeviceTime() {
     Serial.println("TimeManager: Requesting device time from CAN bus...");
     
     // Request time from device via CAN bus
-    comfoair->requestDeviceTime();
+   // comfoair->requestDeviceTime();
     waiting_for_device_time = false;
     device_time_request_timestamp = millis();
 }
@@ -143,7 +143,7 @@ void TimeManager::setDeviceTime(time_t ntp_time) {
                  timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
     
     // Send time to device via CAN bus
-    comfoair->setDeviceTime(device_seconds);
+    //comfoair->setDeviceTime(device_seconds);
     
     Serial.println("TimeManager: Device time set command sent");
 }
@@ -233,7 +233,7 @@ void TimeManager::loop() {
         Serial.println("TimeManager: 8 hours elapsed, re-syncing with NTP and device...");
         syncTime(); // Re-sync with NTP
         if (time_synced) {
-            checkAndSyncDeviceTime(); // Then check device time
+        //    checkAndSyncDeviceTime(); // Then check device time
         }
     }
     
