@@ -9,6 +9,7 @@
 #include "comfoair/sensor_data.h"
 #include "comfoair/filter_data.h"
 #include "comfoair/control_manager.h"
+#include "screen/screen_manager.h"  // NEW: Screen manager for NTM
 #include "mqtt/mqtt.h"
 #include "ota/ota.h"
 #include "time/time_manager.h"
@@ -21,11 +22,11 @@ static uint32_t event_fire_counter = 0;
 
 #define DIMMING false  //set to true to enable dimmming of the screen. 
 //Important to note this does require hardware modification which includes soldering of very tiny resistors
-// PWM dimming of AP3032 via FB injection (IO16 â†' R40(0R) â†' C27(100nF) â†' GND, R36=91k to FB)
+// PWM dimming of AP3032 via FB injection (IO16 → R40(0R) → C27(100nF) → GND, R36=91k to FB)
 const int BL_PWM_PIN = 16;
 const int LEDC_CH     = 1;        // any free channel 0..7
 const int LEDC_BITS   = 8;        // 0..255
-const int LEDC_FREQ   = 2000;     // 1â€"5 kHz works well with 100 nF RC
+const int LEDC_FREQ   = 2000;     // 1–5 kHz works well with 100 nF RC
 
 // Display configuration
 #define SCREEN_WIDTH   480
@@ -83,6 +84,10 @@ comfoair::TimeManager *timeMgr = nullptr;
 comfoair::SensorDataManager *sensorData = nullptr;
 comfoair::FilterDataManager *filterData = nullptr;
 comfoair::ControlManager *controlMgr = nullptr;
+comfoair::ScreenManager *screenMgr = nullptr;  // NEW: Screen manager
+
+// Track current backlight state for TCA9554
+static uint8_t current_tca_state = 0x0E;  // Default: all high (backlight on, LCD on, touch on)
 
 // C interface functions for GUI to call control manager
 extern "C" {
@@ -114,6 +119,20 @@ static void tca_write(uint8_t reg, uint8_t val) {
   Wire.endTransmission();
 }
 
+// NEW: Backlight control function for ScreenManager
+static void control_backlight(bool on) {
+  if (on) {
+    // Turn backlight on (EXIO2 = bit 2)
+    current_tca_state |= (1 << (EXIO_BL_EN - 1));
+    Serial.println("[Backlight] ON");
+  } else {
+    // Turn backlight off (EXIO2 = bit 2)
+    current_tca_state &= ~(1 << (EXIO_BL_EN - 1));
+    Serial.println("[Backlight] OFF");
+  }
+  tca_write(TCA_REG_OUTPUT, current_tca_state);
+}
+
 static void init_expander() {
   Wire.begin(EXPA_I2C_SDA, EXPA_I2C_SCL, 400000);
   delay(50);
@@ -127,8 +146,10 @@ static void init_expander() {
   tca_write(TCA_REG_OUTPUT, 0x08);  // LCD reset high
   delay(50);
   tca_write(TCA_REG_OUTPUT, 0x0C);  // Backlight on
+  current_tca_state = 0x0C;  // Track state
   delay(50);
   tca_write(TCA_REG_OUTPUT, 0x0E);  // Touch reset high - ENABLE TOUCH
+  current_tca_state = 0x0E;  // Track state
   delay(150);  // Delay for GT911 to initialize
 }
 
@@ -162,6 +183,11 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     last_touch_seen = now;
     last_x = x[0];
     last_y = y[0];
+    
+    // NEW: Notify screen manager of touch (for NTM wake)
+    if (screenMgr) {
+      screenMgr->onTouchDetected();
+    }
   }
   
   unsigned long time_since_touch = now - last_touch_seen;
@@ -222,6 +248,7 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     data->point.y = last_y;
   }
 }
+
 // Brightness 0..100% (0% = backlight off/very dim, 100% = bright)
 void setBacklightPct(float pct) {
   if (pct < 0)   pct = 0;
@@ -236,9 +263,10 @@ void setup() {
   delay(500);
   
   Serial.println("\n========================================");
-  Serial.println("ESP32-S3 ComfoAir Control v2.0");
+  Serial.println("ESP32-S3 ComfoAir Control v2.1");
   Serial.println("+ Sensor Data Display");
   Serial.println("+ CAN Bus Time Sync");
+  Serial.println("+ Night Time Mode (NTM)");
   Serial.println("========================================");
   
   setCpuFrequencyMhz(240);
@@ -277,7 +305,6 @@ void setup() {
   lv_display_set_flush_cb(disp, lvgl_flush_cb);
   
   // 4. Initialize touch controller
-  // Initialize touch controller
   Serial.println("Initializing touch...");
   
   pinMode(TOUCH_INT, INPUT);
@@ -296,6 +323,7 @@ void setup() {
   } else {
     Serial.println("ERROR: Touch initialization failed");
   }
+  
   // 5. Load GUI
   Serial.println("Loading GUI...");
   GUI_init();
@@ -327,7 +355,7 @@ void setup() {
     delay(10);
   }
   
-  //Dimming if enabled
+  // Dimming if enabled
   #ifdef DIMMING
   ledcSetup(LEDC_CH, LEDC_FREQ, LEDC_BITS);
   ledcAttachPin(BL_PWM_PIN, LEDC_CH);
@@ -347,13 +375,13 @@ void setup() {
   sensorData = new comfoair::SensorDataManager();
   filterData = new comfoair::FilterDataManager();
   controlMgr = new comfoair::ControlManager();
+  screenMgr = new comfoair::ScreenManager();  // NEW: Screen manager
   
   // Link managers to CAN handler
   comfo->setSensorDataManager(sensorData);
   comfo->setFilterDataManager(filterData);
   comfo->setControlManager(controlMgr);
   
-
   // CRITICAL: Link TimeManager to ComfoAir for time sync
   timeMgr->setComfoAir(comfo);
   comfo->setTimeManager(timeMgr);
@@ -365,6 +393,9 @@ void setup() {
   sensorData->setup();
   filterData->setup();
   controlMgr->setup();
+  
+  // NEW: Initialize screen manager with backlight control
+  screenMgr->begin(control_backlight);
   
   // Start WiFi connection (non-blocking, max 20 sec)
   wifi->setup();
@@ -385,11 +416,9 @@ void setup() {
   Serial.printf("Free heap: %d KB\n", ESP.getFreeHeap() / 1024);
   Serial.printf("Free PSRAM: %d KB\n", ESP.getFreePsram() / 1024);
 }
-// âœ… TOUCH-OPTIMIZED MAIN LOOP
-// This is the loop() function that should replace your current loop() in main.cpp
 
 // ============================================================================
-// MAIN LOOP - OPTIMIZED FOR TOUCH RESPONSIVENESS
+// MAIN LOOP - OPTIMIZED FOR TOUCH RESPONSIVENESS + NTM
 // ============================================================================
 
 void loop() {
@@ -410,6 +439,9 @@ void loop() {
     }
     last_touch_read = now;
   }
+  
+  // ✅ NEW: Screen manager loop (handles NTM state transitions)
+  if (screenMgr) screenMgr->loop();
   
   // ✅ PRIORITY 4: CAN processing throttled to 10ms (prevent flooding)
   if (now - last_can_process >= 10) {
@@ -434,81 +466,3 @@ void loop() {
   // Small delay to allow other tasks
   delay(1);
 }
-
-/* 
- * KEY OPTIMIZATIONS:
- * 
- * 1. Touch polling reduced from 10ms to 5ms (200Hz)
- *    - Improves touch responsiveness
- *    - Reduces perceived latency
- * 
- * 2. CAN processing throttled to 10ms
- *    - Prevents CAN floods from blocking touch
- *    - Data still captured immediately in CAN interrupt
- * 
- * 3. Manager loops called every iteration
- *    - sensorData->loop() checks if 5 seconds elapsed for display update
- *    - timeMgr->loop() checks if 1 second elapsed for time update
- *    - This is lightweight (just timestamp checks)
- * 
- * 4. GUI_process_display_refresh() called early
- *    - Button presses trigger immediate display refresh
- *    - Gives instant visual feedback
- * 
- * RESULT: Touch feels instant, display updates smoothly
- */
-/*
-==============================================================================
-WHAT CHANGED FOR TOUCH RESPONSIVENESS:
-==============================================================================
-
-âœ… Touch polling moved to TOP of loop (highest priority)
-âœ… Touch poll interval reduced from 10ms to 5ms (2x faster)
-âœ… LVGL timer_handler called immediately after touch
-âœ… Display refresh only called when needed (button presses)
-âœ… CAN processing throttled to 10ms (prevents flooding)
-âœ… Time/sensor updates no longer call GUI_request_display_refresh()
-
-RESULT:
-- Touch is checked 200 times/second (every 5ms)
-- Button presses feel instant
-- Dropdown responds immediately
-- Display updates naturally via LVGL timer
-- No more blocking from forced refreshes
-
-==============================================================================
-*/
-
-/*void loop() {
-  static uint32_t last_touch_read = 0;
-  
-  // Call lv_timer_handler() to process LVGL events
-  lv_timer_handler();
-  
-  // Process any pending display refreshes (from GUI event callbacks)
-  GUI_process_display_refresh();
-  
-  // Manually read touch input every 10ms (CRITICAL for touch to work)
-  if (millis() - last_touch_read >= 10) {
-    if (global_touch_indev) {
-      lv_indev_read(global_touch_indev);
-    }
-    last_touch_read = millis();
-  }
-  
-  // Process subsystems
-  if (wifi) wifi->loop();
-  if (comfo) comfo->loop();
-  if (sensorData) sensorData->loop();
-  if (filterData) filterData->loop();
-  
-  // Only process network services if WiFi is connected
-  if (wifi && wifi->isConnected()) {
-    if (mqtt) mqtt->loop();
-    if (ota) ota->loop();
-    if (timeMgr) timeMgr->loop();
-  }
-  
-  // Small delay to allow other tasks
-  delay(1);
-}*/
