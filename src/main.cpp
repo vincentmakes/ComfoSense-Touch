@@ -15,6 +15,7 @@
 #include "time/time_manager.h"
 #include "lvgl.h"
 #include "ui/GUI.h"
+#include "secrets.h"
 
 // Add counter at top of main.cpp
 static uint32_t touch_read_counter = 0;
@@ -368,7 +369,21 @@ void setup() {
   Serial.println("\nInitializing subsystems...");
   
   wifi = new comfoair::WiFi();
-  mqtt = new comfoair::MQTT();
+  
+  // MQTT is optional - only create if enabled
+  #ifdef MQTT_ENABLED
+    #if MQTT_ENABLED
+      mqtt = new comfoair::MQTT();
+      Serial.println("MQTT client enabled");
+    #else
+      mqtt = nullptr;
+      Serial.println("MQTT client disabled (MQTT_ENABLED = false)");
+    #endif
+  #else
+    mqtt = nullptr;
+    Serial.println("MQTT client disabled (MQTT_ENABLED not defined)");
+  #endif
+  
   comfo = new comfoair::ComfoAir();
   ota = new comfoair::OTA();
   timeMgr = new comfoair::TimeManager();
@@ -400,16 +415,31 @@ void setup() {
   // Start WiFi connection (non-blocking, max 20 sec)
   wifi->setup();
   
-  // Initialize CAN bus first (independent of WiFi)
-  comfo->setup();
+  // CRITICAL: Initialize CAN bus AFTER MQTT is ready
+  // ComfoAir::setup() calls mqtt->subscribeTo(), so mqtt must exist
+  // If MQTT is disabled, we need to skip those subscriptions
   
   // Only initialize network-dependent services if WiFi connected
   if (wifi->isConnected()) {
-    mqtt->setup();
+    // MQTT setup only if enabled
+    if (mqtt) {
+      mqtt->setup();
+      Serial.println("MQTT ready - initializing CAN bus with MQTT subscriptions");
+    } else {
+      Serial.println("MQTT disabled - initializing CAN bus without MQTT subscriptions");
+    }
+    
+    // Initialize CAN bus (will use MQTT if available)
+    comfo->setup();
+    
     ota->setup();
     timeMgr->setup();  // This will sync NTP time and check device time
   } else {
-    Serial.println("Skipping MQTT, OTA, and time sync (no WiFi connection)");
+    Serial.println("No WiFi connection");
+    Serial.println("Initializing CAN bus without MQTT subscriptions");
+    
+    // Initialize CAN even without WiFi (no MQTT subscriptions)
+    comfo->setup();
   }
 
   Serial.println("\n=== System Ready ===");
@@ -458,7 +488,9 @@ void loop() {
   
   // Only process network services if WiFi is connected
   if (wifi && wifi->isConnected()) {
+    // MQTT loop only if enabled
     if (mqtt) mqtt->loop();
+    
     if (ota) ota->loop();
     if (timeMgr) timeMgr->loop();          // Updates time display every 1 sec
   }

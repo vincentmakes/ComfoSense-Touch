@@ -23,11 +23,11 @@ void printFrame2(CAN_FRAME *message)
   Serial.println();
 }
 
-#define subscribe(command) mqtt->subscribeTo(MQTT_PREFIX "/commands/" command, [this](char const * _1,uint8_t const * _2, int _3) { \
+#define subscribe(command) if (mqtt) { mqtt->subscribeTo(MQTT_PREFIX "/commands/" command, [this](char const * _1,uint8_t const * _2, int _3) { \
     Serial.print("Received: "); \
     Serial.println(command); \
     this->comfoMessage.sendCommand(command); \
-  });
+  }); }
 
 extern comfoair::MQTT *mqtt;
 char mqttTopicMsgBuf[30];
@@ -100,46 +100,52 @@ namespace comfoair {
     Serial.println("✓ CAN initialized at 50 kbps");
     Serial.println("=== CAN Bus Ready ===\n");
     
-    // Subscribe to MQTT commands
-    subscribe("ventilation_level_0");
-    subscribe("ventilation_level_1");
-    subscribe("ventilation_level_2");
-    subscribe("ventilation_level_3");
-    subscribe("boost_10_min");
-    subscribe("boost_20_min");
-    subscribe("boost_30_min");
-    subscribe("boost_60_min");
-    subscribe("boost_end");
-    subscribe("auto");
-    subscribe("manual");
-    subscribe("bypass_activate_1h");
-    subscribe("bypass_deactivate_1h");
-    subscribe("bypass_auto");
-    subscribe("ventilation_supply_only");
-    subscribe("ventilation_supply_only_reset");
-    subscribe("ventilation_extract_only");
-    subscribe("ventilation_extract_only_reset");
-    subscribe("temp_profile_normal");
-    subscribe("temp_profile_cool");
-    subscribe("temp_profile_warm");
+      // Subscribe to MQTT commands (only if MQTT is enabled)
+    if (mqtt) {
+        // Subscribe to MQTT commands
+        subscribe("ventilation_level_0");
+        subscribe("ventilation_level_1");
+        subscribe("ventilation_level_2");
+        subscribe("ventilation_level_3");
+        subscribe("boost_10_min");
+        subscribe("boost_20_min");
+        subscribe("boost_30_min");
+        subscribe("boost_60_min");
+        subscribe("boost_end");
+        subscribe("auto");
+        subscribe("manual");
+        subscribe("bypass_activate_1h");
+        subscribe("bypass_deactivate_1h");
+        subscribe("bypass_auto");
+        subscribe("ventilation_supply_only");
+        subscribe("ventilation_supply_only_reset");
+        subscribe("ventilation_extract_only");
+        subscribe("ventilation_extract_only_reset");
+        subscribe("temp_profile_normal");
+        subscribe("temp_profile_cool");
+        subscribe("temp_profile_warm");
 
-    mqtt->subscribeTo(MQTT_PREFIX "/commands/" "ventilation_level", [this](char const * _1,uint8_t const * _2, int _3) {
-      sprintf(otherBuf, "ventilation_level_%d", _2[0] - 48);
-      Serial.print("Received: ");
-      Serial.println(_1);
-      Serial.println(otherBuf);
-      return this->comfoMessage.sendCommand(otherBuf);
-    });
-    
-    mqtt->subscribeTo(MQTT_PREFIX "/commands/" "set_mode", [this](char const * _1,uint8_t const * _2, int _3) {
-      if (memcmp("auto", _2, 4) == 0) {
-        Serial.print("Received: ");
-        Serial.println(_1);
-        return this->comfoMessage.sendCommand("auto");
-      } else {
-        return this->comfoMessage.sendCommand("manual");
-      }
-    });
+        mqtt->subscribeTo(MQTT_PREFIX "/commands/" "ventilation_level", [this](char const * _1,uint8_t const * _2, int _3) {
+          sprintf(otherBuf, "ventilation_level_%d", _2[0] - 48);
+          Serial.print("Received: ");
+          Serial.println(_1);
+          Serial.println(otherBuf);
+          return this->comfoMessage.sendCommand(otherBuf);
+        });
+        
+        mqtt->subscribeTo(MQTT_PREFIX "/commands/" "set_mode", [this](char const * _1,uint8_t const * _2, int _3) {
+          if (memcmp("auto", _2, 4) == 0) {
+            Serial.print("Received: ");
+            Serial.println(_1);
+            return this->comfoMessage.sendCommand("auto");
+          } else {
+            return this->comfoMessage.sendCommand("manual");
+          }
+        });
+           Serial.println("✓ MQTT subscriptions complete");
+    } else {
+      Serial.println("⚠️ MQTT disabled - skipping subscriptions");
+    }
   }
   
   void ComfoAir::loop() {
@@ -213,10 +219,11 @@ namespace comfoair {
                       */
         
         // Publish to MQTT - use local copies
-        sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decoded_name);
-        sprintf(mqttTopicValBuf, "%s", decoded_val);
-        mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf);
-        
+        if (mqtt) {
+          sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decoded_name);
+          sprintf(mqttTopicValBuf, "%s", decoded_val);
+          mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf);
+        }
         // ✅ DEBUG: Check routing logic
        // Serial.println("  → Checking sensor data routing...");
         
