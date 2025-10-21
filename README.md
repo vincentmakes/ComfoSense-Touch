@@ -123,28 +123,42 @@ GUI_request_display_refresh();
 lv_obj_invalidate(GUI_Label__screen__time);
 ```
 Same principle applies for the dropdown menu with associated events (VALUE_CHANGED, READY)
-
 ### Dimming the screen
-Dimming of the screen is an option which can be enabled in main.cpp by switching the DIMMING flag to true:  #define DIMMING true
-Additionnally, it requires hardware modifications by adding a size 0402 91K resistor in the R36 location and bridging or putting a 0 ohm resistor in R40 location.
+> [!IMPORTANT] 
+>Dimming of the screen is an option which can be enabled in main.cpp by switching the DIMMING flag to true:  #define DIMMING true
+>Additionnally, it requires hardware modifications by adding a size 0402 100K resistor in the R36 location and  putting a 220k resistor in R40 location.
+>Those are really tiny resistors which might be challenging without a microscope. More details on the location in the two pictures below
 
-Those are really tiny resistors which might be challenging without a microscope
+> [!NOTE]
+> The schematics from waveshare shows few things which I think are not correct. 
+> 1. It shows this can be controlled via a PWM from GPIO42. Tracing it physically, I can confirm that my board which is a v3.0 uses EXIO5 instead just like v1 and v2.
+> 2. We are supposed to feed that into a RC circuit but the schematics suggest a 0R resistor, making that a decoupling capacitor only which will probably result in flickering issues if working at all. The datasheet from the AP3032 even suggest a 10k/100nF RC low pass filter but they are using a much higher frequency (25kHz) which might not work with the I2C expander - or would impact the performance of the whole system. We are running the PWM at 200Hz in our case.
+>
+>**RC filter simulation**
+> 
+><img height="400" alt="R40_R36_location" src="https://github.com/user-attachments/assets/829b432c-18a2-4438-b887-d28418d635f9" />
 
-**High level**  
+
+**High level view**  
 
 ![ESP32-S3-LCD-4-details-intro](https://github.com/user-attachments/assets/a9e630cc-98de-408f-b94d-9fdce430dc17)
 
 
 
 
-**Detailed location**  
+**Detailed location for installing new resistors**  
 
+<img width="806" height="605" alt="R40_R36_location" src="https://github.com/user-attachments/assets/5147d920-3e84-4119-800a-436fecde9d01" />
 
-<img width="806" height="605" alt="R40_R36_location" src="https://github.com/user-attachments/assets/417e30bd-949f-44fe-9e23-f38e1de8ca89" />
-
-The schematics mentions the GPIO42 is connected to R40 but this is incorrect - tracing it back, I've found that it's GPIO16 which is connected. Going through the documentation of the AP3032, we can drive it via PWM which is basically converted into a good enough DC signal to dim the screen
 
 <img width="567" height="557" alt="Schematics_dimming" src="https://github.com/user-attachments/assets/feb8c6c6-6ca6-43b5-bcb8-9f7dacb31753" />
+
+### Night Mode
+
+There's a feature to shutdown the screen during the night (or any given window) which can be set in ***.cpp/h.
+During that window, the screen can come back to life with a simple tap and will remain on for 3min.
+This mode is not linked to the dimming feature and can be used without hardware modification.
+
 
 ### CAN drivers
 One must use the default TWAI drivers for CAN communication. Beside the baud rate and PINS, the default general configuration needs to be changed to the following
