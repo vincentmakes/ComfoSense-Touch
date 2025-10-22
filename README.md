@@ -7,6 +7,9 @@ This new device is meant to not only replace the ComfoConnect LAN but also the C
 <img width="300" alt="PoC_MVHR_Touch" src="https://github.com/user-attachments/assets/7fb632ff-633f-4125-abdc-4f15b32e9081" />
 
 
+![IMG_0151](https://github.com/user-attachments/assets/9f421d4b-a74e-4e73-a82e-e0a182e28b3f)
+
+
 
 The high level requirements are:
     1. Make it as simple as possible for anyone to retrofit their unit
@@ -95,10 +98,8 @@ Additional automation should be done through Home Assistant (such as changing fa
 
 **Detailed location for installing new resistors**  
 
-<img width="806" height="605" alt="R40_R36_location" src="https://github.com/user-attachments/assets/5147d920-3e84-4119-800a-436fecde9d01" />
+<img width="806" height="605" alt="R40_R36_location" src="https://github.com/user-attachments/assets/a0437215-9b4b-4e60-8c90-fb25a2a443de" />
 
-
-<img width="567" height="557" alt="Schematics_dimming" src="https://github.com/user-attachments/assets/feb8c6c6-6ca6-43b5-bcb8-9f7dacb31753" />
 
 ### Night Mode
 
