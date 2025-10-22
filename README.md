@@ -42,19 +42,12 @@ Another manual mentions 150mA max which means 1.8W and is a bit close to the lim
 <img width="696" height="116" alt="image" src="https://github.com/user-attachments/assets/8721c505-c25d-41b7-895a-ea2db5fcfd09" />
 (source: https://www.phstore.co.uk/PDF/Zehnder/Install_Manual_ComfoAir_Q.pdf)
 
+Testing live, I was able to power the Waveshare at full brightness and existing ComfoSense at once.
+
 ## How to use : Flashing the firmware in the ESP32 development board
 
-First, create a "secrets.h" file at the top of this repository, with the configuration values below adapted to your environment (in summary, MQTT server and topic details and wireless SSID and passphrase) :
-
-```c++
-#define MQTT_HOST "192.168.x.y"
-#define MQTT_PASS ""
-#define MQTT_PORT 1883
-#define MQTT_PREFIX "comfoair"
-#define MQTT_USER ""
-#define WIFI_SSID "YOUR_WIRELESS_NETWORK_SSID"
-#define WIFI_PASS "WIRELESS_PASSWORD"
-```
+First, rename the "secrets_template.h" file at the top of this repository into "secrets.h" and fill in the configuration: 
+Wifi, MQTT config, Night Time Mode, Dimming.
 
 Then compile the code using PlatformIO:
 
@@ -68,7 +61,7 @@ That's it ! Check further below for the mounting bracket to install it on the wa
 
 ## Features and logic
 ### Time Management
-Time is fetched from NTP servers. If there's more than 1 min difference between the time of the MVHR and the NTP one, we set the time of the device to the one of the NTP.
+Time is fetched from NTP servers. I was planning to feed the time to the Comfoair but this is more difficult than anticipated and so far this feature is blocking regular CAN Command to work properly so I have commented the 3 lines responsible for it in the time_manager.cpp and will try to fix it at a later stage.
 
 ### Filter and other Sensor Data
 Filter and sensor data are fetched using the CAN command directly (so we don't rely on a MQTT broker which could fail - we keep MQTT only for HA integration and associated usage from a mobile device)
@@ -77,6 +70,40 @@ A warning icon appears if the filters needs to be changed within 21 days. This c
 ### Controls
 Controls are interacting via CAN command directly as well. They are limited for now to : Fan Increase, Fan Decrease, Boost (20min) and Change of Temperature profile (normal, cool, heat). To access any other advanced features, one would need to go to the MVHR itself. I may include a second screen at a later stage to implement additional control (Bypass, etc) but those firs basic control are reflecting my usage of the unit thus far. 
 Additional automation should be done through Home Assistant (such as changing fan speed depending on sensor data, time of the day, etc)
+
+### Dimming the screen
+> [!IMPORTANT] 
+>Dimming of the screen is an option which can be enabled in main.cpp by switching the DIMMING flag to true:  #define DIMMING true
+>Additionnally, it requires hardware modifications by adding a size 0402 120K resistor in the R36 location and  putting a 0R resistor in R40 location.
+>Those are really tiny resistors which might be challenging without a microscope. More details on the location in the two pictures below
+
+> [!NOTE]
+> The schematics from waveshare shows few things which I think are not correct. 
+> 1. It shows this can be controlled via a PWM from GPIO42. Tracing it physically, I can confirm that my board which is a v3.0 uses EXIO5 instead just like v1 and v2.
+> 2.  The datasheet from the AP3032 even suggest a 10k/100nF RC low pass filter but they are using a much higher frequency (25kHz) which might not work with the I2C expander - or would impact the performance of the whole system. We are running the PWM at 60Hz in our case and 0R actually works. I've tried higher values, up to 220k but this was not very successful
+>
+
+
+**High level view**  
+
+![ESP32-S3-LCD-4-details-intro](https://github.com/user-attachments/assets/a9e630cc-98de-408f-b94d-9fdce430dc17)
+
+
+
+
+**Detailed location for installing new resistors**  
+
+<img width="806" height="605" alt="R40_R36_location" src="https://github.com/user-attachments/assets/5147d920-3e84-4119-800a-436fecde9d01" />
+
+
+<img width="567" height="557" alt="Schematics_dimming" src="https://github.com/user-attachments/assets/feb8c6c6-6ca6-43b5-bcb8-9f7dacb31753" />
+
+### Night Mode
+
+There's a feature to shutdown the screen during the night (or any given window) which can be set in secrets.h
+During that window, the screen can come back to life with a simple tap and will remain on for 30s.
+This mode is not linked to the dimming feature and can be used without hardware modification.
+
 
 ## Advanced explanations and troubleshooting I went through
 
@@ -110,7 +137,7 @@ Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(
 
 If you have a different version, you would need to double check those items and adjust main.cpp if necessary.
 
-From a refreshing of sensor data and dropdown menu, only this exact pattern works and make the display refresh the screen properly
+From a refreshing of sensor data and dropdown menu, only this exact pattern works and make the display refresh the screen properly (What I've called "Strategy 5" in the code - after trying 4 other different ways)
 
 ```cpp
 // 1. Set the text
@@ -123,41 +150,6 @@ GUI_request_display_refresh();
 lv_obj_invalidate(GUI_Label__screen__time);
 ```
 Same principle applies for the dropdown menu with associated events (VALUE_CHANGED, READY)
-### Dimming the screen
-> [!IMPORTANT] 
->Dimming of the screen is an option which can be enabled in main.cpp by switching the DIMMING flag to true:  #define DIMMING true
->Additionnally, it requires hardware modifications by adding a size 0402 100K resistor in the R36 location and  putting a 220k resistor in R40 location.
->Those are really tiny resistors which might be challenging without a microscope. More details on the location in the two pictures below
-
-> [!NOTE]
-> The schematics from waveshare shows few things which I think are not correct. 
-> 1. It shows this can be controlled via a PWM from GPIO42. Tracing it physically, I can confirm that my board which is a v3.0 uses EXIO5 instead just like v1 and v2.
-> 2. We are supposed to feed that into a RC circuit but the schematics suggest a 0R resistor, making that a decoupling capacitor only which will probably result in flickering issues if working at all. The datasheet from the AP3032 even suggest a 10k/100nF RC low pass filter but they are using a much higher frequency (25kHz) which might not work with the I2C expander - or would impact the performance of the whole system. We are running the PWM at 200Hz in our case.
->
->**RC filter simulation**
-> 
-><img height="400" alt="R40_R36_location" src="https://github.com/user-attachments/assets/829b432c-18a2-4438-b887-d28418d635f9" />
-
-
-**High level view**  
-
-![ESP32-S3-LCD-4-details-intro](https://github.com/user-attachments/assets/a9e630cc-98de-408f-b94d-9fdce430dc17)
-
-
-
-
-**Detailed location for installing new resistors**  
-
-<img width="806" height="605" alt="R40_R36_location" src="https://github.com/user-attachments/assets/5147d920-3e84-4119-800a-436fecde9d01" />
-
-
-<img width="567" height="557" alt="Schematics_dimming" src="https://github.com/user-attachments/assets/feb8c6c6-6ca6-43b5-bcb8-9f7dacb31753" />
-
-### Night Mode
-
-There's a feature to shutdown the screen during the night (or any given window) which can be set in ***.cpp/h.
-During that window, the screen can come back to life with a simple tap and will remain on for 3min.
-This mode is not linked to the dimming feature and can be used without hardware modification.
 
 
 ### CAN drivers
@@ -219,13 +211,6 @@ Replay CAN Signals: Use the canplayer command to replay the captured signals fro
 canplayer -v -I candump-2025-10-14_163157.log can0=can0
 ```
 
-## TODO
-1. Wifi Manager and MQTT Manager to set those up from a mobile
-2. Brightness
-3. Filter Warning style
-4. Sensors data fetching and styling
-5. Full CAN integration, including error messages
-6. Automated testing / Comfoair emulation
 
 ## Physical Mounting on the wall
 
