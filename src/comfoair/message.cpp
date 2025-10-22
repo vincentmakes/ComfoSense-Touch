@@ -199,6 +199,52 @@ namespace comfoair {
       LAZYSWITCH(292, "outdoor_air_humidity", "%d", vals[0])  // %   
       LAZYSWITCH(293, "pre_heater_humidity_after", "%d", vals[0]) // %
       LAZYSWITCH(294, "supply_air_humidity", "%d", vals[0])  // %   
+      
+      // ==============================================================================
+      // ERROR/ALARM MESSAGES
+      // Based on: https://github.com/michaelarnauts/aiocomfoconnect PROTOCOL-RMI.md
+      // ==============================================================================
+      
+      // Status indicators (may show problems)
+      LAZYSWITCH(37, "current_rmot", "%d", vals[0])  // Current RMOT (may indicate errors)
+      LAZYSWITCH(56, "frost_protection_unbalance", "%d", vals[0])  // Frost protection status
+      
+      // CRITICAL ERRORS
+      LAZYSWITCH(321, "error_overheating", "%s", vals[0] ? "ACTIVE" : "clear")  
+      // DANGER! OVERHEATING! Two or more sensors detecting incorrect temperature. Ventilation stopped.
+      
+      // TEMPERATURE SENSOR ERRORS
+      LAZYSWITCH(322, "error_temp_sensor_p_oda", "%s", vals[0] ? "ACTIVE" : "clear")  
+      // Pre-conditioned outdoor air temperature sensor detecting incorrect temperature
+      
+      // PRE-HEATER ERRORS
+      LAZYSWITCH(323, "error_preheat_location", "%s", vals[0] ? "ACTIVE" : "clear")  
+      // Pre-heater present but not in correct position (right/left)
+      
+      // PRESSURE ERRORS
+      LAZYSWITCH(324, "error_ext_pressure_eha", "%s", vals[0] ? "ACTIVE" : "clear")  
+      // Exhaust air pressure too high. Check outlets, ducts, filters for pollution/obstructions. Check valve settings.
+      
+      LAZYSWITCH(325, "error_ext_pressure_sup", "%s", vals[0] ? "ACTIVE" : "clear")  
+      // Supply air pressure too high. Check outlets, ducts, filters for pollution/obstructions. Check valve settings.
+      
+      // TEMPERATURE CONTROL ERRORS
+      LAZYSWITCH(326, "error_tempcontrol_p_oda", "%s", vals[0] ? "ACTIVE" : "clear")  
+      // Failed to reach required temperature too often for outdoor air after pre-heater
+      
+      LAZYSWITCH(327, "error_tempcontrol_sup", "%s", vals[0] ? "ACTIVE" : "clear")  
+      // Failed to reach required temperature too often for supply air. Modulating bypass may have malfunction.
+      
+      // MAINTENANCE ALARMS
+      LAZYSWITCH(328, "alarm_filter", "%s", vals[0] ? "REPLACE" : "ok")  
+      // Filter replacement alarm
+      
+      // GENERAL WARNINGS
+      LAZYSWITCH(329, "warning_system", "%s", vals[0] ? "WARNING" : "ok")  
+      // General system warning
+      
+      // ==============================================================================
+      
       default: 
         return false;
     }

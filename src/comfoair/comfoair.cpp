@@ -3,6 +3,7 @@
 #include "sensor_data.h"
 #include "filter_data.h"
 #include "control_manager.h"
+#include "error_data.h"  // ← NEW
 #include "../time/time_manager.h"
 #include "../mqtt/mqtt.h"
 #include "../secrets.h"
@@ -40,7 +41,8 @@ namespace comfoair {
     sensorManager(nullptr), 
     filterManager(nullptr), 
     controlManager(nullptr),
-    timeManager(nullptr) {}
+    timeManager(nullptr),
+    errorManager(nullptr) {}  // ← MODIFIED (added errorManager)
 
   void ComfoAir::setSensorDataManager(SensorDataManager* manager) {
     sensorManager = manager;
@@ -61,6 +63,15 @@ namespace comfoair {
     timeManager = manager;
     Serial.println("ComfoAir: TimeManager linked ✓");
   }
+
+  // ============================================================================
+  // ← NEW FUNCTION
+  // ============================================================================
+  void ComfoAir::setErrorDataManager(ErrorDataManager* manager) {
+    errorManager = manager;
+    Serial.println("ComfoAir: ErrorDataManager linked ✓");
+  }
+  // ============================================================================
 
   bool ComfoAir::sendCommand(const char* command) {
     return comfoMessage.sendCommand(command);
@@ -274,6 +285,45 @@ namespace comfoair {
             controlManager->updateTempProfileFromCAN(profile);
           }
         }
+        
+        // ============================================================================
+        // ← NEW: Route error/alarm messages
+        // ============================================================================
+        if (errorManager) {
+          // Determine if error is active based on value string
+          bool error_value = (strcmp(decoded_val, "ACTIVE") == 0 || 
+                            strcmp(decoded_val, "REPLACE") == 0 ||
+                            strcmp(decoded_val, "WARNING") == 0);
+          
+          if (strcmp(decoded_name, "error_overheating") == 0) {
+            errorManager->updateErrorOverheating(error_value);
+          }
+          else if (strcmp(decoded_name, "error_temp_sensor_p_oda") == 0) {
+            errorManager->updateErrorTempSensorPODA(error_value);
+          }
+          else if (strcmp(decoded_name, "error_preheat_location") == 0) {
+            errorManager->updateErrorPreheatLocation(error_value);
+          }
+          else if (strcmp(decoded_name, "error_ext_pressure_eha") == 0) {
+            errorManager->updateErrorExtPressureEHA(error_value);
+          }
+          else if (strcmp(decoded_name, "error_ext_pressure_sup") == 0) {
+            errorManager->updateErrorExtPressureSUP(error_value);
+          }
+          else if (strcmp(decoded_name, "error_tempcontrol_p_oda") == 0) {
+            errorManager->updateErrorTempControlPODA(error_value);
+          }
+          else if (strcmp(decoded_name, "error_tempcontrol_sup") == 0) {
+            errorManager->updateErrorTempControlSUP(error_value);
+          }
+          else if (strcmp(decoded_name, "alarm_filter") == 0) {
+            errorManager->updateAlarmFilter(error_value);
+          }
+          else if (strcmp(decoded_name, "warning_system") == 0) {
+            errorManager->updateWarningSystem(error_value);
+          }
+        }
+        // ============================================================================
       }
     }
   }

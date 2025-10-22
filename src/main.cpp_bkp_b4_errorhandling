@@ -12,7 +12,6 @@
 #include "comfoair/sensor_data.h"
 #include "comfoair/filter_data.h"
 #include "comfoair/control_manager.h"
-#include "comfoair/error_data.h"  // ← NEW: Error data manager
 #include "screen/screen_manager.h"  // NEW: Screen manager for NTM
 #include "mqtt/mqtt.h"
 #include "ota/ota.h"
@@ -81,7 +80,6 @@ comfoair::TimeManager *timeMgr = nullptr;
 comfoair::SensorDataManager *sensorData = nullptr;
 comfoair::FilterDataManager *filterData = nullptr;
 comfoair::ControlManager *controlMgr = nullptr;
-comfoair::ErrorDataManager *errorData = nullptr;  // ← NEW: Error data manager
 comfoair::ScreenManager *screenMgr = nullptr;  // NEW: Screen manager
 
 // Track current backlight state for TCA9554
@@ -250,19 +248,16 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   }
 }
 
-
-
 // Brightness 0..100% (0% = backlight off/very dim, 100% = bright)
 void setup() {
   Serial.begin(115200);
   delay(500);
   
   Serial.println("\n========================================");
-  Serial.println("ESP32-S3 ComfoAir Control v2.2");
+  Serial.println("ESP32-S3 ComfoAir Control v2.1");
   Serial.println("+ Sensor Data Display");
   Serial.println("+ CAN Bus Time Sync");
   Serial.println("+ Night Time Mode (NTM)");
-  Serial.println("+ Error/Alarm Detection");  // ← NEW
   Serial.println("========================================");
   
   setCpuFrequencyMhz(240);
@@ -376,14 +371,12 @@ void setup() {
   sensorData = new comfoair::SensorDataManager();
   filterData = new comfoair::FilterDataManager();
   controlMgr = new comfoair::ControlManager();
-  errorData = new comfoair::ErrorDataManager();  // ← NEW: Create error data manager
   screenMgr = new comfoair::ScreenManager();  // NEW: Screen manager
   
   // Link managers to CAN handler
   comfo->setSensorDataManager(sensorData);
   comfo->setFilterDataManager(filterData);
   comfo->setControlManager(controlMgr);
-  comfo->setErrorDataManager(errorData);  // ← NEW: Link error data manager
   
   // CRITICAL: Link TimeManager to ComfoAir for time sync
   timeMgr->setComfoAir(comfo);
@@ -396,13 +389,9 @@ void setup() {
   sensorData->setup();
   filterData->setup();
   controlMgr->setup();
-  errorData->setup();  // ← NEW: Initialize error data manager
   
-
   // NEW: Initialize screen manager with backlight control AND TCA write function for dimming
   screenMgr->begin(control_backlight, tca_write);
-
- 
   
   // Start WiFi connection (non-blocking, max 20 sec)
   wifi->setup();
@@ -474,7 +463,6 @@ void loop() {
   // ✅ PRIORITY 5: Manager loops (these handle batched updates)
   if (sensorData) sensorData->loop();      // Batches display updates to 5 sec
   if (filterData) filterData->loop();
-  if (errorData) errorData->loop();        // ← NEW: Error data manager loop
   
   // ✅ PRIORITY 6: Network services (lower priority)
   if (wifi) wifi->loop();

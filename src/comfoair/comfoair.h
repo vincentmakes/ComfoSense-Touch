@@ -8,6 +8,7 @@ namespace comfoair {
   class FilterDataManager;
   class ControlManager;
   class TimeManager;
+  class ErrorDataManager;  // ← NEW
 }
 
 namespace comfoair {
@@ -20,6 +21,7 @@ namespace comfoair {
       void setFilterDataManager(FilterDataManager* manager);
       void setControlManager(ControlManager* manager);
       void setTimeManager(TimeManager* manager);
+      void setErrorDataManager(ErrorDataManager* manager);  // ← NEW
       
       // Send CAN command
       bool sendCommand(const char* command);
@@ -36,6 +38,7 @@ namespace comfoair {
       FilterDataManager* filterManager;
       ControlManager* controlManager;
       TimeManager* timeManager;
+      ErrorDataManager* errorManager;  // ← NEW
       
       // Handle device time response
       void handleDeviceTimeResponse(uint32_t device_seconds);
