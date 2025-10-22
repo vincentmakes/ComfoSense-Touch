@@ -75,7 +75,8 @@ There are also 4 spacers which I couldn't print in one block with the rest.
 <img width="406" height="470" alt="Screenshot 2025-10-13 at 21 04 50" src="https://github.com/user-attachments/assets/19eaab50-7157-47e3-8a91-93aab00d5241" />
 <img width="462" height="487" alt="Screenshot 2025-10-13 at 21 05 23" src="https://github.com/user-attachments/assets/361ac999-a9c5-406a-a605-eae045d39541" />
 
-It will fit into the existing standard junction box (Swiss size, 81mm diam / 57mm in between mounting screws, 4 sides)
+It will fit into the existing standard junction box (Swiss size, 81mm diam / 57mm in between mounting screws, 4 sides).
+Fusion files are included as well as ready to print 3mf files with a Bambulab profile
 
 
 ## Features and logic
