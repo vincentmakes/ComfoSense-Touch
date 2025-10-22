@@ -16,7 +16,9 @@ Ready to be installed
 
 ![IMG_0152 Small](https://github.com/user-attachments/assets/18c18500-1f08-4de5-8d8c-a54a6e9c6a70)
 
+ComfoSense C67 in comparison
 
+<img width="300" alt="image" src="https://github.com/user-attachments/assets/9b135c1b-a45b-4518-a536-6289baf93e6a" />
 
 
 This version has the following features and tackle the issues below:
