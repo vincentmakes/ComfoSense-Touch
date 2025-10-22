@@ -20,6 +20,7 @@ Ready to be installed
 
 The high level requirements are:
 
+
     1. Make it as simple as possible for anyone to retrofit their unit
     
     2. Tackle connectivity, UI/UX in one go
