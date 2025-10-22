@@ -57,7 +57,7 @@ public:
         // Accept all messages
         twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
         
-
+    // Differs from default config given by Waveshare in their demo code. (longer queues here)
     twai_general_config_t g_config = {
         .mode = TWAI_MODE_NORMAL,
         .tx_io = TX_GPIO_NUM,

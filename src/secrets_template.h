@@ -55,8 +55,8 @@
 // When disabled, screen runs at full brightness
 #define DIMMING_ENABLED true
 
-// Default brightness level (0-100)
-// 0 = darkest, 100 = brightest
+// Default brightness level (0-100) 
+// 0 = darkest, 100 = brightest (relatively speaking - please don't expect full range of brightness)
 // Recommended: 0 for comfortable viewing
 #define DIMMING_DEFAULT_BRIGHTNESS 0
 

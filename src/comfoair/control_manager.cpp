@@ -53,10 +53,10 @@ void ControlManager::increaseFanSpeed() {
         
         Serial.printf("ControlManager: Increase fan speed to %d\n", current_fan_speed);
         
-        // ✅ Update display immediately (NO Strategy 5 - user triggered!)
+        // Update display immediately (NO Strategy 5 - user triggered!)
         GUI_update_fan_speed_display_from_cpp(current_fan_speed, boost_active);
         
-        // ✅ Send CAN command
+        //  Send CAN command
         sendFanSpeedCommand(current_fan_speed);
     } else {
         Serial.println("ControlManager: Already at max speed (3)");
@@ -70,10 +70,10 @@ void ControlManager::decreaseFanSpeed() {
         
         Serial.printf("ControlManager: Decrease fan speed to %d\n", current_fan_speed);
         
-        // ✅ Update display immediately (NO Strategy 5 - user triggered!)
+        // Update display immediately (NO Strategy 5 - user triggered!)
         GUI_update_fan_speed_display_from_cpp(current_fan_speed, boost_active);
         
-        // ✅ Send CAN command
+        // Send CAN command
         sendFanSpeedCommand(current_fan_speed);
     } else {
         Serial.println("ControlManager: Already at min speed (0)");
@@ -86,10 +86,10 @@ void ControlManager::activateBoost() {
     
     Serial.println("ControlManager: Boost activated (20 min)");
     
-    // ✅ Update display immediately (NO Strategy 5 - user triggered!)
+    // Update display immediately (NO Strategy 5 - user triggered!)
     GUI_update_fan_speed_display_from_cpp(current_fan_speed, boost_active);
     
-    // ✅ Send CAN command
+    //  Send CAN command
     sendBoostCommand();
 }
 
@@ -101,10 +101,10 @@ void ControlManager::setTempProfile(uint8_t profile) {
     const char* profile_names[] = {"NORMAL", "COOLING", "HEATING"};
     Serial.printf("ControlManager: Temperature profile set to %s\n", profile_names[profile]);
     
-    // ✅ Update display (NO Strategy 5 - user triggered!)
+    // Update display (NO Strategy 5 - user triggered!)
     GUI_update_temp_profile_display_from_cpp(profile);
     
-    // ✅ Send CAN command
+    // Send CAN command
     sendTempProfileCommand(profile);
 }
 
@@ -239,9 +239,7 @@ void ControlManager::sendTempProfileCommand(uint8_t profile) {
 
 extern "C" {
 
-// ✅ OPTIMIZED: Images update instantly WITHOUT Strategy 5!
-// User-triggered events (buttons) should NOT use GUI_request_display_refresh()
-// Only background updates (like TimeManager) need Strategy 5
+
 void GUI_update_fan_speed_display_from_cpp(uint8_t speed, bool boost) {
     // Hide all fan speed images first
     lv_obj_set_style_opa(GUI_Image__screen__fanspeed0, LV_OPA_0, 0);
@@ -268,10 +266,9 @@ void GUI_update_fan_speed_display_from_cpp(uint8_t speed, bool boost) {
         lv_obj_set_style_opa(active_image, LV_OPA_COVER, 0);
     }
     
-    // ✅ NO GUI_request_display_refresh() - images update on next lv_timer_handler()
-    // This is INSTANT because main loop calls lv_timer_handler() every 1ms
+
     GUI_request_display_refresh();
-    // Just invalidate - LVGL will handle the rest
+
     lv_obj_t* parent = lv_obj_get_parent(GUI_Image__screen__fanspeed0);
     if (parent) {
         lv_obj_invalidate(parent);
@@ -286,7 +283,7 @@ void GUI_update_temp_profile_display_from_cpp(uint8_t profile) {
     Serial.printf("GUI: Update temp profile display to %d\n", profile);
     
     // If you have visual elements to update, just invalidate them
-    // NO GUI_request_display_refresh() needed for user-triggered events!
+
 }
 
 }

@@ -22,8 +22,8 @@ ScreenManager::ScreenManager()
       last_pwm_update(0),
       pwm_state(false),
       pwm_on_time_us(0),
-      pwm_period_us(16700),  // 80Hz = 12500us period
-                             // Flicker-free with R40=0Ω (no filtering), maximum range
+      pwm_period_us(16700),  // 80Hz = 12500us period OR 60Hz = 16700us
+                             // Flicker-free with R40=0Ω (no filtering), range is limited by R36
       ntm_enabled(NTM_ENABLED),
       permanent_ntm(NTM_PERMANENT),
       ntm_start_hour(NTM_START_HOUR),
@@ -45,7 +45,7 @@ void ScreenManager::begin(void (*backlightControlFn)(bool on),
     Serial.printf("TCA Output State: 0x%02X (preserves backlight)\n", tca_output_state);
     
     // DEBUG: Show brightness value from secrets.h
-    Serial.printf("Current Brightness Value: %d%% (from DIMMING_DEFAULT_BRIGHTNESS)\n", current_brightness);
+    //Serial.printf("Current Brightness Value: %d%% (from DIMMING_DEFAULT_BRIGHTNESS)\n", current_brightness);
     
     // Check if dimming is enabled
     #ifdef DIMMING_ENABLED
@@ -234,8 +234,7 @@ void ScreenManager::setPWMPin(bool state) {
 
 void ScreenManager::calculatePWMTiming() {
     // Invert brightness for intuitive control:
-    // User expects: 100 = brightest, 0 = darkest
-    // But AP3032 FB works opposite: HIGH = darker, LOW = brighter
+    // AP3032 FB works opposite: HIGH = darker, LOW = brighter
     // So we invert: user 100 → 0% duty (brightest), user 0 → 100% duty (darkest)
     
     uint8_t inverted_brightness = 100 - current_brightness;

@@ -62,29 +62,29 @@ void GUI_process_display_refresh(void) {
 void GUI_event__Button__screen__BSpeedPlus__Clicked (lv_event_t* event) {
     if (is_too_soon(&last_plus_press)) return;
     
-    printf("✅ [+] Fan Speed\n");
+    printf(" [+] Fan Speed\n");
     control_manager_increase_fan_speed();
     GUI_request_display_refresh();
-    // ✅ NO GUI_request_display_refresh() - images update on next timer cycle
+    //  NO GUI_request_display_refresh() - images update on next timer cycle
     // This happens in < 1ms because main loop calls lv_timer_handler() constantly
 }
 
 void GUI_event__Button__screen__BSpeedMinus__Clicked (lv_event_t* event) {
     if (is_too_soon(&last_minus_press)) return;
     
-    printf("✅ [-] Fan Speed\n");
+    printf(" [-] Fan Speed\n");
     control_manager_decrease_fan_speed();
     GUI_request_display_refresh();
-    // ✅ NO forced refresh needed
+    //  NO forced refresh needed
 }
 
 void GUI_event__Button__screen__buttonspeedboost__Clicked (lv_event_t* event) {
     if (is_too_soon(&last_boost_press)) return;
     
-    printf("✅ [BOOST]\n");
+    printf(" [BOOST]\n");
     control_manager_activate_boost();
     GUI_request_display_refresh();
-    // ✅ NO forced refresh needed
+    //  NO forced refresh needed
 }
 
 //==============TEST=============
@@ -112,8 +112,8 @@ void GUI_event__Dropdown__screen__modedropdown__Value_Changed (lv_event_t* event
     lv_obj_t *dropdown = lv_event_get_target(event);
     uint16_t selected = lv_dropdown_get_selected(dropdown);
     
-    printf("✅ [DROPDOWN] %d\n", selected);
-        // ✅ Close dropdown and invalidate - NO forced refresh!
+    printf(" [DROPDOWN] %d\n", selected);
+        //  Close dropdown and invalidate - NO forced refresh!
     lv_dropdown_close(dropdown);
     GUI_request_display_refresh();   
     lv_obj_invalidate(dropdown);
@@ -154,24 +154,3 @@ void GUI_init_dropdown_styling(void) {
 void GUI_init_fan_speed_display(void) {
     printf("Fan speed display handled by control manager\n");
 }
-
-// ============================================================================
-// KEY INSIGHT: Strategy 5 is ONLY for background updates!
-// ============================================================================
-// 
-// USE Strategy 5 (GUI_request_display_refresh) for:
-//   ✅ TimeManager updating time/date labels every second
-//   ✅ Sensor data updating in background
-//   ✅ Any non-user-triggered label text updates
-//
-// DON'T USE Strategy 5 for:
-//   ❌ Button presses (user-triggered)
-//   ❌ Dropdown (user-triggered)
-//   ❌ Touch events
-//   ❌ Image updates (these are fast enough with just invalidate)
-//
-// Why? lv_refr_now() blocks for 50-200ms. When you stack multiple calls,
-// you get multi-second delays. User-triggered events should rely on the
-// main loop's lv_timer_handler() which is called every ~1ms.
-//
-// ============================================================================

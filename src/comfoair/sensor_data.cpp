@@ -32,7 +32,7 @@ void SensorDataManager::loop() {
     
     // Once we've received ANY CAN data, stop the demo mode entirely
     if (can_data_ever_received) {
-        // ✅ BATCHED UPDATES: Check if 2 seconds elapsed since last display update
+        //  BATCHED UPDATES: Check if 2 seconds elapsed since last display update
         // This reduces from 100+/sec to 0.5/sec while still feeling responsive
         if (display_update_pending && (now - last_display_update >= 2000)) {
             updateDisplay();
@@ -59,7 +59,7 @@ void SensorDataManager::updateInsideTemp(float temp) {
     
     Serial.printf("SensorData: Inside temp updated: %.1f°C (CAN data received)\n", temp);
     
-    // ✅ Mark for display update (will be shown within 2 seconds)
+    //  Mark for display update (will be shown within 2 seconds)
     last_can_update = millis();
     display_update_pending = true;
 }
@@ -72,7 +72,7 @@ void SensorDataManager::updateOutsideTemp(float temp) {
     
     Serial.printf("SensorData: Outside temp updated: %.1f°C (CAN data received)\n", temp);
     
-    // ✅ Mark for display update (will be shown within 2 seconds)
+    //  Mark for display update (will be shown within 2 seconds)
     last_can_update = millis();
     display_update_pending = true;
 }
@@ -85,7 +85,7 @@ void SensorDataManager::updateInsideHumidity(float humidity) {
     
     Serial.printf("SensorData: Inside humidity updated: %.0f%% (CAN data received)\n", humidity);
     
-    // ✅ Mark for display update (will be shown within 2 seconds)
+    //  Mark for display update (will be shown within 2 seconds)
     last_can_update = millis();
     display_update_pending = true;
 }
@@ -98,7 +98,7 @@ void SensorDataManager::updateOutsideHumidity(float humidity) {
     
     Serial.printf("SensorData: Outside humidity updated: %.0f%% (CAN data received)\n", humidity);
     
-    // ✅ Mark for display update (will be shown within 2 seconds)
+    //  Mark for display update (will be shown within 2 seconds)
     last_can_update = millis();
     display_update_pending = true;
 }
@@ -140,7 +140,7 @@ void SensorDataManager::updateDisplay() {
                   outside_temp_str, outside_hum_str,
                   current_data.valid ? "(CAN)" : "(DUMMY)");
     
-    // ✅ **STRATEGY 5 PATTERN** with 2-second batching
+    //  **STRATEGY 5 PATTERN** with 2-second batching
     // 1. Set the text
     lv_label_set_text(GUI_Label__screen__insideTemp, inside_temp_str);
     lv_label_set_text(GUI_Label__screen__outsideTemp, outside_temp_str);
@@ -148,7 +148,7 @@ void SensorDataManager::updateDisplay() {
     lv_label_set_text(GUI_Label__screen__outsideHum, outside_hum_str);
     
     // 2. Request display refresh (calls lv_refr_now())
-    // ✅ Only called every 2 seconds max (batched), not on every CAN frame
+    //  Only called every 2 seconds max (batched), not on every CAN frame
     // Reduces from 100+/sec to 0.5/sec while still feeling responsive
     GUI_request_display_refresh();
     
