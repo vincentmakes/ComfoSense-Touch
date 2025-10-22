@@ -43,3 +43,20 @@
 // After this time, screen automatically turns off again
 // Example: 180 = 3 minutes
 #define NTM_WAKE_DURATION_SEC 30
+
+// ============================================================================
+// Screen Dimming Configuration
+// ============================================================================
+
+// Enable/disable PWM brightness dimming
+// Hardware: Need two 0402 SMD resistors (R40=0 and R36=91k)
+// Check repo for more information
+// When enabled, software PWM at 60Hz is generated via I2C writes to TCA9554
+// When disabled, screen runs at full brightness
+#define DIMMING_ENABLED true
+
+// Default brightness level (0-100)
+// 0 = darkest, 100 = brightest
+// Recommended: 0 for comfortable viewing
+#define DIMMING_DEFAULT_BRIGHTNESS 0
+
