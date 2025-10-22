@@ -18,22 +18,9 @@ Ready to be installed
 
 
 
-The high level requirements are:
-
-
-    1. Make it as simple as possible for anyone to retrofit their unit
-    
-    2. Tackle connectivity, UI/UX in one go
-    
-    3. Keep MQTT integration capabilities for Home Assistant integration
-    
-    4. Use ESP32 since this is one of the best IoT MCU in 2025 with an active community
-
-
-
-
 
 This version has the following features and tackle the issues below:
+
     1. Wifi connection close to the Comfoair can be limited due to its location (typically the attic or the cellar), hence bringing the IoT device closer to a central area in the house (where the ComfoSense display controller normally sits) mitigate this.
     
     2. Better user interface than the one ComfoSense, with all basic functions exposed in one screen
