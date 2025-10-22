@@ -2,16 +2,30 @@
 
 This software is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver, namely this one in particular : https://github.com/dardhal/comfoair-esp32 and leveraging the excellent work from Michael Arnauts on mapping the CAN frames : https://github.com/michaelarnauts/aiocomfoconnect
 
-This new device is meant to not only replace the ComfoConnect LAN but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir. On top of having a much better UI, it's been optimized to be very snappy and responsive - in contrast to the slowness of the ComfoSense C67.
+This new device is meant to not only replace the ComfoConnect LAN but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir. On top of having a much better UI, it's been optimized to be very snappy and responsive.
+
+From concept
 
 <img width="300" alt="PoC_MVHR_Touch" src="https://github.com/user-attachments/assets/7fb632ff-633f-4125-abdc-4f15b32e9081" />
+
+To reality
+
+![IMG_0151](https://github.com/user-attachments/assets/9f421d4b-a74e-4e73-a82e-e0a182e28b3f)
+
+Ready to be installed
+
+![IMG_0152 Small](https://github.com/user-attachments/assets/18c18500-1f08-4de5-8d8c-a54a6e9c6a70)
 
 
 
 The high level requirements are:
+
     1. Make it as simple as possible for anyone to retrofit their unit
+    
     2. Tackle connectivity, UI/UX in one go
+    
     3. Keep MQTT integration capabilities for Home Assistant integration
+    
     4. Use ESP32 since this is one of the best IoT MCU in 2025 with an active community
 
 
@@ -20,9 +34,13 @@ The high level requirements are:
 
 This version has the following features and tackle the issues below:
     1. Wifi connection close to the Comfoair can be limited due to its location (typically the attic or the cellar), hence bringing the IoT device closer to a central area in the house (where the ComfoSense display controller normally sits) mitigate this.
+    
     2. Better user interface than the one ComfoSense, with all basic functions exposed in one screen
+    
     3. Provides exact number of days before filter change is needed (instead of the generic message Expect change of filter soon ... for 3 weeks)
+    
     4. Provides additional sensor data coming from the MVHR (temperature, humidity)
+    
     5. Provide same integration with HomeAssistant via MQTT, similarly to the original ESP32 + CAN Transceiver program
 
 This means this display can be used also by people who are not interested in the HA integration but simply want a better UI/UX than the one provided by Zehnder
@@ -33,11 +51,13 @@ Prerequisites:
 
 * Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 
-Not tested yet but I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
-Our device consumes at best 1.2W (measured) so that should be plenty which means is can be connected directly in place of the ComfoSense C67
+I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
+Our device consumes at best 1.2W (5V at 230mA measured at full brightness) which means it can be connected directly in place of the ComfoSense C67.
+At minimum brightness I'm operating at, I have measured 5V at 110mA which is 0.55W
+
 <img width="902" height="309" alt="Screenshot 2025-10-11 at 14 16 59" src="https://github.com/user-attachments/assets/860e895b-08bd-40b6-a3f8-3b2253ed920b" />
 (source: https://zehnderamerica.com/resources/comfoair-q-installer-manual/)
-Another manual mentions 150mA max which means 1.8W and is a bit close to the limit but would still work,especially with the screen a bit dimmed
+Another manual mentions 150mA max which means 1.8W and is a bit close to the limit but would still work,especially with the screen dimmed
 
 <img width="696" height="116" alt="image" src="https://github.com/user-attachments/assets/8721c505-c25d-41b7-895a-ea2db5fcfd09" />
 (source: https://www.phstore.co.uk/PDF/Zehnder/Install_Manual_ComfoAir_Q.pdf)
@@ -93,10 +113,8 @@ Additional automation should be done through Home Assistant (such as changing fa
 
 **Detailed location for installing new resistors**  
 
-<img width="806" height="605" alt="R40_R36_location" src="https://github.com/user-attachments/assets/5147d920-3e84-4119-800a-436fecde9d01" />
+<img width="806" height="605" alt="R40_R36_location" src="https://github.com/user-attachments/assets/a0437215-9b4b-4e60-8c90-fb25a2a443de" />
 
-
-<img width="567" height="557" alt="Schematics_dimming" src="https://github.com/user-attachments/assets/feb8c6c6-6ca6-43b5-bcb8-9f7dacb31753" />
 
 ### Night Mode
 
