@@ -33,11 +33,13 @@ Prerequisites:
 
 * Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 
-Not tested yet but I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
-Our device consumes at best 1.2W (measured) so that should be plenty which means is can be connected directly in place of the ComfoSense C67
+I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
+Our device consumes at best 1.2W (5V at 230mA measured at full brightness) which means it can be connected directly in place of the ComfoSense C67.
+At minimum brightness I'm operating at, I have measured 5V at 110mA which is 0.55W
+
 <img width="902" height="309" alt="Screenshot 2025-10-11 at 14 16 59" src="https://github.com/user-attachments/assets/860e895b-08bd-40b6-a3f8-3b2253ed920b" />
 (source: https://zehnderamerica.com/resources/comfoair-q-installer-manual/)
-Another manual mentions 150mA max which means 1.8W and is a bit close to the limit but would still work,especially with the screen a bit dimmed
+Another manual mentions 150mA max which means 1.8W and is a bit close to the limit but would still work,especially with the screen dimmed
 
 <img width="696" height="116" alt="image" src="https://github.com/user-attachments/assets/8721c505-c25d-41b7-895a-ea2db5fcfd09" />
 (source: https://www.phstore.co.uk/PDF/Zehnder/Install_Manual_ComfoAir_Q.pdf)
