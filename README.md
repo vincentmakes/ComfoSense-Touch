@@ -39,18 +39,7 @@ Prerequisites:
 
 * Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 
-I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
-Our device consumes at best 1.2W (5V at 230mA measured at full brightness) which means it can be connected directly in place of the ComfoSense C67.
-At minimum brightness I'm operating at, I have measured 5V at 110mA which is 0.55W
-
-<img width="902" height="309" alt="Screenshot 2025-10-11 at 14 16 59" src="https://github.com/user-attachments/assets/860e895b-08bd-40b6-a3f8-3b2253ed920b" />
-(source: https://zehnderamerica.com/resources/comfoair-q-installer-manual/)
-Another manual mentions 150mA max which means 1.8W and is a bit close to the limit but would still work,especially with the screen dimmed
-
-<img width="696" height="116" alt="image" src="https://github.com/user-attachments/assets/8721c505-c25d-41b7-895a-ea2db5fcfd09" />
-(source: https://www.phstore.co.uk/PDF/Zehnder/Install_Manual_ComfoAir_Q.pdf)
-
-Testing live, I was able to power the Waveshare at full brightness and existing ComfoSense at once.
+See Power section for more details, but tldr; the device can be installed in place of the ComfoSense controller
 
 ## How to use : Flashing the firmware in the ESP32 development board
 
@@ -129,6 +118,20 @@ Additional automation should be done through Home Assistant (such as changing fa
 There's a feature to shutdown the screen during the night (or any given window) which can be set in secrets.h
 During that window, the screen can come back to life with a simple tap and will remain on for 30s.
 This mode is not linked to the dimming feature and can be used without hardware modification.
+
+### Power
+I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
+Our device consumes at best 1.2W (5V at 230mA measured at full brightness) which means it can be connected directly in place of the ComfoSense C67.
+At minimum brightness I'm operating at, I have measured 5V at 110mA which is 0.55W
+
+<img width="902" height="309" alt="Screenshot 2025-10-11 at 14 16 59" src="https://github.com/user-attachments/assets/860e895b-08bd-40b6-a3f8-3b2253ed920b" />
+(source: https://zehnderamerica.com/resources/comfoair-q-installer-manual/)
+Another manual mentions 150mA max which means 1.8W and is a bit close to the limit but would still work,especially with the screen dimmed
+
+<img width="696" height="116" alt="image" src="https://github.com/user-attachments/assets/8721c505-c25d-41b7-895a-ea2db5fcfd09" />
+(source: https://www.phstore.co.uk/PDF/Zehnder/Install_Manual_ComfoAir_Q.pdf)
+
+Testing live, I was able to power the Waveshare at full brightness and existing ComfoSense at once.
 
 
 ## Advanced explanations and troubleshooting I went through
