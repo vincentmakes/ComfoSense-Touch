@@ -81,7 +81,7 @@ Fusion files are included as well as ready to print 3mf files with a Bambulab pr
 
 ## Features and logic
 ### Time Management
-Time is fetched from NTP servers. I was planning to feed the time to the Comfoair but this is more difficult than anticipated and so far this feature is blocking regular CAN Command to work properly so I have commented the 3 lines responsible for it in the time_manager.cpp and will try to fix it at a later stage.
+Time is fetched from NTP servers. The time is not yet being fed back to the ComfoAir but it's on my todo.
 
 ### Filter and other Sensor Data
 Filter and sensor data are fetched using the CAN command directly (so we don't rely on a MQTT broker which could fail - we keep MQTT only for HA integration and associated usage from a mobile device)
@@ -93,7 +93,7 @@ Additional automation should be done through Home Assistant (such as changing fa
 
 ### Dimming the screen
 > [!IMPORTANT] 
->Dimming of the screen is an option which can be enabled in main.cpp by switching the DIMMING flag to true:  #define DIMMING true
+>Dimming of the screen is an option which can be enabled in secrets.h by switching the DIMMING flag to true:  #define DIMMING true
 >Additionnally, it requires hardware modifications by adding a size 0402 120K resistor in the R36 location and  putting a 0R resistor in R40 location.
 >Those are really tiny resistors which might be challenging without a microscope. More details on the location in the two pictures below
 
