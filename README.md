@@ -4,11 +4,12 @@ This software is inspired by the work of many others who successfully managed to
 
 This new device is meant to not only replace the ComfoConnect LAN but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir. On top of having a much better UI, it's been optimized to be very snappy and responsive.
 
-From concept
+Demo of the device
 
-<img width="300" alt="PoC_MVHR_Touch" src="https://github.com/user-attachments/assets/7fb632ff-633f-4125-abdc-4f15b32e9081" />
+[![Video Title](https://img.youtube.com/vi/VIDEO_ID/0.jpg)](https://www.youtube.com/watch?v=69VF5-dpnYU)
 
-To reality
+
+![IMG_0163](https://github.com/user-attachments/assets/a208e729-8a26-401f-b928-26063ef255df)
 
 ![IMG_0151](https://github.com/user-attachments/assets/9f421d4b-a74e-4e73-a82e-e0a182e28b3f)
 
