@@ -41,7 +41,8 @@ Prerequisites:
 
 * Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 
-See Power section for more details, but tldr; the device can be installed in place of the ComfoSense controller
+See Power section for more details, but tldr; the device can be installed in place of the ComfoSense controller.
+
 
 ## How to use : Flashing the firmware in the ESP32 development board
 
@@ -94,7 +95,7 @@ Additional automation should be done through Home Assistant (such as changing fa
 ### Dimming the screen
 > [!IMPORTANT] 
 >Dimming of the screen is an option which can be enabled in secrets.h by switching the DIMMING flag to true:  #define DIMMING true
->Additionnally, it requires hardware modifications by adding a size 0402 120K resistor in the R36 location and  putting a 0R resistor in R40 location.
+>Additionnally, it requires hardware modifications by adding a size 0402 100k resistor in the R36 location and  putting a 0R resistor in R40 location.
 >Those are really tiny resistors which might be challenging without a microscope. More details on the location in the two pictures below
 
 > [!NOTE]
@@ -135,7 +136,7 @@ Another manual mentions 150mA max which means 1.8W and is a bit close to the lim
 (source: https://www.phstore.co.uk/PDF/Zehnder/Install_Manual_ComfoAir_Q.pdf)
 
 Testing live, I was able to power the Waveshare at full brightness and existing ComfoSense at once.
-
+I have not tested the case if more devices than that are connected to it (sensors, other modules).
 
 ## Advanced explanations and troubleshooting I went through
 
@@ -201,7 +202,7 @@ One must use the default TWAI drivers for CAN communication. Beside the baud rat
 
 Changing the queue length is key: not changing it results in the driver splitting the CAN frames with a delay. This results in the frame not being read by the ComfoAir unit on top of making the display being very unresponsive
  
-## SIT 1 : ComfoAir emulation (One way)
+## SIT : ComfoAir emulation (One way)
 Testing is crucial for the CAN integration and since I didn't feel like debugging in the attic, nor hooking up and playing directly with the MVHR, I'm using a USB to CAN analyzer together with the CAN Utils suite on a VM.
 I've recorded a serie of steps (Fan speed 0->3; Temp Heat->Cool->Normal) and playing it back. Additionnally, the recording also capture sensor data from the ComfoAir which I can feed back into the ESP32.
 
@@ -220,7 +221,7 @@ Identify the CAN Interface: In the Linux terminal, list the network interfaces t
 ip link show
 ```
 
-Configure and Bring Up the CAN Interface: You'll need to set the bitrate for your CAN bus. For example, for a 125kbps bus:
+Configure and Bring Up the CAN Interface: You'll need to set the bitrate for your CAN bus. For example, for a 50kbps bus:
 ```shell
 sudo ip link set can0 type can bitrate 50000
 sudo ip link set can0 up
