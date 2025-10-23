@@ -101,7 +101,8 @@ Additional automation should be done through Home Assistant (such as changing fa
 > [!NOTE]
 > The schematics from waveshare shows few things which I think are not correct. 
 > 1. It shows this can be controlled via a PWM from GPIO42. Tracing it physically, I can confirm that my board which is a v3.0 uses EXIO5 instead just like v1 and v2.
-> 2.  The datasheet from the AP3032 even suggest a 10k/100nF RC low pass filter but they are using a much higher frequency (25kHz) which might not work with the I2C expander - or would impact the performance of the whole system. We are running the PWM at 60Hz in our case and 0R actually works. I've tried higher values, up to 220k but this was not very successful
+> 2.  The datasheet from the AP3032 even suggest a 10k/100nF RC low pass filter but they are using a much higher frequency (25kHz) which might not work with the I2C expander - or would impact the performance of the whole system. We are running the PWM at 60Hz in our case and 0R actually works. I've tried higher values, up to 220k but this was not very successful.
+> 
 > Confirmed by Waveshare in the following issue: https://github.com/waveshareteam/ESP32-display-support/issues/30
 > 1. Future version of this board will include a dedicated chip to handle the dimming so I'm guessing no more resistor to solder
 > 2. Reducing R36 to 68k might help with the range of brightness (not tested yet)
