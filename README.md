@@ -6,12 +6,11 @@ This new device is meant to not only replace the ComfoConnect LAN but also the C
 
 Demo of the device
 
-[![Video Title](https://img.youtube.com/vi/VIDEO_ID/0.jpg)](https://www.youtube.com/watch?v=69VF5-dpnYU)
+[![Watch the video](https://img.youtube.com/vi/69VF5-dpnYU/maxresdefault.jpg)](https://youtu.be/69VF5-dpnYU)
 
+### [Demo ComfoSense Touch](https://youtu.be/69VF5-dpnYU)
 
-![IMG_0163](https://github.com/user-attachments/assets/a208e729-8a26-401f-b928-26063ef255df)
-
-![IMG_0151](https://github.com/user-attachments/assets/9f421d4b-a74e-4e73-a82e-e0a182e28b3f)
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/b92b7554-c1ed-415e-8fdf-e054b1937c69" /> ![IMG_0151](https://github.com/user-attachments/assets/9f421d4b-a74e-4e73-a82e-e0a182e28b3f)
 
 Ready to be installed
 
