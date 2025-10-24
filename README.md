@@ -46,8 +46,12 @@ See Power section for more details, but tldr; the device can be installed in pla
 
 ## How to use : Flashing the firmware in the ESP32 development board
 
-First, rename the "secrets_template.h" file at the top of this repository into "secrets.h" and fill in the configuration: 
+First, rename the "secrets_template.h" file at the top of this repository into "**secrets.h**" and fill in the configuration: 
 Wifi, MQTT config, Night Time Mode, Dimming.
+
+In **platformio.in**i, set the path to your device (by default it is **/dev/cu.usbmodem1101**).
+
+In **time_manager.cpp**, set your timezone by using the IANA standard (TZ identifier): https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 
 Then compile the code using PlatformIO:
 
