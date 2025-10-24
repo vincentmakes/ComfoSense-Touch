@@ -27,12 +27,13 @@ void TimeManager::setup() {
 }
 
 void TimeManager::syncTime() {
-    // Configure NTP with timezone offset (adjust for your timezone)
-   // configTime(3600, 0, "pool.ntp.org", "time.nist.gov");
-
+    // Configure timezone using IANA timezone database
+    // This automatically handles DST transitions
     setenv("TZ", "Europe/Zurich", 1);
     tzset();
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");  // UTC+2 (Zurich summer time)
+    
+    // Configure NTP (GMT offset and DST offset are now ignored, timezone handles it)
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
     
     Serial.print("TimeManager: Waiting for NTP sync");
     
