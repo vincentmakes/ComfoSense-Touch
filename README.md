@@ -1,38 +1,28 @@
 # Zehnder Comfoair Q350 MQTT bridge + Touch Screen
 
-This software is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver, namely this one in particular : https://github.com/dardhal/comfoair-esp32 and leveraging the excellent work from Michael Arnauts on mapping the CAN frames : https://github.com/michaelarnauts/aiocomfoconnect
+This project is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver, namely this one in particular : https://github.com/dardhal/comfoair-esp32 and leveraging the excellent work from Michael Arnauts on mapping the CAN frames : https://github.com/michaelarnauts/aiocomfoconnect
 
 This new device is meant to not only replace the ComfoConnect LAN but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir. On top of having a much better UI, it's been optimized to be very snappy and responsive.
 
-From concept
+Demo of the device
 
-<img width="300" alt="PoC_MVHR_Touch" src="https://github.com/user-attachments/assets/7fb632ff-633f-4125-abdc-4f15b32e9081" />
+[![Watch the video](https://img.youtube.com/vi/69VF5-dpnYU/maxresdefault.jpg)](https://youtu.be/69VF5-dpnYU)
 
-To reality
+### [Demo ComfoSense Touch](https://youtu.be/69VF5-dpnYU) (2min - Youtube)
 
-![IMG_0151](https://github.com/user-attachments/assets/9f421d4b-a74e-4e73-a82e-e0a182e28b3f)
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/b92b7554-c1ed-415e-8fdf-e054b1937c69" /> ![IMG_0151](https://github.com/user-attachments/assets/9f421d4b-a74e-4e73-a82e-e0a182e28b3f)
 
 Ready to be installed
 
 ![IMG_0152 Small](https://github.com/user-attachments/assets/18c18500-1f08-4de5-8d8c-a54a6e9c6a70)
 
+ComfoSense C67 in comparison
 
-
-The high level requirements are:
-
-    1. Make it as simple as possible for anyone to retrofit their unit
-    
-    2. Tackle connectivity, UI/UX in one go
-    
-    3. Keep MQTT integration capabilities for Home Assistant integration
-    
-    4. Use ESP32 since this is one of the best IoT MCU in 2025 with an active community
-
-
-
+<img width="300" alt="image" src="https://github.com/user-attachments/assets/9b135c1b-a45b-4518-a536-6289baf93e6a" />
 
 
 This version has the following features and tackle the issues below:
+
     1. Wifi connection close to the Comfoair can be limited due to its location (typically the attic or the cellar), hence bringing the IoT device closer to a central area in the house (where the ComfoSense display controller normally sits) mitigate this.
     
     2. Better user interface than the one ComfoSense, with all basic functions exposed in one screen
@@ -51,23 +41,17 @@ Prerequisites:
 
 * Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 
-I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
-Our device consumes at best 1.2W (5V at 230mA measured at full brightness) which means it can be connected directly in place of the ComfoSense C67.
-At minimum brightness I'm operating at, I have measured 5V at 110mA which is 0.55W
+See Power section for more details, but tldr; the device can be installed in place of the ComfoSense controller.
 
-<img width="902" height="309" alt="Screenshot 2025-10-11 at 14 16 59" src="https://github.com/user-attachments/assets/860e895b-08bd-40b6-a3f8-3b2253ed920b" />
-(source: https://zehnderamerica.com/resources/comfoair-q-installer-manual/)
-Another manual mentions 150mA max which means 1.8W and is a bit close to the limit but would still work,especially with the screen dimmed
-
-<img width="696" height="116" alt="image" src="https://github.com/user-attachments/assets/8721c505-c25d-41b7-895a-ea2db5fcfd09" />
-(source: https://www.phstore.co.uk/PDF/Zehnder/Install_Manual_ComfoAir_Q.pdf)
-
-Testing live, I was able to power the Waveshare at full brightness and existing ComfoSense at once.
 
 ## How to use : Flashing the firmware in the ESP32 development board
 
-First, rename the "secrets_template.h" file at the top of this repository into "secrets.h" and fill in the configuration: 
+First, rename the "secrets_template.h" file at the top of this repository into "**secrets.h**" and fill in the configuration: 
 Wifi, MQTT config, Night Time Mode, Dimming.
+
+In **platformio.in**i, set the path to your device (by default it is **/dev/cu.usbmodem1101**).
+
+In **time_manager.cpp**, set your timezone by using the IANA standard (TZ identifier): https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 
 Then compile the code using PlatformIO:
 
@@ -79,9 +63,30 @@ pio device monitor -b 115200
 ```
 That's it ! Check further below for the mounting bracket to install it on the wall and options for dimming the screen (requires hardware changes)
 
+## Physical Mounting on the wall
+
+The mounting consists of 3 main part : two oversized (150%) Garmin style mount (male and female) and a decorative frame fixed by friction fit (to be improved)
+There are also 4 spacers which I couldn't print in one block with the rest.
+
+### Exploded View
+<img width="630" height="427" alt="Screenshot 2025-10-13 at 21 13 38" src="https://github.com/user-attachments/assets/bc6cec2d-78e7-4756-b521-b968adbb318a" />
+<img width="616" height="444" alt="Screenshot 2025-10-13 at 21 13 54" src="https://github.com/user-attachments/assets/d7627883-ff95-4f8a-a9a3-e4513db0246c" />
+
+
+
+### Partially installed View
+<img width="401" height="505" alt="Screenshot 2025-10-13 at 21 03 39" src="https://github.com/user-attachments/assets/d05f1e82-8608-4693-9c84-68b03b4bfe2a" />
+<img width="452" height="532" alt="Screenshot 2025-10-13 at 21 04 36" src="https://github.com/user-attachments/assets/c397266f-36fe-41c8-ada1-e499f48246b9" />
+<img width="406" height="470" alt="Screenshot 2025-10-13 at 21 04 50" src="https://github.com/user-attachments/assets/19eaab50-7157-47e3-8a91-93aab00d5241" />
+<img width="462" height="487" alt="Screenshot 2025-10-13 at 21 05 23" src="https://github.com/user-attachments/assets/361ac999-a9c5-406a-a605-eae045d39541" />
+
+It will fit into the existing standard junction box (Swiss size, 81mm diam / 57mm in between mounting screws, 4 sides).
+Fusion files are included as well as ready to print 3mf files with a Bambulab profile
+
+
 ## Features and logic
 ### Time Management
-Time is fetched from NTP servers. I was planning to feed the time to the Comfoair but this is more difficult than anticipated and so far this feature is blocking regular CAN Command to work properly so I have commented the 3 lines responsible for it in the time_manager.cpp and will try to fix it at a later stage.
+Time is fetched from NTP servers. The time is not yet being fed back to the ComfoAir but it's on my todo.
 
 ### Filter and other Sensor Data
 Filter and sensor data are fetched using the CAN command directly (so we don't rely on a MQTT broker which could fail - we keep MQTT only for HA integration and associated usage from a mobile device)
@@ -93,15 +98,18 @@ Additional automation should be done through Home Assistant (such as changing fa
 
 ### Dimming the screen
 > [!IMPORTANT] 
->Dimming of the screen is an option which can be enabled in main.cpp by switching the DIMMING flag to true:  #define DIMMING true
->Additionnally, it requires hardware modifications by adding a size 0402 120K resistor in the R36 location and  putting a 0R resistor in R40 location.
+>Dimming of the screen is an option which can be enabled in secrets.h by switching the DIMMING flag to true:  #define DIMMING true
+>Additionnally, it requires hardware modifications by adding a size 0402 100k resistor in the R36 location and  putting a 0R resistor in R40 location.
 >Those are really tiny resistors which might be challenging without a microscope. More details on the location in the two pictures below
 
 > [!NOTE]
 > The schematics from waveshare shows few things which I think are not correct. 
 > 1. It shows this can be controlled via a PWM from GPIO42. Tracing it physically, I can confirm that my board which is a v3.0 uses EXIO5 instead just like v1 and v2.
-> 2.  The datasheet from the AP3032 even suggest a 10k/100nF RC low pass filter but they are using a much higher frequency (25kHz) which might not work with the I2C expander - or would impact the performance of the whole system. We are running the PWM at 60Hz in our case and 0R actually works. I've tried higher values, up to 220k but this was not very successful
->
+> 2.  The datasheet from the AP3032 even suggest a 10k/100nF RC low pass filter but they are using a much higher frequency (25kHz) which might not work with the I2C expander - or would impact the performance of the whole system. We are running the PWM at 60Hz in our case and 0R actually works. I've tried higher values, up to 220k but this was not very successful.
+> 
+> Confirmed by Waveshare in the following issue: https://github.com/waveshareteam/ESP32-display-support/issues/30
+> 1. Future version of this board will include a dedicated chip to handle the dimming so I'm guessing no more resistor to solder
+> 2. Reducing R36 to 68k might help with the range of brightness (not tested yet)
 
 
 **High level view**  
@@ -122,6 +130,20 @@ There's a feature to shutdown the screen during the night (or any given window) 
 During that window, the screen can come back to life with a simple tap and will remain on for 30s.
 This mode is not linked to the dimming feature and can be used without hardware modification.
 
+### Power
+I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
+Our device consumes at best 1.2W (5V at 230mA measured at full brightness) which means it can be connected directly in place of the ComfoSense C67.
+At minimum brightness I'm operating at, I have measured 5V at 110mA which is 0.55W
+
+<img width="902" height="309" alt="Screenshot 2025-10-11 at 14 16 59" src="https://github.com/user-attachments/assets/860e895b-08bd-40b6-a3f8-3b2253ed920b" />
+(source: https://zehnderamerica.com/resources/comfoair-q-installer-manual/)
+Another manual mentions 150mA max which means 1.8W and is a bit close to the limit but would still work,especially with the screen dimmed
+
+<img width="696" height="116" alt="image" src="https://github.com/user-attachments/assets/8721c505-c25d-41b7-895a-ea2db5fcfd09" />
+(source: https://www.phstore.co.uk/PDF/Zehnder/Install_Manual_ComfoAir_Q.pdf)
+
+Testing live, I was able to power the Waveshare at full brightness and existing ComfoSense at once.
+I have not tested the case if more devices than that are connected to it (sensors, other modules).
 
 ## Advanced explanations and troubleshooting I went through
 
@@ -187,7 +209,7 @@ One must use the default TWAI drivers for CAN communication. Beside the baud rat
 
 Changing the queue length is key: not changing it results in the driver splitting the CAN frames with a delay. This results in the frame not being read by the ComfoAir unit on top of making the display being very unresponsive
  
-## SIT 1 : ComfoAir emulation (One way)
+## SIT : ComfoAir emulation (One way)
 Testing is crucial for the CAN integration and since I didn't feel like debugging in the attic, nor hooking up and playing directly with the MVHR, I'm using a USB to CAN analyzer together with the CAN Utils suite on a VM.
 I've recorded a serie of steps (Fan speed 0->3; Temp Heat->Cool->Normal) and playing it back. Additionnally, the recording also capture sensor data from the ComfoAir which I can feed back into the ESP32.
 
@@ -206,7 +228,7 @@ Identify the CAN Interface: In the Linux terminal, list the network interfaces t
 ip link show
 ```
 
-Configure and Bring Up the CAN Interface: You'll need to set the bitrate for your CAN bus. For example, for a 125kbps bus:
+Configure and Bring Up the CAN Interface: You'll need to set the bitrate for your CAN bus. For example, for a 50kbps bus:
 ```shell
 sudo ip link set can0 type can bitrate 50000
 sudo ip link set can0 up
@@ -230,24 +252,6 @@ canplayer -v -I candump-2025-10-14_163157.log can0=can0
 ```
 
 
-## Physical Mounting on the wall
-
-The mounting consists of 3 main part : two oversized (150%) Garmin style mount (male and female) and a decorative frame fixed by friction fit (to be improved)
-There are also 4 spacers which I couldn't print in one block with the rest.
-
-### Exploded View
-<img width="630" height="427" alt="Screenshot 2025-10-13 at 21 13 38" src="https://github.com/user-attachments/assets/bc6cec2d-78e7-4756-b521-b968adbb318a" />
-<img width="616" height="444" alt="Screenshot 2025-10-13 at 21 13 54" src="https://github.com/user-attachments/assets/d7627883-ff95-4f8a-a9a3-e4513db0246c" />
-
-
-
-### Partially installed View
-<img width="401" height="505" alt="Screenshot 2025-10-13 at 21 03 39" src="https://github.com/user-attachments/assets/d05f1e82-8608-4693-9c84-68b03b4bfe2a" />
-<img width="452" height="532" alt="Screenshot 2025-10-13 at 21 04 36" src="https://github.com/user-attachments/assets/c397266f-36fe-41c8-ada1-e499f48246b9" />
-<img width="406" height="470" alt="Screenshot 2025-10-13 at 21 04 50" src="https://github.com/user-attachments/assets/19eaab50-7157-47e3-8a91-93aab00d5241" />
-<img width="462" height="487" alt="Screenshot 2025-10-13 at 21 05 23" src="https://github.com/user-attachments/assets/361ac999-a9c5-406a-a605-eae045d39541" />
-
-It will fit into the existing standard junction box (Swiss size, 81mm diam / 57mm in between mounting screws, 4 sides)
 
 
 ## MQTT commands to interact with the ventilation unit (copy / paste from repo mentionned at the top)
