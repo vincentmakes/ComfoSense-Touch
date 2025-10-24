@@ -37,9 +37,10 @@ This means this display can be used also by people who are not interested in the
 
 ## What to use : Hardware Components
 
-Prerequisites:
+1. Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
+Watchout that Waveshare also has a 4.3in device which wouldn't work for this project, both from a power and lack of CAN transceiver pov.
 
-* Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
+2. Optionnally: two SMD resistors, size 0402 (0R or a wire and a 100k value) in order for the dimming feature to work (see Dimming section for more details.)
 
 See Power section for more details, but tldr; the device can be installed in place of the ComfoSense controller.
 
