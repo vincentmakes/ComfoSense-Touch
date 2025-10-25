@@ -137,6 +137,10 @@ This mode is not linked to the dimming feature and can be used without hardware 
 
 This mode can be enabled in secrets.h. When set to true, the device is no longer a MQTT bridge but requires another MQTT bridge and MQTT broker (check the repo mentionned at the beginning).
 The benefit is the device doesn't have to be hooked up to the Comfonet and can be installed anywhere in the house, as a secondary controller.
+The diagram below illustrates the architecture of the two modes
+
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/d15e320c-76d2-4e3e-8ec3-89ae38b1aeb1" />
+
 
 
 ### Power
