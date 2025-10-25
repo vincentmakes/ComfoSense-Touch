@@ -5,12 +5,8 @@
 
 -Fix or remove "Auto" label
 
--Move timezone to secrets.h (done in next commit)
-
--Move Filter Warning threshold to secrets.h (done in next commit)
 
 ## Future Features
-Add a remote client mode: requires another esp32 as MQTT bridge hooked up to the ComfoAir
 
 Add second screen to manage : 
 
