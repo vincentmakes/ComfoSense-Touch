@@ -103,7 +103,7 @@ namespace comfoair {
   }
 
   bool ComfoMessage::sendCommand(char const * command) {
-    // ✅ FIXED: Send command only ONCE (removed duplicate send and 1-second delay)
+    // âœ… FIXED: Send command only ONCE (removed duplicate send and 1-second delay)
     #define CMDIF(name) if (strcmp(command, #name) == 0) { \
                           return this->send(new std::vector<uint8_t>( CMD_ ## name )); \
                         } else 
@@ -148,6 +148,7 @@ namespace comfoair {
 
 // For documentation on PDOID's see: https://github.com/michaelarnauts/comfoconnect/blob/master/PROTOCOL-PDO.md
     switch (PDOID) {
+      LAZYSWITCH(1, "device_time", "%u", uint32)  // Device time in seconds since 2000-01-01
       LAZYSWITCH(16, "away_indicator", "%s", vals[0] == 0x07 ? "true" : "false")
       LAZYSWITCH(49, "operating_mode", "%s", vals[0] == 1 ? "limited_manual": (vals[0] == 0xff ? "auto": "unlimited_manual"))  // 01 = limited_manual, FF = auto, 05 = unlimited_manual
       LAZYSWITCH(65, "fan_speed", "%d", vals[0])
@@ -184,15 +185,15 @@ namespace comfoair {
       LAZYSWITCH(227, "bypass_state", "%d", vals[0])  // %
 
       // temps
-      LAZYSWITCH(209, "rmot", "%.1f", int16/ 10.0)  // C°
-      LAZYSWITCH(212, "target_temp", "%.1f", uint16/ 10.0)  // C°
-      LAZYSWITCH(220, "pre_heater_temp_before", "%.1f", int16/10.0) // C°
-      LAZYSWITCH(221, "post_heater_temp_after", "%.1f", int16/10.0)  // C°
-      LAZYSWITCH(274, "extract_air_temp", "%.1f", int16 /10.0)  // C°   
-      LAZYSWITCH(275, "exhaust_air_temp", "%.1f", int16 /10.0)  // C°   
-      LAZYSWITCH(276, "outdoor_air_temp", "%.1f", int16 /10.0)  // C°   
-      LAZYSWITCH(277, "pre_heater_temp_after", "%.1f", int16 /10.0)  // C°
-      LAZYSWITCH(278, "post_heater_temp_before", "%.1f", int16 /10.0)  // C°   
+      LAZYSWITCH(209, "rmot", "%.1f", int16/ 10.0)  // CÂ°
+      LAZYSWITCH(212, "target_temp", "%.1f", uint16/ 10.0)  // CÂ°
+      LAZYSWITCH(220, "pre_heater_temp_before", "%.1f", int16/10.0) // CÂ°
+      LAZYSWITCH(221, "post_heater_temp_after", "%.1f", int16/10.0)  // CÂ°
+      LAZYSWITCH(274, "extract_air_temp", "%.1f", int16 /10.0)  // CÂ°   
+      LAZYSWITCH(275, "exhaust_air_temp", "%.1f", int16 /10.0)  // CÂ°   
+      LAZYSWITCH(276, "outdoor_air_temp", "%.1f", int16 /10.0)  // CÂ°   
+      LAZYSWITCH(277, "pre_heater_temp_after", "%.1f", int16 /10.0)  // CÂ°
+      LAZYSWITCH(278, "post_heater_temp_before", "%.1f", int16 /10.0)  // CÂ°   
       // Humidity
       LAZYSWITCH(290, "extract_air_humidity", "%d", vals[0])  // %
       LAZYSWITCH(291, "exhaust_air_humidity", "%d", vals[0])  // %   
@@ -298,51 +299,31 @@ namespace comfoair {
 
   // Time synchronization methods
   bool ComfoMessage::requestTime() {
-    Serial.println("ComfoMessage: Sending time request (RTR frame)");
+    Serial.println("ComfoMessage: Sending time request");
     
-    // Create RTR (Remote Transmission Request) frame
-    // CAN ID: 0x10040028 (time request)
-    message.id = 0x10040028;
-    message.extended = true;
-    message.rtr = true;  // This is a request frame
-    message.length = 0;  // RTR frames have no data
+    // Request time using the same RMI pattern as other commands
+    // RMI command to request PDOID 1 (device time)
+    // Format: 0x84 = RMI Read, 0x15 = ??, 0x??= subcommand, 0x01 = PDOID 1
+    std::vector<uint8_t> timeRequestCmd = { 0x82, 0x15, 0x01, 0x00 };  // Read request for PDOID 1
     
-   // bool success = CAN0.sendFrame(message);
-    bool success = false;
-    if (success) {
-      Serial.println("ComfoMessage: Time request sent successfully");
-    } else {
-      Serial.println("ComfoMessage: Failed to send time request");
-    }
-    
-    return success;
+    return this->send(&timeRequestCmd);
   }
 
   bool ComfoMessage::setTime(uint32_t secondsSince2000) {
     Serial.printf("ComfoMessage: Setting device time to %u seconds since 2000-01-01\n", secondsSince2000);
     
-    // Create time set message
-    // CAN ID: 0x10040001 (time set)
-    message.id = 0x10040001;
-    message.extended = true;
-    message.rtr = false;
-    message.length = 4;
+    // Set time using RMI write pattern (similar to other commands)
+    // Format: 0x84 = RMI Write, 0x15, then PDOID, then 4-byte time value
+    std::vector<uint8_t> timeSetCmd = { 
+      0x84, 0x15, 0x01, 0x00,  // Write to PDOID 1 (time)
+      0x00, 0x00, 0x00, 0x00,  // Reserved bytes
+      (uint8_t)(secondsSince2000 & 0xFF),         // Time byte 0 (LSB)
+      (uint8_t)((secondsSince2000 >> 8) & 0xFF),  // Time byte 1
+      (uint8_t)((secondsSince2000 >> 16) & 0xFF), // Time byte 2
+      (uint8_t)((secondsSince2000 >> 24) & 0xFF)  // Time byte 3 (MSB)
+    };
     
-    // Pack seconds as little-endian 32-bit value
-    message.data.uint8[0] = (secondsSince2000) & 0xFF;
-    message.data.uint8[1] = (secondsSince2000 >> 8) & 0xFF;
-    message.data.uint8[2] = (secondsSince2000 >> 16) & 0xFF;
-    message.data.uint8[3] = (secondsSince2000 >> 24) & 0xFF;
-    
-    //bool success = CAN0.sendFrame(message);
-    bool success = false;
-    if (success) {
-      Serial.println("ComfoMessage: Time set command sent successfully");
-    } else {
-      Serial.println("ComfoMessage: Failed to send time set command");
-    }
-    
-    return success;
+    return this->send(&timeSetCmd);
   }
 
   bool ComfoMessage::setTimeFromDateTime(uint16_t year, uint8_t month, uint8_t day,

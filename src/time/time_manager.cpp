@@ -27,12 +27,8 @@ void TimeManager::setup() {
 }
 
 void TimeManager::syncTime() {
-    // Configure timezone using IANA timezone database
-    // This automatically handles DST transitions
-    setenv("TZ", "Europe/Zurich", 1);
-    tzset();
-    
-    // Configure NTP (GMT offset and DST offset are now ignored, timezone handles it)
+    // First, sync with NTP to get UTC time
+    Serial.println("TimeManager: Starting NTP sync...");
     configTime(0, 0, "pool.ntp.org", "time.nist.gov");
     
     Serial.print("TimeManager: Waiting for NTP sync");
@@ -57,9 +53,19 @@ void TimeManager::syncTime() {
     
     if (timeinfo.tm_year > (2020 - 1900)) {
         Serial.println(" SUCCESS");
-        Serial.printf("TimeManager: NTP sync successful - %04d-%02d-%02d %02d:%02d:%02d\n",
+        
+        // Now set the timezone - this converts UTC time to local time
+        setenv("TZ", "Europe/Zurich", 1);
+        tzset();
+        
+        // Get the local time after timezone is set
+        time(&now);
+        localtime_r(&now, &timeinfo);
+        
+        Serial.printf("TimeManager: NTP sync successful - %04d-%02d-%02d %02d:%02d:%02d %s\n",
                      timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
-                     timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                     timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
+                     timeinfo.tm_isdst ? "CEST" : "CET");
         time_synced = true;
         last_sync_check = millis();
         
@@ -81,8 +87,8 @@ void TimeManager::checkAndSyncDeviceTime() {
     Serial.println("TimeManager: Requesting device time from CAN bus...");
     
     // Request time from device via CAN bus
-   // comfoair->requestDeviceTime();
-    waiting_for_device_time = false;
+    comfoair->requestDeviceTime();
+    waiting_for_device_time = true;
     device_time_request_timestamp = millis();
 }
 
@@ -144,7 +150,7 @@ void TimeManager::setDeviceTime(time_t ntp_time) {
                  timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
     
     // Send time to device via CAN bus
-    //comfoair->setDeviceTime(device_seconds);
+    comfoair->setDeviceTime(device_seconds);
     
     Serial.println("TimeManager: Device time set command sent");
 }
@@ -202,13 +208,13 @@ void TimeManager::updateDisplay() {
     String timeStr = getTimeString();
     String dateStr = getDateString();
     
-    // ✅ **STRATEGY 5 PATTERN** (but optimized to reduce refresh frequency)
+    // âœ… **STRATEGY 5 PATTERN** (but optimized to reduce refresh frequency)
     // 1. Set the text
     lv_label_set_text(GUI_Label__screen__time, timeStr.c_str());
     lv_label_set_text(GUI_Label__screen__date, dateStr.c_str());
     
     // 2. Request display refresh (this calls lv_refr_now())
-    // ✅ OPTIMIZATION: Only refresh every second (not a problem for time display)
+    // âœ… OPTIMIZATION: Only refresh every second (not a problem for time display)
     // This reduces from potentially 60Hz to 1Hz for time updates
     GUI_request_display_refresh();
     
@@ -234,7 +240,7 @@ void TimeManager::loop() {
         Serial.println("TimeManager: 8 hours elapsed, re-syncing with NTP and device...");
         syncTime(); // Re-sync with NTP
         if (time_synced) {
-        //    checkAndSyncDeviceTime(); // Then check device time
+            checkAndSyncDeviceTime(); // Then check device time
         }
     }
     
