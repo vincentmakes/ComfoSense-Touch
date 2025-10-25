@@ -1,6 +1,6 @@
 # Zehnder Comfoair Q350 MQTT bridge + Touch Screen
 
-This project is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver, namely this one in particular : https://github.com/dardhal/comfoair-esp32 and leveraging the excellent work from Michael Arnauts on mapping the CAN frames : https://github.com/michaelarnauts/aiocomfoconnect
+This project is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver, namely those ones in particular : https://github.com/vekexasia/comfoair-esp32 & https://github.com/dardhal/comfoair-esp32 and leveraging the excellent work from Michael Arnauts on mapping the CAN frames : https://github.com/michaelarnauts/aiocomfoconnect
 
 This new device is meant to not only replace the ComfoConnect LAN but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir. On top of having a much better UI, it's been optimized to be very snappy and responsive.
 
@@ -37,9 +37,10 @@ This means this display can be used also by people who are not interested in the
 
 ## What to use : Hardware Components
 
-Prerequisites:
+1. Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
+Watchout that Waveshare also has a 4.3in device which wouldn't work for this project, both from a power and lack of CAN transceiver pov.
 
-* Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
+2. Optionnally: two SMD resistors, size 0402 (0R or a wire and a 100k value) in order for the dimming feature to work (see Dimming section for more details.)
 
 See Power section for more details, but tldr; the device can be installed in place of the ComfoSense controller.
 
@@ -129,6 +130,18 @@ Additional automation should be done through Home Assistant (such as changing fa
 There's a feature to shutdown the screen during the night (or any given window) which can be set in secrets.h
 During that window, the screen can come back to life with a simple tap and will remain on for 30s.
 This mode is not linked to the dimming feature and can be used without hardware modification.
+
+### Filter Warning Threshold
+
+### Remote Client Mode
+
+This mode can be enabled in secrets.h. When set to true, the device is no longer a MQTT bridge but requires another MQTT bridge and MQTT broker (check the repo mentionned at the beginning).
+The benefit is the device doesn't have to be hooked up to the Comfonet and can be installed anywhere in the house, as a secondary controller.
+The diagram below illustrates the architecture of the two modes
+
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/d15e320c-76d2-4e3e-8ec3-89ae38b1aeb1" />
+
+
 
 ### Power
 I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
