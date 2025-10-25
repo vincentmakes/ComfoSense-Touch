@@ -298,16 +298,21 @@ namespace comfoair {
   }
 
   // Time synchronization methods
-  bool ComfoMessage::requestTime() {
-    Serial.println("ComfoMessage: Sending time request");
+bool ComfoMessage::requestTime() {
+    Serial.println("ComfoMessage: Sending time request (Alt 1: RMI 0x83)");
     
-    // Request time using the same RMI pattern as other commands
-    // RMI command to request PDOID 1 (device time)
-    // Format: 0x84 = RMI Read, 0x15 = ??, 0x??= subcommand, 0x01 = PDOID 1
-    std::vector<uint8_t> timeRequestCmd = { 0x82, 0x15, 0x01, 0x00 };  // Read request for PDOID 1
+    // Try 0x83 instead of 0x82 for read command
+    std::vector<uint8_t> timeRequestCmd = { 0x82, 0x01, 0x01, 0x00 };
+
+    //2 0x85, 0x15, 0x01, 0x00
+    //3 0x82, 0x01, 0x01, 0x00 *< fails
+    //4 0x82, 0x15, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 
+    //5 0x82, 0x15, 0x28, 0x00
+    //6 0x80, 0x15, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00
     
     return this->send(&timeRequestCmd);
-  }
+    
+}
 
   bool ComfoMessage::setTime(uint32_t secondsSince2000) {
     Serial.printf("ComfoMessage: Setting device time to %u seconds since 2000-01-01\n", secondsSince2000);
@@ -315,12 +320,11 @@ namespace comfoair {
     // Set time using RMI write pattern (similar to other commands)
     // Format: 0x84 = RMI Write, 0x15, then PDOID, then 4-byte time value
     std::vector<uint8_t> timeSetCmd = { 
-      0x84, 0x15, 0x01, 0x00,  // Write to PDOID 1 (time)
-      0x00, 0x00, 0x00, 0x00,  // Reserved bytes
-      (uint8_t)(secondsSince2000 & 0xFF),         // Time byte 0 (LSB)
-      (uint8_t)((secondsSince2000 >> 8) & 0xFF),  // Time byte 1
-      (uint8_t)((secondsSince2000 >> 16) & 0xFF), // Time byte 2
-      (uint8_t)((secondsSince2000 >> 24) & 0xFF)  // Time byte 3 (MSB)
+ 0x80, 0x15, 0x01, 0x00,  // Different command type
+        (uint8_t)(secondsSince2000 & 0xFF),
+        (uint8_t)((secondsSince2000 >> 8) & 0xFF),
+        (uint8_t)((secondsSince2000 >> 16) & 0xFF),
+        (uint8_t)((secondsSince2000 >> 24) & 0xFF)
     };
     
     return this->send(&timeSetCmd);
@@ -364,4 +368,5 @@ namespace comfoair {
     return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
   }
 
+   
 }

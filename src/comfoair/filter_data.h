@@ -2,6 +2,7 @@
 #define FILTER_DATA_H
 
 #include <Arduino.h>
+#include "../secrets.h"
 
 namespace comfoair {
 
@@ -34,7 +35,14 @@ private:
     
     static const unsigned long DATA_TIMEOUT = 86400000; // 24 hours in milliseconds
     static const int DUMMY_DAYS = 99;
-    static const int WARNING_THRESHOLD = 21; // Show warning when <= 21 days
+
+    #ifdef WARNING_THRESHOLD_DAYS
+            static const int WARNING_THRESHOLD = WARNING_THRESHOLD_DAYS;  //as per config in secrets.h
+    #else
+            static const int WARNING_THRESHOLD = 21; // Show warning when <= 21 days
+    #endif
+
+
 };
 
 } // namespace comfoair

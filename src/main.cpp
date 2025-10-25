@@ -16,6 +16,7 @@
 #include "screen/screen_manager.h"  // NEW: Screen manager for NTM
 #include "mqtt/mqtt.h"
 #include "ota/ota.h"
+
 #include "time/time_manager.h"
 #include "lvgl.h"
 #include "ui/GUI.h"
@@ -227,43 +228,46 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     
     unsigned long press_duration = now - touch_start_time;
     
+    // âœ… ALWAYS release regardless of duration - let LVGL handle debouncing
     data->state = LV_INDEV_STATE_RELEASED;
     data->point.x = last_x;
     data->point.y = last_y;
     
-    if (press_duration < MIN_PRESS_DURATION_MS) {
-      Serial.printf("⚠️  [%lu] PRESS IGNORED (too brief: %lu ms)\n", now, press_duration);
-    } else {
-      Serial.printf("🔴 [%lu] PRESS END (duration: %lu ms)\n", now, press_duration);
-    }
+    Serial.printf("🔴 [%lu] PRESS RELEASED after %lums\n", now, press_duration);
     
     touch_active = false;
   }
   else {
     // ────────────────────────────────────────────────────────────────────────
-    // IDLE
+    // NO TOUCH
     // ────────────────────────────────────────────────────────────────────────
-    
     data->state = LV_INDEV_STATE_RELEASED;
-    data->point.x = last_x;
-    data->point.y = last_y;
   }
 }
 
-
-
-// Brightness 0..100% (0% = backlight off/very dim, 100% = bright)
 void setup() {
   Serial.begin(115200);
-  delay(500);
+  delay(1000);
   
-  Serial.println("\n========================================");
-  Serial.println("ESP32-S3 ComfoAir Control v2.2");
-  Serial.println("+ Sensor Data Display");
-  Serial.println("+ CAN Bus Time Sync");
-  Serial.println("+ Night Time Mode (NTM)");
-  Serial.println("+ Error/Alarm Detection");  // ← NEW
-  Serial.println("========================================");
+  // ============================================================================
+  // REMOTE CLIENT MODE CHECK
+  // ============================================================================
+  #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+    Serial.println("\n╔═══════════════════════════════════════════════════════════╗");
+    Serial.println("║     REMOTE CLIENT MODE ENABLED                            ║");
+    Serial.println("║     - No CAN bus initialization                           ║");
+    Serial.println("║     - All data via MQTT from bridge device                ║");
+    Serial.println("║     - Commands sent via MQTT                              ║");
+    Serial.println("║     - Time sync disabled                                  ║");
+    Serial.println("╚═══════════════════════════════════════════════════════════╝\n");
+  #else
+    Serial.println("\n╔═══════════════════════════════════════════════════════════╗");
+    Serial.println("║     NORMAL MODE - Direct CAN Communication                ║");
+    Serial.println("╚═══════════════════════════════════════════════════════════╝\n");
+  #endif
+  
+  Serial.println("=== ESP32-S3 Touch LCD 4.0\" MVHR Controller ===");
+  Serial.printf("CPU Frequency: %d MHz\n", getCpuFrequencyMhz());
   
   setCpuFrequencyMhz(240);
   
@@ -356,23 +360,33 @@ void setup() {
   
   wifi = new comfoair::WiFi();
   
-  // MQTT is optional - only create if enabled
-  #ifdef MQTT_ENABLED
-    #if MQTT_ENABLED
-      mqtt = new comfoair::MQTT();
-      Serial.println("MQTT client enabled");
+  // ============================================================================
+  // MQTT CONFIGURATION
+  // ============================================================================
+  #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+    // In remote client mode, MQTT is MANDATORY
+    mqtt = new comfoair::MQTT();
+    Serial.println("MQTT client enabled (REQUIRED for Remote Client Mode)");
+  #else
+    // In normal mode, MQTT is optional
+    #ifdef MQTT_ENABLED
+      #if MQTT_ENABLED
+        mqtt = new comfoair::MQTT();
+        Serial.println("MQTT client enabled");
+      #else
+        mqtt = nullptr;
+        Serial.println("MQTT client disabled (MQTT_ENABLED = false)");
+      #endif
     #else
       mqtt = nullptr;
-      Serial.println("MQTT client disabled (MQTT_ENABLED = false)");
+      Serial.println("MQTT client disabled (MQTT_ENABLED not defined)");
     #endif
-  #else
-    mqtt = nullptr;
-    Serial.println("MQTT client disabled (MQTT_ENABLED not defined)");
   #endif
   
   comfo = new comfoair::ComfoAir();
   ota = new comfoair::OTA();
   timeMgr = new comfoair::TimeManager();
+  
   sensorData = new comfoair::SensorDataManager();
   filterData = new comfoair::FilterDataManager();
   controlMgr = new comfoair::ControlManager();
@@ -385,12 +399,31 @@ void setup() {
   comfo->setControlManager(controlMgr);
   comfo->setErrorDataManager(errorData);  // ← NEW: Link error data manager
   
-  // CRITICAL: Link TimeManager to ComfoAir for time sync
-  timeMgr->setComfoAir(comfo);
-  comfo->setTimeManager(timeMgr);
+  // ============================================================================
+  // TIME MANAGER LINKING
+  // ============================================================================
+  #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+    // In remote client mode: NTP only, no device time sync
+    // TimeManager is still created and used for NTP time display
+    // But we don't link it to ComfoAir (no CAN time sync)
+    Serial.println("TimeManager: NTP mode only (no device sync in Remote Client Mode)");
+  #else
+    // In normal mode: NTP + device time sync via CAN
+    // CRITICAL: Link TimeManager to ComfoAir for time sync
+    timeMgr->setComfoAir(comfo);
+    comfo->setTimeManager(timeMgr);
+  #endif
   
   // Link ComfoAir to control manager (for sending commands)
   controlMgr->setComfoAir(comfo);
+  
+  // Link MQTT to control manager for remote client mode
+  #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+    if (mqtt) {
+      controlMgr->setMQTT(mqtt);
+      Serial.println("ControlManager: MQTT linked for remote command sending ✓");
+    }
+  #endif
   
   // Initialize managers
   sensorData->setup();
@@ -407,31 +440,132 @@ void setup() {
   // Start WiFi connection (non-blocking, max 20 sec)
   wifi->setup();
   
-  // CRITICAL: Initialize CAN bus AFTER MQTT is ready
-  // ComfoAir::setup() calls mqtt->subscribeTo(), so mqtt must exist
-  // If MQTT is disabled, we need to skip those subscriptions
-  
   // Only initialize network-dependent services if WiFi connected
   if (wifi->isConnected()) {
-    // MQTT setup only if enabled
+    // MQTT setup (required in remote client mode, optional otherwise)
     if (mqtt) {
       mqtt->setup();
-      Serial.println("MQTT ready - initializing CAN bus with MQTT subscriptions");
-    } else {
-      Serial.println("MQTT disabled - initializing CAN bus without MQTT subscriptions");
+      Serial.println("MQTT ready");
+      
+      // ========================================================================
+      // MQTT DATA SUBSCRIPTIONS (Remote Client Mode)
+      // ========================================================================
+      #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+        Serial.println("Setting up MQTT subscriptions for sensor data...");
+        
+        // Subscribe to sensor data from bridge
+        mqtt->subscribeTo(MQTT_PREFIX "/extract_air_temp", [](char const * _1, uint8_t const * _2, int _3) {
+          if (sensorData) {
+            float temp = atof((char*)_2);
+            sensorData->updateInsideTemp(temp);
+            Serial.printf("MQTT: Inside temp = %.1f°C\n", temp);
+          }
+        });
+        
+        mqtt->subscribeTo(MQTT_PREFIX "/outdoor_air_temp", [](char const * _1, uint8_t const * _2, int _3) {
+          if (sensorData) {
+            float temp = atof((char*)_2);
+            sensorData->updateOutsideTemp(temp);
+            Serial.printf("MQTT: Outside temp = %.1f°C\n", temp);
+          }
+        });
+        
+        mqtt->subscribeTo(MQTT_PREFIX "/extract_air_humidity", [](char const * _1, uint8_t const * _2, int _3) {
+          if (sensorData) {
+            float humidity = atof((char*)_2);
+            sensorData->updateInsideHumidity(humidity);
+            Serial.printf("MQTT: Inside humidity = %.1f%%\n", humidity);
+          }
+        });
+        
+        mqtt->subscribeTo(MQTT_PREFIX "/outdoor_air_humidity", [](char const * _1, uint8_t const * _2, int _3) {
+          if (sensorData) {
+            float humidity = atof((char*)_2);
+            sensorData->updateOutsideHumidity(humidity);
+            Serial.printf("MQTT: Outside humidity = %.1f%%\n", humidity);
+          }
+        });
+        
+        mqtt->subscribeTo(MQTT_PREFIX "/remaining_days_filter_replacement", [](char const * _1, uint8_t const * _2, int _3) {
+          if (filterData) {
+            int days = atoi((char*)_2);
+            filterData->updateFilterDays(days);
+            Serial.printf("MQTT: Filter days = %d\n", days);
+          }
+        });
+        
+        mqtt->subscribeTo(MQTT_PREFIX "/fan_speed", [](char const * _1, uint8_t const * _2, int _3) {
+          if (controlMgr) {
+            int speed = atoi((char*)_2);
+            controlMgr->updateFanSpeedFromCAN(speed);
+            Serial.printf("MQTT: Fan speed = %d\n", speed);
+          }
+        });
+        
+        mqtt->subscribeTo(MQTT_PREFIX "/temp_profile", [](char const * _1, uint8_t const * _2, int _3) {
+          if (controlMgr) {
+            uint8_t profile = 0;
+            if (strcmp((char*)_2, "cold") == 0) profile = 1;
+            else if (strcmp((char*)_2, "warm") == 0) profile = 2;
+            controlMgr->updateTempProfileFromCAN(profile);
+            Serial.printf("MQTT: Temp profile = %s (%d)\n", (char*)_2, profile);
+          }
+        });
+        
+        // Subscribe to error/alarm messages
+        mqtt->subscribeTo(MQTT_PREFIX "/error_overheating", [](char const * _1, uint8_t const * _2, int _3) {
+          if (errorData) {
+            bool active = (strcmp((char*)_2, "ACTIVE") == 0);
+            errorData->updateErrorOverheating(active);
+          }
+        });
+        
+        mqtt->subscribeTo(MQTT_PREFIX "/alarm_filter", [](char const * _1, uint8_t const * _2, int _3) {
+          if (errorData) {
+            bool active = (strcmp((char*)_2, "REPLACE") == 0 || strcmp((char*)_2, "ACTIVE") == 0);
+            errorData->updateAlarmFilter(active);
+          }
+        });
+        
+        Serial.println("✓ MQTT sensor data subscriptions complete");
+      #endif
+      // ========================================================================
     }
     
-    // Initialize CAN bus (will use MQTT if available)
-    comfo->setup();
+    // ============================================================================
+    // CAN BUS INITIALIZATION (only in non-remote client mode)
+    // ============================================================================
+    #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+      Serial.println("⚠️  CAN bus initialization SKIPPED (Remote Client Mode)");
+    #else
+      // Initialize CAN bus with MQTT subscriptions if available
+      if (mqtt) {
+        Serial.println("MQTT ready - initializing CAN bus with MQTT subscriptions");
+      } else {
+        Serial.println("MQTT disabled - initializing CAN bus without MQTT subscriptions");
+      }
+      comfo->setup();
+    #endif
     
     ota->setup();
-    timeMgr->setup();  // This will sync NTP time and check device time
+    
+    // TimeManager setup - always needed for NTP time display
+    // In remote client mode: NTP only (no device time sync)
+    // In normal mode: NTP + device time sync via CAN
+    if (timeMgr) {
+      timeMgr->setup();  // This will sync NTP time (and device time if not in remote mode)
+    }
+    
   } else {
     Serial.println("No WiFi connection");
-    Serial.println("Initializing CAN bus without MQTT subscriptions");
     
-    // Initialize CAN even without WiFi (no MQTT subscriptions)
-    comfo->setup();
+    #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+      Serial.println("⚠️  CRITICAL: Remote Client Mode requires WiFi connection!");
+      Serial.println("⚠️  Device will not function without MQTT connectivity");
+    #else
+      Serial.println("Initializing CAN bus without MQTT subscriptions");
+      comfo->setup();
+    #endif
   }
 
   Serial.println("\n=== System Ready ===");
@@ -465,15 +599,21 @@ void loop() {
   // ✅ NEW: Screen manager loop (handles NTM state transitions)
   if (screenMgr) screenMgr->loop();
   
-  // ✅ PRIORITY 4: CAN processing throttled to 10ms (prevent flooding)
-  if (now - last_can_process >= 10) {
-    if (comfo) comfo->loop();
-    last_can_process = now;
-  }
+  // ============================================================================
+  // CAN PROCESSING (only in non-remote client mode)
+  // ============================================================================
+  #if !defined(REMOTE_CLIENT_MODE) || !REMOTE_CLIENT_MODE
+    // ✅ PRIORITY 4: CAN processing throttled to 10ms (prevent flooding)
+    if (now - last_can_process >= 10) {
+      if (comfo) comfo->loop();
+      last_can_process = now;
+    }
+  #endif
   
   // ✅ PRIORITY 5: Manager loops (these handle batched updates)
   if (sensorData) sensorData->loop();      // Batches display updates to 5 sec
   if (filterData) filterData->loop();
+  if (controlMgr) controlMgr->loop(); 
   if (errorData) errorData->loop();        // ← NEW: Error data manager loop
   
   // ✅ PRIORITY 6: Network services (lower priority)
@@ -481,11 +621,13 @@ void loop() {
   
   // Only process network services if WiFi is connected
   if (wifi && wifi->isConnected()) {
-    // MQTT loop only if enabled
+    // MQTT loop (critical in remote client mode)
     if (mqtt) mqtt->loop();
     
     if (ota) ota->loop();
-    if (timeMgr) timeMgr->loop();          // Updates time display every 1 sec
+    
+    // TimeManager loop - always needed for time display updates
+    if (timeMgr) timeMgr->loop();
   }
   
   // Small delay to allow other tasks

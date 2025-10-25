@@ -1,6 +1,7 @@
 #include "time_manager.h"
 #include "../comfoair/comfoair.h"
 #include "../ui/GUI.h"
+#include "../secrets.h"
 #include <WiFi.h>
 #include <time.h>
 #include <sys/time.h>
@@ -54,8 +55,16 @@ void TimeManager::syncTime() {
     if (timeinfo.tm_year > (2020 - 1900)) {
         Serial.println(" SUCCESS");
         
-        // Now set the timezone - this converts UTC time to local time
-        setenv("TZ", "Europe/Zurich", 1);
+        // Set the timezone using the user-configured value from secrets.h
+        // This converts UTC time to local time with proper DST handling
+        #ifdef TIMEZONE
+            setenv("TZ", TIMEZONE, 1);
+            Serial.printf("TimeManager: Timezone set to: %s\n", TIMEZONE);
+        #else
+            // Fallback to CET if not defined
+            setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
+            Serial.println("TimeManager: Timezone set to: CET-1CEST,M3.5.0,M10.5.0/3 (default)");
+        #endif
         tzset();
         
         // Get the local time after timezone is set
@@ -69,8 +78,16 @@ void TimeManager::syncTime() {
         time_synced = true;
         last_sync_check = millis();
         
-        // After NTP sync, check device time
-        checkAndSyncDeviceTime();
+        // ====================================================================
+        // DEVICE TIME SYNC (only in non-remote client mode)
+        // ====================================================================
+        #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+            Serial.println("TimeManager: Device time sync SKIPPED (Remote Client Mode)");
+        #else
+            // After NTP sync, check device time
+            checkAndSyncDeviceTime();
+        #endif
+        // ====================================================================
     } else {
         Serial.println(" FAILED");
         Serial.println("TimeManager: NTP sync failed");
@@ -79,80 +96,98 @@ void TimeManager::syncTime() {
 }
 
 void TimeManager::checkAndSyncDeviceTime() {
-    if (!comfoair) {
-        Serial.println("TimeManager: ComfoAir not set, cannot check device time");
+    #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+        // In remote client mode, skip device time sync
+        Serial.println("TimeManager: checkAndSyncDeviceTime() - SKIPPED (Remote Client Mode)");
         return;
-    }
-    
-    Serial.println("TimeManager: Requesting device time from CAN bus...");
-    
-    // Request time from device via CAN bus
-    comfoair->requestDeviceTime();
-    waiting_for_device_time = true;
-    device_time_request_timestamp = millis();
+    #else
+        if (!comfoair) {
+            Serial.println("TimeManager: ComfoAir not set, cannot check device time");
+            return;
+        }
+        
+        Serial.println("TimeManager: Requesting device time from CAN bus...");
+        
+        // Request time from device via CAN bus
+        comfoair->requestDeviceTime();
+        waiting_for_device_time = true;
+        device_time_request_timestamp = millis();
+    #endif
 }
 
 void TimeManager::onDeviceTimeReceived(uint32_t device_seconds) {
-    if (!waiting_for_device_time) {
-        return; // Ignore if we didn't request it
-    }
-    
-    waiting_for_device_time = false;
-    
-    // Convert device seconds to time_t
-    time_t device_time = deviceSecondsToTime(device_seconds);
-    time_t ntp_time;
-    time(&ntp_time);
-    
-    // Calculate difference in seconds
-    int time_diff = abs((int)difftime(ntp_time, device_time));
-    
-    // Log both times
-    struct tm device_tm, ntp_tm;
-    localtime_r(&device_time, &device_tm);
-    localtime_r(&ntp_time, &ntp_tm);
-    
-    char device_str[64], ntp_str[64];
-    strftime(device_str, sizeof(device_str), "%Y-%m-%d %H:%M:%S", &device_tm);
-    strftime(ntp_str, sizeof(ntp_str), "%Y-%m-%d %H:%M:%S", &ntp_tm);
-    
-    Serial.printf("TimeManager: Device time: %s\n", device_str);
-    Serial.printf("TimeManager: NTP time:    %s\n", ntp_str);
-    Serial.printf("TimeManager: Difference:  %d seconds\n", time_diff);
-    
-    // Check if difference exceeds threshold
-    if (time_diff > TIME_DIFFERENCE_THRESHOLD) {
-        Serial.printf("TimeManager: Time difference (%d sec) exceeds threshold (%d sec)\n", 
-                     time_diff, TIME_DIFFERENCE_THRESHOLD);
-        Serial.println("TimeManager: Setting device time to NTP time...");
-        setDeviceTime(ntp_time);
-    } else {
-        Serial.println("TimeManager: Device time is synchronized (within threshold)");
-    }
-    
-    last_sync_check = millis();
+    #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+        // In remote client mode, ignore device time responses
+        Serial.println("TimeManager: onDeviceTimeReceived() - IGNORED (Remote Client Mode)");
+        return;
+    #else
+        if (!waiting_for_device_time) {
+            return; // Ignore if we didn't request it
+        }
+        
+        waiting_for_device_time = false;
+        
+        // Convert device seconds to time_t
+        time_t device_time = deviceSecondsToTime(device_seconds);
+        time_t ntp_time;
+        time(&ntp_time);
+        
+        // Calculate difference in seconds
+        int time_diff = abs((int)difftime(ntp_time, device_time));
+        
+        // Log both times
+        struct tm device_tm, ntp_tm;
+        localtime_r(&device_time, &device_tm);
+        localtime_r(&ntp_time, &ntp_tm);
+        
+        char device_str[64], ntp_str[64];
+        strftime(device_str, sizeof(device_str), "%Y-%m-%d %H:%M:%S", &device_tm);
+        strftime(ntp_str, sizeof(ntp_str), "%Y-%m-%d %H:%M:%S", &ntp_tm);
+        
+        Serial.printf("TimeManager: Device time: %s\n", device_str);
+        Serial.printf("TimeManager: NTP time:    %s\n", ntp_str);
+        Serial.printf("TimeManager: Difference:  %d seconds\n", time_diff);
+        
+        // Check if difference exceeds threshold
+        if (time_diff > TIME_DIFFERENCE_THRESHOLD) {
+            Serial.printf("TimeManager: Time difference (%d sec) exceeds threshold (%d sec)\n", 
+                         time_diff, TIME_DIFFERENCE_THRESHOLD);
+            Serial.println("TimeManager: Setting device time to NTP time...");
+            setDeviceTime(ntp_time);
+        } else {
+            Serial.println("TimeManager: Device time is synchronized (within threshold)");
+        }
+        
+        last_sync_check = millis();
+    #endif
 }
 
 void TimeManager::setDeviceTime(time_t ntp_time) {
-    if (!comfoair) {
-        Serial.println("TimeManager: ComfoAir not set, cannot set device time");
+    #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+        // In remote client mode, skip device time setting
+        Serial.println("TimeManager: setDeviceTime() - SKIPPED (Remote Client Mode)");
         return;
-    }
-    
-    // Convert NTP time to device seconds
-    uint32_t device_seconds = timeToDeviceSeconds(ntp_time);
-    
-    struct tm timeinfo;
-    localtime_r(&ntp_time, &timeinfo);
-    
-    Serial.printf("TimeManager: Setting device time to: %04d-%02d-%02d %02d:%02d:%02d\n",
-                 timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
-                 timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-    
-    // Send time to device via CAN bus
-    comfoair->setDeviceTime(device_seconds);
-    
-    Serial.println("TimeManager: Device time set command sent");
+    #else
+        if (!comfoair) {
+            Serial.println("TimeManager: ComfoAir not set, cannot set device time");
+            return;
+        }
+        
+        // Convert NTP time to device seconds
+        uint32_t device_seconds = timeToDeviceSeconds(ntp_time);
+        
+        struct tm timeinfo;
+        localtime_r(&ntp_time, &timeinfo);
+        
+        Serial.printf("TimeManager: Setting device time to: %04d-%02d-%02d %02d:%02d:%02d\n",
+                     timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                     timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+        
+        // Send time to device via CAN bus
+        comfoair->setDeviceTime(device_seconds);
+        
+        Serial.println("TimeManager: Device time set command sent");
+    #endif
 }
 
 uint32_t TimeManager::timeToDeviceSeconds(time_t unix_time) {
@@ -208,13 +243,13 @@ void TimeManager::updateDisplay() {
     String timeStr = getTimeString();
     String dateStr = getDateString();
     
-    // âœ… **STRATEGY 5 PATTERN** (but optimized to reduce refresh frequency)
+    // ✅ **STRATEGY 5 PATTERN** (but optimized to reduce refresh frequency)
     // 1. Set the text
     lv_label_set_text(GUI_Label__screen__time, timeStr.c_str());
     lv_label_set_text(GUI_Label__screen__date, dateStr.c_str());
     
     // 2. Request display refresh (this calls lv_refr_now())
-    // âœ… OPTIMIZATION: Only refresh every second (not a problem for time display)
+    // ✅ OPTIMIZATION: Only refresh every second (not a problem for time display)
     // This reduces from potentially 60Hz to 1Hz for time updates
     GUI_request_display_refresh();
     
@@ -235,21 +270,33 @@ void TimeManager::loop() {
         last_update = now;
     }
     
-    // Re-sync with NTP every 8 hours (was every hour)
-    if (now - last_sync_check >= SYNC_CHECK_INTERVAL) {
-        Serial.println("TimeManager: 8 hours elapsed, re-syncing with NTP and device...");
-        syncTime(); // Re-sync with NTP
-        if (time_synced) {
-            checkAndSyncDeviceTime(); // Then check device time
+    // ========================================================================
+    // PERIODIC RE-SYNC
+    // ========================================================================
+    #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+        // In remote client mode: Only re-sync NTP every 8 hours (no device sync)
+        if (now - last_sync_check >= SYNC_CHECK_INTERVAL) {
+            Serial.println("TimeManager: 8 hours elapsed, re-syncing with NTP...");
+            syncTime(); // Re-sync with NTP only
         }
-    }
-    
-    // Handle timeout for device time request (5 seconds)
-    if (waiting_for_device_time && (now - device_time_request_timestamp > 5000)) {
-        Serial.println("TimeManager: Device time request timeout");
-        waiting_for_device_time = false;
-        last_sync_check = now; // Reset to retry in another 8 hours
-    }
+    #else
+        // In normal mode: Re-sync NTP + device time every 8 hours
+        if (now - last_sync_check >= SYNC_CHECK_INTERVAL) {
+            Serial.println("TimeManager: 8 hours elapsed, re-syncing with NTP and device...");
+            syncTime(); // Re-sync with NTP
+            if (time_synced) {
+                checkAndSyncDeviceTime(); // Then check device time
+            }
+        }
+        
+        // Handle timeout for device time request (5 seconds)
+        if (waiting_for_device_time && (now - device_time_request_timestamp > 5000)) {
+            Serial.println("TimeManager: Device time request timeout");
+            waiting_for_device_time = false;
+            last_sync_check = now; // Reset to retry in another 8 hours
+        }
+    #endif
+    // ========================================================================
 }
 
 } // namespace comfoair

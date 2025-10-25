@@ -28,7 +28,7 @@ namespace comfoair {
       bool setTime(uint32_t secondsSince2000);
       bool setTimeFromDateTime(uint16_t year, uint8_t month, uint8_t day, 
                                uint8_t hour, uint8_t minute, uint8_t second);
-      
+
     private:
       uint8_t sequence;
       

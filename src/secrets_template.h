@@ -20,6 +20,70 @@
 #define MQTT_PREFIX "comfoair"
 
 // ============================================================================
+// Remote Client Mode Configuration
+// ============================================================================
+
+// Remote Client Mode - device acts as MQTT-only client
+// When enabled:
+//   - CAN bus is NOT initialized (no direct MVHR communication)
+//   - All data is received via MQTT from a separate bridge device
+//   - Commands are sent via MQTT (not directly to CAN bus)
+//   - Time sync with MVHR is disabled
+//   - Device relies entirely on MQTT broker for communication
+// When disabled:
+//   - Normal operation with direct CAN bus communication
+//   - MQTT is optional and used in parallel with CAN
+#define REMOTE_CLIENT_MODE false
+
+// NOTE: When REMOTE_CLIENT_MODE is true, MQTT_ENABLED is automatically forced to true
+
+// ============================================================================
+// Time Configuration
+// ============================================================================
+
+// Timezone configuration for NTP time display
+// Use POSIX timezone format (ESP32 doesn't support IANA names like "Europe/Zurich")
+//
+// using Linux/Macos, one can use "cat /usr/share/zoneinfo/Europe/Zurich | strings | tail -1"
+// in order to convert IANA to POSIX (replace Europe/Zurich with your IANA identifier)
+//
+//
+// Common European timezones:
+// - Central European Time (CET/CEST): "CET-1CEST,M3.5.0,M10.5.0/3"
+//   (Zurich, Paris, Berlin, Rome, Madrid, etc.)
+// - Western European Time (WET/WEST): "WET0WEST,M3.5.0/1,M10.5.0"
+//   (London, Lisbon)
+// - Eastern European Time (EET/EEST): "EET-2EEST,M3.5.0/3,M10.5.0/4"
+//   (Athens, Helsinki, Bucharest)
+//
+// Common US timezones:
+// - Eastern: "EST5EDT,M3.2.0,M11.1.0"
+// - Central: "CST6CDT,M3.2.0,M11.1.0"
+// - Mountain: "MST7MDT,M3.2.0,M11.1.0"
+// - Pacific: "PST8PDT,M3.2.0,M11.1.0"
+//
+// No DST (examples):
+// - "UTC0" (UTC, no DST)
+// - "JST-9" (Japan Standard Time, UTC+9, no DST)
+// - "IST-5:30" (India Standard Time, UTC+5:30, no DST)
+//
+// Format explanation: "STD offset DST,start_rule,end_rule"
+// - STD: Standard time name (e.g., CET)
+// - offset: Hours from UTC (negative for east, e.g., -1 means UTC+1)
+// - DST: Daylight saving time name (e.g., CEST)
+// - start_rule: When DST starts (M3.5.0 = last Sunday of March at 2am)
+// - end_rule: When DST ends (M10.5.0/3 = last Sunday of October at 3am)
+#define TIMEZONE "CET-1CEST,M3.5.0,M10.5.0/3"
+
+// ============================================================================
+// Night Time Mode (NTM) Configuration
+// ============================================================================
+
+// Customize as of when the warning sign appears before having to change the filters
+
+#define WARNING_THRESHOLD_DAYS 21
+
+// ============================================================================
 // Night Time Mode (NTM) Configuration
 // ============================================================================
 
