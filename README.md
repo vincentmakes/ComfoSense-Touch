@@ -131,6 +131,14 @@ There's a feature to shutdown the screen during the night (or any given window) 
 During that window, the screen can come back to life with a simple tap and will remain on for 30s.
 This mode is not linked to the dimming feature and can be used without hardware modification.
 
+### Filter Warning Threshold
+
+### Remote Client Mode
+
+This mode can be enabled in secrets.h. When set to true, the device is no longer a MQTT bridge but requires another MQTT bridge and MQTT broker (check the repo mentionned at the beginning).
+The benefit is the device doesn't have to be hooked up to the Comfonet and can be installed anywhere in the house, as a secondary controller.
+
+
 ### Power
 I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
 Our device consumes at best 1.2W (5V at 230mA measured at full brightness) which means it can be connected directly in place of the ComfoSense C67.
