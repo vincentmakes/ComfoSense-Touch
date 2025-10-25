@@ -48,11 +48,10 @@ See Power section for more details, but tldr; the device can be installed in pla
 ## How to use : Flashing the firmware in the ESP32 development board
 
 First, rename the "secrets_template.h" file at the top of this repository into "**secrets.h**" and fill in the configuration: 
-Wifi, MQTT config, Night Time Mode, Dimming.
+Wifi, MQTT config, Night Time Mode, Dimming, Timezone
 
 In **platformio.in**i, set the path to your device (by default it is **/dev/cu.usbmodem1101**).
 
-In **time_manager.cpp**, set your timezone by using the IANA standard (TZ identifier): https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 
 Then compile the code using PlatformIO:
 
@@ -91,7 +90,7 @@ Time is fetched from NTP servers. The time is not yet being fed back to the Comf
 
 ### Filter and other Sensor Data
 Filter and sensor data are fetched using the CAN command directly (so we don't rely on a MQTT broker which could fail - we keep MQTT only for HA integration and associated usage from a mobile device)
-A warning icon appears if the filters needs to be changed within 21 days. This can be changed in src/comfoair/filter_data.h through WARNING_THRESHOLD
+A warning icon appears if the filters needs to be changed within 21 days. This can be changed in secrets.h through WARNING_THRESHOLD_DAYS value
 
 ### Controls
 Controls are interacting via CAN command directly as well. They are limited for now to : Fan Increase, Fan Decrease, Boost (20min) and Change of Temperature profile (normal, cool, heat). To access any other advanced features, one would need to go to the MVHR itself. I may include a second screen at a later stage to implement additional control (Bypass, etc) but those firs basic control are reflecting my usage of the unit thus far. 
@@ -130,8 +129,6 @@ Additional automation should be done through Home Assistant (such as changing fa
 There's a feature to shutdown the screen during the night (or any given window) which can be set in secrets.h
 During that window, the screen can come back to life with a simple tap and will remain on for 30s.
 This mode is not linked to the dimming feature and can be used without hardware modification.
-
-### Filter Warning Threshold
 
 ### Remote Client Mode
 
