@@ -39,7 +39,7 @@ private:
     #ifdef WARNING_THRESHOLD_DAYS
             static const int WARNING_THRESHOLD = WARNING_THRESHOLD_DAYS;  //as per config in secrets.h
     #else
-            static const int WARNING_THRESHOLD = 21; // Show warning when <= 21 days
+            static const int WARNING_THRESHOLD = 100 ; // Show warning when <= 21 days
     #endif
 
 

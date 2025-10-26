@@ -571,6 +571,7 @@ void setup() {
   Serial.println("\n=== System Ready ===");
   Serial.printf("Free heap: %d KB\n", ESP.getFreeHeap() / 1024);
   Serial.printf("Free PSRAM: %d KB\n", ESP.getFreePsram() / 1024);
+
 }
 
 // ============================================================================
@@ -632,4 +633,6 @@ void loop() {
   
   // Small delay to allow other tasks
   delay(1);
+
+
 }

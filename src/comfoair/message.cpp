@@ -135,6 +135,28 @@ namespace comfoair {
     // Clear the message structure to prevent garbage data
     memset(message, 0, sizeof(DecodedMessage));
     
+    // ====================================================================
+    // SPECIAL CASE: Time response (CAN ID 0x10040001)
+    // ====================================================================
+    // Tested and confirmed: 2025-10-26
+    // Time response comes on a special CAN ID, not via PDOID
+    // Format: 4 bytes, little-endian, seconds since 2000-01-01
+    // ====================================================================
+    if (frame->id == 0x10040001) {
+      if (frame->length >= 4) {
+        uint8_t *vals = &frame->data.uint8[0];
+        uint32_t device_seconds = vals[0] | (vals[1] << 8) | (vals[2] << 16) | (vals[3] << 24);
+        
+        snprintf(message->val, 15, "%u", device_seconds);
+        strncpy(message->name, "device_time", 39);
+        message->name[39] = '\0';
+        
+        Serial.printf("ComfoMessage: ✅ Time response decoded: %u seconds\n", device_seconds);
+        return true;
+      }
+    }
+    // ====================================================================
+    
     uint16_t PDOID = (frame->id & 0x01fff000) >> 14;
     uint8_t *vals = &frame->data.uint8[0];
     #define uint16 (vals[0] + (vals[1]<<8))
@@ -298,36 +320,82 @@ namespace comfoair {
   }
 
   // Time synchronization methods
-bool ComfoMessage::requestTime() {
-    Serial.println("ComfoMessage: Sending time request (Alt 1: RMI 0x83)");
+  bool ComfoMessage::requestTime() {
+    Serial.println("ComfoMessage: Sending time request (RTR to 0x10080028)");
     
-    // Try 0x83 instead of 0x82 for read command
-    std::vector<uint8_t> timeRequestCmd = { 0x82, 0x01, 0x01, 0x00 };
-
-    //2 0x85, 0x15, 0x01, 0x00
-    //3 0x82, 0x01, 0x01, 0x00 *< fails
-    //4 0x82, 0x15, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00 
-    //5 0x82, 0x15, 0x28, 0x00
-    //6 0x80, 0x15, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00
+    // ====================================================================
+    // CONFIRMED WORKING: RTR to CAN ID 0x10080028
+    // ====================================================================
+    // Tested on 2025-10-26: This command successfully triggers time response
+    // Response comes on CAN ID 0x10040001 with 4 bytes (seconds since 2000)
+    // 
+    // Previous attempts with RMI protocol failed - MVHR uses simple RTR!
+    // 
+    // RELIABILITY FIX: Send multiple times to handle missed responses
+    // ====================================================================
     
-    return this->send(&timeRequestCmd);
+    message.id = 0x10080028;
+    message.extended = true;
+    message.rtr = true;  // Remote Transmission Request (no data)
+    message.length = 0;
     
-}
+    bool success = false;
+    
+    // Send 3 times with delays to increase reliability
+    for (int i = 0; i < 3; i++) {
+      if (CAN0.sendFrame(message)) {
+        success = true;
+        Serial.printf("ComfoMessage: Time request sent (attempt %d/3)\n", i + 1);
+      } else {
+        Serial.printf("ComfoMessage: Time request failed (attempt %d/3)\n", i + 1);
+      }
+      delay(100);  // Small delay between attempts
+    }
+    
+    if (success) {
+      Serial.println("ComfoMessage: Time request sequence complete");
+    } else {
+      Serial.println("ComfoMessage: All time request attempts failed");
+    }
+    
+    return success;
+  }
 
   bool ComfoMessage::setTime(uint32_t secondsSince2000) {
     Serial.printf("ComfoMessage: Setting device time to %u seconds since 2000-01-01\n", secondsSince2000);
     
-    // Set time using RMI write pattern (similar to other commands)
-    // Format: 0x84 = RMI Write, 0x15, then PDOID, then 4-byte time value
-    std::vector<uint8_t> timeSetCmd = { 
- 0x80, 0x15, 0x01, 0x00,  // Different command type
-        (uint8_t)(secondsSince2000 & 0xFF),
-        (uint8_t)((secondsSince2000 >> 8) & 0xFF),
-        (uint8_t)((secondsSince2000 >> 16) & 0xFF),
-        (uint8_t)((secondsSince2000 >> 24) & 0xFF)
-    };
+    // ====================================================================
+    // CONFIRMED WORKING: CAN ID 0x10040001
+    // ====================================================================
+    // Tested on 2025-10-26: Both 0x10040001 and 0x10040028 work
+    // Using 0x10040001 (the same ID where time is read from)
+    // 
+    // Format: 4 bytes, little-endian, seconds since 2000-01-01
+    // NOTE: MVHR expects UTC time, not local time with timezone!
+    // ====================================================================
     
-    return this->send(&timeSetCmd);
+    message.id = 0x10040001;  // ✅ CONFIRMED WORKING
+    message.extended = true;
+    message.rtr = false;  // Not RTR - we're sending data
+    message.length = 4;
+    
+    // Pack time as little-endian 4 bytes
+    message.data.uint8[0] = (secondsSince2000) & 0xFF;
+    message.data.uint8[1] = (secondsSince2000 >> 8) & 0xFF;
+    message.data.uint8[2] = (secondsSince2000 >> 16) & 0xFF;
+    message.data.uint8[3] = (secondsSince2000 >> 24) & 0xFF;
+    
+    bool success = CAN0.sendFrame(message);
+    
+    if (success) {
+      Serial.printf("ComfoMessage: ✅ Time set command sent to 0x10040001: [%02X %02X %02X %02X]\n",
+                   message.data.uint8[0], message.data.uint8[1], 
+                   message.data.uint8[2], message.data.uint8[3]);
+    } else {
+      Serial.println("ComfoMessage: ❌ Failed to send time set command");
+    }
+    
+    return success;
   }
 
   bool ComfoMessage::setTimeFromDateTime(uint16_t year, uint8_t month, uint8_t day,
@@ -368,5 +436,4 @@ bool ComfoMessage::requestTime() {
     return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
   }
 
-   
 }

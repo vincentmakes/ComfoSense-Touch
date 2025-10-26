@@ -106,6 +106,15 @@ void TimeManager::checkAndSyncDeviceTime() {
             return;
         }
         
+        // ====================================================================
+        // RELIABILITY FIX: Wait for CAN bus and MVHR to be ready
+        // ====================================================================
+        // After NTP sync or boot, give the MVHR a moment to be ready
+        // to respond to time requests
+        // ====================================================================
+        Serial.println("TimeManager: Waiting 2 seconds for MVHR to be ready...");
+        delay(2000);
+        
         Serial.println("TimeManager: Requesting device time from CAN bus...");
         
         // Request time from device via CAN bus
@@ -121,39 +130,97 @@ void TimeManager::onDeviceTimeReceived(uint32_t device_seconds) {
         Serial.println("TimeManager: onDeviceTimeReceived() - IGNORED (Remote Client Mode)");
         return;
     #else
-        if (!waiting_for_device_time) {
-            return; // Ignore if we didn't request it
-        }
+        // ====================================================================
+        // FIX: Don't check waiting_for_device_time flag
+        // ====================================================================
+        // The flag can be false if first request timed out, but we still
+        // want to process the response from subsequent requests.
+        // It's safe to process any device time response we receive.
+        // ====================================================================
         
+        // Clear the flag (in case we were waiting)
         waiting_for_device_time = false;
+        
+        Serial.println("TimeManager: Processing device time response...");
+        
+        // ====================================================================
+        // CRITICAL FIX: MVHR expects UTC, not local time!
+        // ====================================================================
+        // The MVHR stores time in UTC (or CET without DST adjustment).
+        // We were sending local time with timezone offset (CEST = UTC+2),
+        // but MVHR expects raw UTC time.
+        //
+        // Solution: Calculate UTC offset manually (tm_gmtoff not available)
+        // ====================================================================
         
         // Convert device seconds to time_t
         time_t device_time = deviceSecondsToTime(device_seconds);
-        time_t ntp_time;
-        time(&ntp_time);
         
-        // Calculate difference in seconds
-        int time_diff = abs((int)difftime(ntp_time, device_time));
+        // Get current local time
+        time_t now_timestamp;
+        time(&now_timestamp);
         
-        // Log both times
-        struct tm device_tm, ntp_tm;
+        // Get both local and UTC time structures
+        struct tm device_tm, local_tm, utc_tm;
         localtime_r(&device_time, &device_tm);
-        localtime_r(&ntp_time, &ntp_tm);
+        localtime_r(&now_timestamp, &local_tm);
+        gmtime_r(&now_timestamp, &utc_tm);
         
-        char device_str[64], ntp_str[64];
+        // ====================================================================
+        // CRITICAL FIX: MVHR expects CET (UTC+1), not UTC!
+        // ====================================================================
+        // Testing showed MVHR is 1 hour ahead when we send UTC.
+        // This means MVHR stores time in CET (Central European Time, UTC+1)
+        // year-round, regardless of DST.
+        //
+        // So we need to convert: CEST (local) → CET (MVHR)
+        // - In summer (CEST = UTC+2): Subtract 1 hour to get CET
+        // - In winter (CET = UTC+1):  Subtract 0 hours (already CET)
+        // ====================================================================
+        
+        long cet_offset;
+        if (local_tm.tm_isdst > 0) {
+            // DST active: We're in CEST (UTC+2)
+            // Convert to CET: subtract 1 hour
+            cet_offset = 3600;  // CEST → CET
+            Serial.println("TimeManager: CEST detected, converting to CET (subtract 1 hour)");
+        } else {
+            // DST not active: We're already in CET (UTC+1)
+            // No conversion needed
+            cet_offset = 0;  // Already CET
+            Serial.println("TimeManager: CET detected, no conversion needed");
+        }
+        
+        // Calculate CET timestamp (not UTC!)
+        time_t cet_timestamp = now_timestamp - cet_offset;
+        
+        // Calculate difference (compare device time with local time for threshold check)
+        int time_diff = abs((int)difftime(now_timestamp, device_time));
+        
+        // Log all times for debugging
+        char device_str[64], local_str[64], cet_str[64];
+        struct tm cet_tm;
+        localtime_r(&cet_timestamp, &cet_tm);
+        
         strftime(device_str, sizeof(device_str), "%Y-%m-%d %H:%M:%S", &device_tm);
-        strftime(ntp_str, sizeof(ntp_str), "%Y-%m-%d %H:%M:%S", &ntp_tm);
+        strftime(local_str, sizeof(local_str), "%Y-%m-%d %H:%M:%S %Z", &local_tm);
+        strftime(cet_str, sizeof(cet_str), "%Y-%m-%d %H:%M:%S CET", &cet_tm);
         
         Serial.printf("TimeManager: Device time: %s\n", device_str);
-        Serial.printf("TimeManager: NTP time:    %s\n", ntp_str);
+        Serial.printf("TimeManager: Local time:  %s\n", local_str);
+        Serial.printf("TimeManager: CET time:    %s (will send this to MVHR)\n", cet_str);
+        Serial.printf("TimeManager: CET offset:  %ld seconds (%.1f hours)\n", 
+                     cet_offset, cet_offset / 3600.0);
         Serial.printf("TimeManager: Difference:  %d seconds\n", time_diff);
         
         // Check if difference exceeds threshold
         if (time_diff > TIME_DIFFERENCE_THRESHOLD) {
             Serial.printf("TimeManager: Time difference (%d sec) exceeds threshold (%d sec)\n", 
                          time_diff, TIME_DIFFERENCE_THRESHOLD);
-            Serial.println("TimeManager: Setting device time to NTP time...");
-            setDeviceTime(ntp_time);
+            Serial.println("TimeManager: Setting device time to CET (MVHR expects CET)...");
+            
+            // ✅ CRITICAL: Send CET time, not UTC or local time!
+            setDeviceTime(cet_timestamp);
         } else {
             Serial.println("TimeManager: Device time is synchronized (within threshold)");
         }

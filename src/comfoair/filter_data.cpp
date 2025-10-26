@@ -14,11 +14,11 @@ void FilterDataManager::setup() {
     filter_days_remaining = DUMMY_DAYS;
     has_data = false;
     
-    // Hide warning icon by default (since dummy = 99 days)
-    lv_obj_add_flag(GUI_Image__screen__image, LV_OBJ_FLAG_HIDDEN);
-    
     // Update display
     updateDisplay();
+    
+    // Update warning icon based on threshold (don't assume it should be hidden)
+    updateWarningIcon();
     
     Serial.println("FilterDataManager: Ready (using 99 days until CAN data available)");
 }
