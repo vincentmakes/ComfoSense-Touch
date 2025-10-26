@@ -1,7 +1,6 @@
 # Next releases
 
 ## Fixes/Cleanup
--Fix time manager to feed/fetch time from ComfoAir
 
 -Fix or remove "Auto" label
 
@@ -23,3 +22,5 @@ Add second screen to manage :
 -Add Time sync indicator next to time
 
 -Add MQTT indicator next to wifi icon
+
+Add a third screen to display all sensor data (grouped), in bulk
