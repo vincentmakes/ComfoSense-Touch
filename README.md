@@ -83,10 +83,20 @@ There are also 4 spacers which I couldn't print in one block with the rest.
 It will fit into the existing standard junction box (Swiss size, 81mm diam / 57mm in between mounting screws, 4 sides).
 Fusion files are included as well as ready to print 3mf files with a Bambulab profile
 
+## Other option : as a remote client
+Remote Client mode doesn't require direct connection to the ComfoAir CAN bus and can be set anywhere as long as there's a MQTT bridge. The display can be powered directly via a USB-C to USB-A cable. I have created a Desktop mount for that purpose.
+
+If you are using a straight cable, you can use the alternative decorative frame - if you want to hide the cable in the back, you will need to use a 180° USB-C to USB-A cable.
+
+
+<img width="674" height="464" alt="Screenshot 2025-10-26 at 16 32 19" src="https://github.com/user-attachments/assets/dc0fef3b-23fa-43eb-ba84-8d1efe282fe5" />
+
 
 ## Features and logic
 ### Time Management
-Time is fetched from NTP servers. The time is not yet being fed back to the ComfoAir but it's on my todo.
+Time is fetched from NTP servers. The timezone can be setup in secrets.h : follow the instructions in there to get your correct timezone. 
+
+When used in direct mode, it fetches the time of the MVHR, compares it to the NTP server and sync it if needed. Be aware I have tested this setup currently in CET and not yet in CEST. We know the MVHR is handling its own Summer Time /Winter Time change so we'll have to see what's the outcome in April and adjust if needed.
 
 ### Filter and other Sensor Data
 Filter and sensor data are fetched using the CAN command directly (so we don't rely on a MQTT broker which could fail - we keep MQTT only for HA integration and associated usage from a mobile device)
