@@ -65,6 +65,10 @@ That's it ! Check further below for the mounting bracket to install it on the wa
 
 ## Physical Mounting on the wall
 
+> [!IMPORTANT] 
+> When printing the decorating frame, consider scaling it up to 100.2% along the X and Y axis. This is already modified in the 3mf file. Otherwise it's a little bit tight to
+> install and you could damage the screen when putting it on or off (the edges crack easily)
+
 The mounting consists of 3 main part : two oversized (150%) Garmin style mount (male and female) and a decorative frame fixed by friction fit (to be improved)
 There are also 4 spacers which I couldn't print in one block with the rest.
 
