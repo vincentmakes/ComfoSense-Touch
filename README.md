@@ -4,7 +4,7 @@ This project is inspired by the work of many others who successfully managed to 
 
 This new device is meant to not only replace the ComfoConnect LAN but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir. On top of having a much better UI, it's been optimized to be very snappy and responsive.
 
-This device can function in two modes: Directly connected to the ComfoAir, in place of the ComfoSense or as a Remote Client (requires a MQTT bridge)
+This device can function in two modes: Directly connected to the ComfoAir, in place of the ComfoSense or as a Remote Client (requires a simpler MQTT bridge, like this one https://github.com/vincentmakes/MQTTBridgeComfoAirQ/)
 
 <img width="869" height="443" alt="image" src="https://github.com/user-attachments/assets/0ac9e52d-0ce7-4bae-bc95-ab738f8bc27c" />
 
