@@ -30,7 +30,7 @@ void TimeManager::setup() {
 void TimeManager::syncTime() {
     // First, sync with NTP to get UTC time
     Serial.println("TimeManager: Starting NTP sync...");
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    configTime(0, 0, "time.google.com", "pool.ntp.org");
     
     Serial.print("TimeManager: Waiting for NTP sync");
     
