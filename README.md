@@ -4,17 +4,18 @@ This project is inspired by the work of many others who successfully managed to 
 
 This new device is meant to not only replace the ComfoConnect LAN but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir. On top of having a much better UI, it's been optimized to be very snappy and responsive.
 
+This device can function in two modes: Directly connected to the ComfoAir, in place of the ComfoSense or as a Remote Client (requires a MQTT bridge)
+
+<img width="1090" height="533" alt="image" src="https://github.com/user-attachments/assets/4ff6d420-9d35-4493-8041-1e36075e193c" />
+
+<img width="1090" height="544" alt="image" src="https://github.com/user-attachments/assets/34ba77d6-276a-4c76-ac55-eb05052f67c2" />
+
+
 Demo of the device
 
 [![Watch the video](https://img.youtube.com/vi/69VF5-dpnYU/maxresdefault.jpg)](https://youtu.be/69VF5-dpnYU)
 
 ### [Demo ComfoSense Touch](https://youtu.be/69VF5-dpnYU) (2min - Youtube)
-
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/b92b7554-c1ed-415e-8fdf-e054b1937c69" /> ![IMG_0151](https://github.com/user-attachments/assets/9f421d4b-a74e-4e73-a82e-e0a182e28b3f)
-
-Ready to be installed
-
-![IMG_0152 Small](https://github.com/user-attachments/assets/18c18500-1f08-4de5-8d8c-a54a6e9c6a70)
 
 ComfoSense C67 in comparison
 
