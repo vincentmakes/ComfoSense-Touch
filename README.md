@@ -6,9 +6,11 @@ This new device is meant to not only replace the ComfoConnect LAN but also the C
 
 This device can function in two modes: Directly connected to the ComfoAir, in place of the ComfoSense or as a Remote Client (requires a MQTT bridge)
 
-<img width="1090" height="533" alt="image" src="https://github.com/user-attachments/assets/4ff6d420-9d35-4493-8041-1e36075e193c" />
+<img width="869" height="443" alt="image" src="https://github.com/user-attachments/assets/0ac9e52d-0ce7-4bae-bc95-ab738f8bc27c" />
 
-<img width="1090" height="544" alt="image" src="https://github.com/user-attachments/assets/34ba77d6-276a-4c76-ac55-eb05052f67c2" />
+
+<img width="1090" height="534" alt="image" src="https://github.com/user-attachments/assets/a7de1947-1972-4ca2-af93-a847c2907c84" />
+
 
 
 Demo of the device
