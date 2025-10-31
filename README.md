@@ -107,7 +107,7 @@ In a next iteration, I will provide a 3d printed model for this type of usage: o
 
 The downside of this setup is in case of a power reboot, the power button on the side of the screen needs to be pressed manually so it boots up. 
 
-An alternative plug and play option is this product from Waveshare as well :  https://www.waveshare.com/esp32-s3-rs485-can.htm (19$). 
+An alternative plug and play option is this product from Waveshare as well :  https://www.waveshare.com/esp32-s3-rs485-can.htm (19$). This has the benefit that no power button needs to be pressed for reboot and it accept an external antenna in case your MVHR is in a not so well wifi covered area.
 
 It will run this firmware just fine, but the platformio.ini file may need to be adjusted - I will provide this option in the future.
 
