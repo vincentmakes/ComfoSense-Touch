@@ -99,6 +99,17 @@ If you are using a straight cable, you can use the alternative decorative frame 
 
 <img width="674" height="464" alt="Screenshot 2025-10-26 at 16 32 19" src="https://github.com/user-attachments/assets/dc0fef3b-23fa-43eb-ba84-8d1efe282fe5" />
 
+## Other option : as a pure MQTT bridge
+
+This device can also be used as a pure MQTT bridge, connected to the ComfoAir : simply set the night time mode to be permanent in secrets.h, this way the screen will be turned off permanently (can be waken up with a tap). It is a more expensive option (35$) than putting together a esp32, DC DC buck converter and CAN transceiver (15-20$) but it's also an easy "plug and play" one.
+
+In a next iteration, I will provide a 3d printed model for this type of usage: one that integrates a RJ45 female port connected to the display so it can be connected/disconnected easily.
+
+The downside of this setup is in case of a power reboot, the power button on the side of the screen needs to be pressed manually so it boots up. 
+
+An alternative plug and play option is this product from Waveshare as well :  https://www.waveshare.com/esp32-s3-rs485-can.htm (19$). 
+
+It will run this firmware just fine, but the platformio.ini file may need to be adjusted - I will provide this option in the future.
 
 ## Features and logic
 ### Time Management
