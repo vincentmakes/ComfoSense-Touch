@@ -28,6 +28,7 @@ lv_obj_t*  GUI_Image__screen__fanspeed3;
 lv_obj_t*  GUI_Image__screen__fanspeedboost;
 lv_obj_t*  GUI_Dropdown__screen__modedropdown;
 lv_obj_t*  GUI_Button__screen__centerfan;
+lv_obj_t*  GUI_Label__screen__boosttimer;  // NEW: Boost timer label
 
 
 lv_style_t GUI_Style__class_IjzeXjGNl2hqzr__;
@@ -52,4 +53,3 @@ lv_style_t GUI_Style__class_5qfkyxJclqQGgq__;
 lv_style_t GUI_Style__class_e43nEdwxt3dT0L__;
 lv_style_t GUI_Style__class_kr8vNLKWRCqnOJ__;
 lv_style_t GUI_Style__class_V1ohqLxZAM4F0a__;
-

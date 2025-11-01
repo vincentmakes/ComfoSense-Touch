@@ -12,7 +12,7 @@
 #include "comfoair/sensor_data.h"
 #include "comfoair/filter_data.h"
 #include "comfoair/control_manager.h"
-#include "comfoair/error_data.h"  // ← NEW: Error data manager
+#include "comfoair/error_data.h"  // â† NEW: Error data manager
 #include "screen/screen_manager.h"  // NEW: Screen manager for NTM
 #include "mqtt/mqtt.h"
 #include "ota/ota.h"
@@ -82,7 +82,7 @@ comfoair::TimeManager *timeMgr = nullptr;
 comfoair::SensorDataManager *sensorData = nullptr;
 comfoair::FilterDataManager *filterData = nullptr;
 comfoair::ControlManager *controlMgr = nullptr;
-comfoair::ErrorDataManager *errorData = nullptr;  // ← NEW: Error data manager
+comfoair::ErrorDataManager *errorData = nullptr;  // â† NEW: Error data manager
 comfoair::ScreenManager *screenMgr = nullptr;  // NEW: Screen manager
 
 // Track current backlight state for TCA9554
@@ -171,7 +171,7 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   static unsigned long last_touch_seen = 0;
   static unsigned long touch_start_time = 0;
   
-  // ⚡ OPTIMIZED TIMING - Faster response!
+  // âš¡ OPTIMIZED TIMING - Faster response!
   static const unsigned long RELEASE_DELAY_MS = 20;      // Reduced from 30ms
   static const unsigned long MIN_PRESS_DURATION_MS = 50; // Reduced from 80ms
   
@@ -199,9 +199,7 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   // ============================================================================
   
   if (finger_detected_now && !touch_active) {
-    // ────────────────────────────────────────────────────────────────────────
     // NEW PRESS - Report immediately!
-    // ────────────────────────────────────────────────────────────────────────
     
     touch_active = true;
     touch_start_time = now;
@@ -210,37 +208,31 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     data->point.x = last_x;
     data->point.y = last_y;
     
-    Serial.printf("🟢 [%lu] PRESS START at (%d, %d)\n", now, last_x, last_y);
+    Serial.printf("[%lu] PRESS START at (%d, %d)\n", now, last_x, last_y);
   }
   else if (touch_active && time_since_touch < RELEASE_DELAY_MS) {
-    // ────────────────────────────────────────────────────────────────────────
     // PRESS HELD - Keep reporting pressed
-    // ────────────────────────────────────────────────────────────────────────
     
     data->state = LV_INDEV_STATE_PRESSED;
     data->point.x = last_x;
     data->point.y = last_y;
   }
   else if (touch_active && time_since_touch >= RELEASE_DELAY_MS) {
-    // ────────────────────────────────────────────────────────────────────────
     // PRESS RELEASED - Faster release detection!
-    // ────────────────────────────────────────────────────────────────────────
     
     unsigned long press_duration = now - touch_start_time;
     
-    // âœ… ALWAYS release regardless of duration - let LVGL handle debouncing
+    // ALWAYS release regardless of duration - let LVGL handle debouncing
     data->state = LV_INDEV_STATE_RELEASED;
     data->point.x = last_x;
     data->point.y = last_y;
     
-    Serial.printf("🔴 [%lu] PRESS RELEASED after %lums\n", now, press_duration);
+    Serial.printf("ðŸ”´ [%lu] PRESS RELEASED after %lums\n", now, press_duration);
     
     touch_active = false;
   }
   else {
-    // ────────────────────────────────────────────────────────────────────────
     // NO TOUCH
-    // ────────────────────────────────────────────────────────────────────────
     data->state = LV_INDEV_STATE_RELEASED;
   }
 }
@@ -253,17 +245,9 @@ void setup() {
   // REMOTE CLIENT MODE CHECK
   // ============================================================================
   #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
-    Serial.println("\n╔═══════════════════════════════════════════════════════════╗");
-    Serial.println("║     REMOTE CLIENT MODE ENABLED                            ║");
-    Serial.println("║     - No CAN bus initialization                           ║");
-    Serial.println("║     - All data via MQTT from bridge device                ║");
-    Serial.println("║     - Commands sent via MQTT                              ║");
-    Serial.println("║     - Time sync disabled                                  ║");
-    Serial.println("╚═══════════════════════════════════════════════════════════╝\n");
+    Serial.println("REMOTE CLIENT MODE ENABLED ");
   #else
-    Serial.println("\n╔═══════════════════════════════════════════════════════════╗");
-    Serial.println("║     NORMAL MODE - Direct CAN Communication                ║");
-    Serial.println("╚═══════════════════════════════════════════════════════════╝\n");
+    Serial.println("NORMAL MODE - Direct CAN Communication ");
   #endif
   
   Serial.println("=== ESP32-S3 Touch LCD 4.0\" MVHR Controller ===");
@@ -313,7 +297,7 @@ void setup() {
   if (touch.begin(Wire, GT911_SLAVE_ADDRESS_L, TOUCH_SDA, TOUCH_SCL)) {
     Serial.println("Touch initialized successfully");
     
-    // ✅ Keep setMaxTouchPoint(5) - this is fine
+    // âœ… Keep setMaxTouchPoint(5) - this is fine
     touch.setMaxTouchPoint(5);
     
     Serial.println("Touch configuration:");
@@ -390,14 +374,14 @@ void setup() {
   sensorData = new comfoair::SensorDataManager();
   filterData = new comfoair::FilterDataManager();
   controlMgr = new comfoair::ControlManager();
-  errorData = new comfoair::ErrorDataManager();  // ← NEW: Create error data manager
+  errorData = new comfoair::ErrorDataManager();  // â† NEW: Create error data manager
   screenMgr = new comfoair::ScreenManager();  // NEW: Screen manager
   
   // Link managers to CAN handler
   comfo->setSensorDataManager(sensorData);
   comfo->setFilterDataManager(filterData);
   comfo->setControlManager(controlMgr);
-  comfo->setErrorDataManager(errorData);  // ← NEW: Link error data manager
+  comfo->setErrorDataManager(errorData);  // â† NEW: Link error data manager
   
   // ============================================================================
   // TIME MANAGER LINKING
@@ -421,7 +405,7 @@ void setup() {
   #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
     if (mqtt) {
       controlMgr->setMQTT(mqtt);
-      Serial.println("ControlManager: MQTT linked for remote command sending ✓");
+      Serial.println("ControlManager: MQTT linked for remote command sending âœ“");
     }
   #endif
   
@@ -429,7 +413,7 @@ void setup() {
   sensorData->setup();
   filterData->setup();
   controlMgr->setup();
-  errorData->setup();  // ← NEW: Initialize error data manager
+  errorData->setup();  // â† NEW: Initialize error data manager
   
 
   // NEW: Initialize screen manager with backlight control AND TCA write function for dimming
@@ -458,7 +442,7 @@ void setup() {
           if (sensorData) {
             float temp = atof((char*)_2);
             sensorData->updateInsideTemp(temp);
-            Serial.printf("MQTT: Inside temp = %.1f°C\n", temp);
+            Serial.printf("MQTT: Inside temp = %.1fÂ°C\n", temp);
           }
         });
         
@@ -466,7 +450,7 @@ void setup() {
           if (sensorData) {
             float temp = atof((char*)_2);
             sensorData->updateOutsideTemp(temp);
-            Serial.printf("MQTT: Outside temp = %.1f°C\n", temp);
+            Serial.printf("MQTT: Outside temp = %.1fÂ°C\n", temp);
           }
         });
         
@@ -511,7 +495,9 @@ void setup() {
             Serial.printf("MQTT: Temp profile = %s (%d)\n", (char*)_2, profile);
           }
         });
-        
+        //
+
+
         // Subscribe to error/alarm messages
         mqtt->subscribeTo(MQTT_PREFIX "/error_overheating", [](char const * _1, uint8_t const * _2, int _3) {
           if (errorData) {
@@ -527,7 +513,7 @@ void setup() {
           }
         });
         
-        Serial.println("✓ MQTT sensor data subscriptions complete");
+        Serial.println("âœ“ MQTT sensor data subscriptions complete");
       #endif
       // ========================================================================
     }
@@ -536,7 +522,7 @@ void setup() {
     // CAN BUS INITIALIZATION (only in non-remote client mode)
     // ============================================================================
     #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
-      Serial.println("⚠️  CAN bus initialization SKIPPED (Remote Client Mode)");
+      Serial.println("âš ï¸  CAN bus initialization SKIPPED (Remote Client Mode)");
     #else
       // Initialize CAN bus with MQTT subscriptions if available
       if (mqtt) {
@@ -560,8 +546,8 @@ void setup() {
     Serial.println("No WiFi connection");
     
     #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
-      Serial.println("⚠️  CRITICAL: Remote Client Mode requires WiFi connection!");
-      Serial.println("⚠️  Device will not function without MQTT connectivity");
+      Serial.println("âš ï¸  CRITICAL: Remote Client Mode requires WiFi connection!");
+      Serial.println("âš ï¸  Device will not function without MQTT connectivity");
     #else
       Serial.println("Initializing CAN bus without MQTT subscriptions");
       comfo->setup();
@@ -582,42 +568,42 @@ void loop() {
   static unsigned long last_touch_read = 0;
   static unsigned long last_can_process = 0;
   
-  // ✅ PRIORITY 1: LVGL timer handler (MUST be called frequently)
+  // âœ… PRIORITY 1: LVGL timer handler (MUST be called frequently)
   lv_timer_handler();
   
-  // ✅ PRIORITY 2: Process display refreshes (instant for button presses)
+  // âœ… PRIORITY 2: Process display refreshes (instant for button presses)
   GUI_process_display_refresh();
   
-  // ✅ PRIORITY 3: Touch polling every 5ms (CRITICAL for responsiveness)
+  // âœ… PRIORITY 3: Touch polling every 5ms (CRITICAL for responsiveness)
   unsigned long now = millis();
-  if (now - last_touch_read >= 5) {  // ← 5ms = 200Hz polling
+  if (now - last_touch_read >= 5) {  // â† 5ms = 200Hz polling
     if (global_touch_indev) {
       lv_indev_read(global_touch_indev);
     }
     last_touch_read = now;
   }
   
-  // ✅ NEW: Screen manager loop (handles NTM state transitions)
+  // âœ… NEW: Screen manager loop (handles NTM state transitions)
   if (screenMgr) screenMgr->loop();
   
   // ============================================================================
   // CAN PROCESSING (only in non-remote client mode)
   // ============================================================================
   #if !defined(REMOTE_CLIENT_MODE) || !REMOTE_CLIENT_MODE
-    // ✅ PRIORITY 4: CAN processing throttled to 10ms (prevent flooding)
+    // âœ… PRIORITY 4: CAN processing throttled to 10ms (prevent flooding)
     if (now - last_can_process >= 10) {
       if (comfo) comfo->loop();
       last_can_process = now;
     }
   #endif
   
-  // ✅ PRIORITY 5: Manager loops (these handle batched updates)
+  // âœ… PRIORITY 5: Manager loops (these handle batched updates)
   if (sensorData) sensorData->loop();      // Batches display updates to 5 sec
   if (filterData) filterData->loop();
   if (controlMgr) controlMgr->loop(); 
-  if (errorData) errorData->loop();        // ← NEW: Error data manager loop
+  if (errorData) errorData->loop();        // â† NEW: Error data manager loop
   
-  // ✅ PRIORITY 6: Network services (lower priority)
+  // âœ… PRIORITY 6: Network services (lower priority)
   if (wifi) wifi->loop();
   
   // Only process network services if WiFi is connected

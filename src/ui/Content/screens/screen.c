@@ -105,6 +105,7 @@ void GUI_initScreen__screen () {
      lv_obj_set_align( GUI_Label__screen__auto, LV_ALIGN_CENTER );
      lv_obj_set_pos( GUI_Label__screen__auto, -25, 77 );
      lv_obj_set_size( GUI_Label__screen__auto, LV_SIZE_CONTENT, LV_SIZE_CONTENT );
+     lv_obj_add_flag( GUI_Label__screen__auto, LV_OBJ_FLAG_HIDDEN ); 
 
      GUI_Image__screen__fanspeed0 = lv_img_create( GUI_Screen__screen );
      lv_obj_add_flag( GUI_Image__screen__fanspeed0, LV_OBJ_FLAG_ADV_HITTEST );
@@ -156,6 +157,15 @@ void GUI_initScreen__screen () {
      lv_obj_set_pos( GUI_Button__screen__centerfan, -91, 11 );
      lv_obj_set_size( GUI_Button__screen__centerfan, 30, 30 );
 
+      // NEW: Boost timer label centered on centerfan button
+      GUI_Label__screen__boosttimer = lv_label_create( GUI_Button__screen__centerfan );
+      lv_obj_set_align( GUI_Label__screen__boosttimer, LV_ALIGN_CENTER );
+      lv_obj_set_size( GUI_Label__screen__boosttimer, LV_SIZE_CONTENT, LV_SIZE_CONTENT );
+      lv_label_set_text( GUI_Label__screen__boosttimer, "00" );
+      lv_obj_set_style_text_color( GUI_Label__screen__boosttimer, lv_color_hex(0xFFFFFF), LV_PART_MAIN );
+      lv_obj_set_style_text_font( GUI_Label__screen__boosttimer, &defaultsmall_1, LV_PART_MAIN );
+      lv_obj_add_flag( GUI_Label__screen__boosttimer, LV_OBJ_FLAG_HIDDEN );  // Hidden by default
+
 
     GUI_initScreenStyles__screen();
     GUI_initScreenTexts__screen();
@@ -167,11 +177,11 @@ void GUI_initScreenTexts__screen () {
       lv_label_set_text( GUI_Label__screen__date, "2 Sept. 2025" );
       lv_label_set_text( GUI_Label__screen__filter, "Filter Change\n in 45 days" );
        lv_label_set_text( GUI_Label__screen__labelboost, "BOOST" );
-     lv_label_set_text( GUI_Label__screen__insideTemp, "22°C" );
-     lv_label_set_text( GUI_Label__screen__outsideTemp, "16°C" );
+     lv_label_set_text( GUI_Label__screen__insideTemp, "22Â°C" );
+     lv_label_set_text( GUI_Label__screen__outsideTemp, "16Â°C" );
      lv_label_set_text( GUI_Label__screen__insideHum, "45%" );
      lv_label_set_text( GUI_Label__screen__outsideHum, "85%" );
-     lv_label_set_text( GUI_Label__screen__auto, "Auto" );
+     lv_label_set_text( GUI_Label__screen__auto, "Auto" ); 
      lv_dropdown_set_options( GUI_Dropdown__screen__modedropdown, "NORMAL\nCOOLING\nHEATING" );
 }
 

@@ -38,6 +38,7 @@ extern lv_obj_t*  GUI_Image__screen__fanspeed3;
 extern lv_obj_t*  GUI_Image__screen__fanspeedboost;
 extern lv_obj_t*  GUI_Dropdown__screen__modedropdown;
 extern lv_obj_t*  GUI_Button__screen__centerfan;
+extern lv_obj_t*  GUI_Label__screen__boosttimer;  // NEW: Label for boost timer display
 
 
 // Screen-specific function declarations

@@ -103,7 +103,7 @@ namespace comfoair {
   }
 
   bool ComfoMessage::sendCommand(char const * command) {
-    // âœ… FIXED: Send command only ONCE (removed duplicate send and 1-second delay)
+    // Ã¢Å“â€¦ FIXED: Send command only ONCE (removed duplicate send and 1-second delay)
     #define CMDIF(name) if (strcmp(command, #name) == 0) { \
                           return this->send(new std::vector<uint8_t>( CMD_ ## name )); \
                         } else 
@@ -151,7 +151,7 @@ namespace comfoair {
         strncpy(message->name, "device_time", 39);
         message->name[39] = '\0';
         
-        Serial.printf("ComfoMessage: ✅ Time response decoded: %u seconds\n", device_seconds);
+        Serial.printf("ComfoMessage: âœ… Time response decoded: %u seconds\n", device_seconds);
         return true;
       }
     }
@@ -207,15 +207,15 @@ namespace comfoair {
       LAZYSWITCH(227, "bypass_state", "%d", vals[0])  // %
 
       // temps
-      LAZYSWITCH(209, "rmot", "%.1f", int16/ 10.0)  // CÂ°
-      LAZYSWITCH(212, "target_temp", "%.1f", uint16/ 10.0)  // CÂ°
-      LAZYSWITCH(220, "pre_heater_temp_before", "%.1f", int16/10.0) // CÂ°
-      LAZYSWITCH(221, "post_heater_temp_after", "%.1f", int16/10.0)  // CÂ°
-      LAZYSWITCH(274, "extract_air_temp", "%.1f", int16 /10.0)  // CÂ°   
-      LAZYSWITCH(275, "exhaust_air_temp", "%.1f", int16 /10.0)  // CÂ°   
-      LAZYSWITCH(276, "outdoor_air_temp", "%.1f", int16 /10.0)  // CÂ°   
-      LAZYSWITCH(277, "pre_heater_temp_after", "%.1f", int16 /10.0)  // CÂ°
-      LAZYSWITCH(278, "post_heater_temp_before", "%.1f", int16 /10.0)  // CÂ°   
+      LAZYSWITCH(209, "rmot", "%.1f", int16/ 10.0)  // CÃ‚Â°
+      LAZYSWITCH(212, "target_temp", "%.1f", uint16/ 10.0)  // CÃ‚Â°
+      LAZYSWITCH(220, "pre_heater_temp_before", "%.1f", int16/10.0) // CÃ‚Â°
+      LAZYSWITCH(221, "post_heater_temp_after", "%.1f", int16/10.0)  // CÃ‚Â°
+      LAZYSWITCH(274, "extract_air_temp", "%.1f", int16 /10.0)  // CÃ‚Â°   
+      LAZYSWITCH(275, "exhaust_air_temp", "%.1f", int16 /10.0)  // CÃ‚Â°   
+      LAZYSWITCH(276, "outdoor_air_temp", "%.1f", int16 /10.0)  // CÃ‚Â°   
+      LAZYSWITCH(277, "pre_heater_temp_after", "%.1f", int16 /10.0)  // CÃ‚Â°
+      LAZYSWITCH(278, "post_heater_temp_before", "%.1f", int16 /10.0)  // CÃ‚Â°   
       // Humidity
       LAZYSWITCH(290, "extract_air_humidity", "%d", vals[0])  // %
       LAZYSWITCH(291, "exhaust_air_humidity", "%d", vals[0])  // %   
@@ -324,39 +324,35 @@ namespace comfoair {
     Serial.println("ComfoMessage: Sending time request (RTR to 0x10080028)");
     
     // ====================================================================
-    // CONFIRMED WORKING: RTR to CAN ID 0x10080028
+    // FIX: Use LOCAL message variable to avoid polluting global state
     // ====================================================================
-    // Tested on 2025-10-26: This command successfully triggers time response
-    // Response comes on CAN ID 0x10040001 with 4 bytes (seconds since 2000)
-    // 
-    // Previous attempts with RMI protocol failed - MVHR uses simple RTR!
-    // 
-    // RELIABILITY FIX: Send multiple times to handle missed responses
+    // The global 'message' variable is used by send() for regular commands
+    // Using it for RTR would leave message.rtr = true, breaking all
+    // subsequent commands. Use a local variable instead.
     // ====================================================================
+    CAN_FRAME rtr_message;
+    rtr_message.id = 0x10080028;
+    rtr_message.extended = true;
+    rtr_message.rtr = true;  // Remote Transmission Request (no data)
+    rtr_message.length = 0;
+    memset(rtr_message.data.byte, 0, 8);  // Ensure clean data buffer
     
-    message.id = 0x10080028;
-    message.extended = true;
-    message.rtr = true;  // Remote Transmission Request (no data)
-    message.length = 0;
-    
-    bool success = false;
-    
-    // Send 3 times with delays to increase reliability
-    for (int i = 0; i < 3; i++) {
-      if (CAN0.sendFrame(message)) {
-        success = true;
-        Serial.printf("ComfoMessage: Time request sent (attempt %d/3)\n", i + 1);
-      } else {
-        Serial.printf("ComfoMessage: Time request failed (attempt %d/3)\n", i + 1);
-      }
-      delay(100);  // Small delay between attempts
-    }
+    // ====================================================================
+    // Send RTR frame ONCE (no loop, no delays)
+    // ====================================================================
+    // Previous code sent 3x with 100ms delays = 300ms blocking
+    // One RTR is sufficient, MVHR will respond if it's ready
+    // ====================================================================
+    bool success = CAN0.sendFrame(rtr_message);
     
     if (success) {
-      Serial.println("ComfoMessage: Time request sequence complete");
+      Serial.println("ComfoMessage: ✅ Time request sent (1 RTR, non-blocking)");
+      Serial.println("ComfoMessage:    Response expected on 0x10040001 within 5s");
     } else {
-      Serial.println("ComfoMessage: All time request attempts failed");
+      Serial.println("ComfoMessage: ❌ Time request failed (no CAN ACK)");
     }
+    
+    // Global 'message' variable is untouched - regular commands will work!
     
     return success;
   }
@@ -374,7 +370,7 @@ namespace comfoair {
     // NOTE: MVHR expects UTC time, not local time with timezone!
     // ====================================================================
     
-    message.id = 0x10040001;  // ✅ CONFIRMED WORKING
+    message.id = 0x10040001;  // âœ… CONFIRMED WORKING
     message.extended = true;
     message.rtr = false;  // Not RTR - we're sending data
     message.length = 4;
@@ -388,11 +384,11 @@ namespace comfoair {
     bool success = CAN0.sendFrame(message);
     
     if (success) {
-      Serial.printf("ComfoMessage: ✅ Time set command sent to 0x10040001: [%02X %02X %02X %02X]\n",
+      Serial.printf("ComfoMessage: âœ… Time set command sent to 0x10040001: [%02X %02X %02X %02X]\n",
                    message.data.uint8[0], message.data.uint8[1], 
                    message.data.uint8[2], message.data.uint8[3]);
     } else {
-      Serial.println("ComfoMessage: ❌ Failed to send time set command");
+      Serial.println("ComfoMessage: âŒ Failed to send time set command");
     }
     
     return success;
