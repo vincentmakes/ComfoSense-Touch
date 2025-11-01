@@ -7,6 +7,8 @@
 
 ## Future Features
 
+Investigate if the switch between modes can be automated upon detection of a CAN message
+
 Add second screen to manage : 
 
 -Manual Night Time mode (override)

@@ -4,7 +4,9 @@ This project is inspired by the work of many others who successfully managed to 
 
 This new device is meant to not only replace the ComfoConnect LAN but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir. On top of having a much better UI, it's been optimized to be very snappy and responsive.
 
-This device can function in two modes: Directly connected to the ComfoAir, in place of the ComfoSense or as a Remote Client (requires a simpler MQTT bridge, like this one https://github.com/vincentmakes/MQTTBridgeComfoAirQ/)
+This device can function in two modes: Directly connected to the ComfoAir, in place of the ComfoSense or as a Remote Client.
+
+Remote Client requires a simpler MQTT bridge - alternatively, have a second esp32 display acting as a bridge, with night time mode permanently on. This way only one firmware is needed for both devices.
 
 <img width="869" height="443" alt="image" src="https://github.com/user-attachments/assets/0ac9e52d-0ce7-4bae-bc95-ab738f8bc27c" />
 
@@ -98,6 +100,17 @@ If you are using a straight cable, you can use the alternative decorative frame 
 
 <img width="674" height="464" alt="Screenshot 2025-10-26 at 16 32 19" src="https://github.com/user-attachments/assets/dc0fef3b-23fa-43eb-ba84-8d1efe282fe5" />
 
+## Other option : as a pure MQTT bridge
+
+This device can also be used as a pure MQTT bridge, connected to the ComfoAir : simply set the night time mode to be permanent in secrets.h, this way the screen will be turned off permanently (can be waken up with a tap). It is a more expensive option (35$) than putting together a esp32, DC DC buck converter and CAN transceiver (15-20$) but it's also an easy "plug and play" one.
+
+In a next iteration, I will provide a 3d printed model for this type of usage: one that integrates a RJ45 female port connected to the display so it can be connected/disconnected easily.
+
+The downside of this setup is in case of a power reboot, the power button on the side of the screen needs to be pressed manually so it boots up. 
+
+An alternative plug and play option is this product from Waveshare as well :  https://www.waveshare.com/esp32-s3-rs485-can.htm (19$). This has the benefit that no power button needs to be pressed for reboot and it accept an external antenna in case your MVHR is in a not so well wifi covered area.
+
+It will run this firmware just fine, but the platformio.ini file may need to be adjusted - I will provide this option in the future.
 
 ## Features and logic
 ### Time Management
@@ -110,7 +123,16 @@ Filter and sensor data are fetched using the CAN command directly (so we don't r
 A warning icon appears if the filters needs to be changed within 21 days. This can be changed in secrets.h through WARNING_THRESHOLD_DAYS value
 
 ### Controls
-Controls are interacting via CAN command directly as well. They are limited for now to : Fan Increase, Fan Decrease, Boost (20min) and Change of Temperature profile (normal, cool, heat). To access any other advanced features, one would need to go to the MVHR itself. I may include a second screen at a later stage to implement additional control (Bypass, etc) but those firs basic control are reflecting my usage of the unit thus far. 
+Controls are interacting via CAN command directly as well. They are limited for now to : Fan Increase, Fan Decrease, Boost (20min increments) and Change of Temperature profile (normal, cool, heat). To access any other advanced features, one would need to go to the MVHR itself. I may include a second screen at a later stage to implement additional control (Bypass, etc) but those firs basic control are reflecting my usage of the unit thus far. 
+> [!NOTE]
+>Note that the Boost function by 20min increments is on the esp32 side only and we're not using the logic from the ComfoAir which has some limitations. Essentially, it set the fan >speed on 3 for a period of time define by how many times one presses the Boost button. The boost button can be pressed at any time to increase the current count by 20min (capped at 99 min). 
+>Pressing any other fan control interrupts the Boost mode and timer.
+
+Here's an example in boost mode with the timer just started at 20min.
+
+<img width="300" alt="Screenshot 2025-11-01 at 20 25 42" src="https://github.com/user-attachments/assets/8b3d8986-1d7d-4480-a682-edb0600a9527" />
+
+
 Additional automation should be done through Home Assistant (such as changing fan speed depending on sensor data, time of the day, etc)
 
 ### Dimming the screen
