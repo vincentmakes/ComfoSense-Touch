@@ -458,13 +458,13 @@ void GUI_update_temp_profile_display_from_cpp(uint8_t profile) {
 }
 
 void GUI_update_boost_timer_display(int minutes_remaining) {
-    // âœ… FEATURE 2: Display minutes remaining in centerfan placeholder
+    // FEATURE 2: Display minutes remaining in centerfan placeholder
     // Small font, white color, no background
     
     if (minutes_remaining > 0) {
         char timer_text[4];
         if (minutes_remaining > 99) minutes_remaining = 99;  // Cap at 99
-        snprintf(timer_text, sizeof(timer_text), "%02d", minutes_remaining);
+        snprintf(timer_text, sizeof(timer_text), "%02d'", minutes_remaining);
         
         lv_label_set_text(GUI_Label__screen__boosttimer, timer_text);
         
