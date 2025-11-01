@@ -124,8 +124,15 @@ A warning icon appears if the filters needs to be changed within 21 days. This c
 
 ### Controls
 Controls are interacting via CAN command directly as well. They are limited for now to : Fan Increase, Fan Decrease, Boost (20min increments) and Change of Temperature profile (normal, cool, heat). To access any other advanced features, one would need to go to the MVHR itself. I may include a second screen at a later stage to implement additional control (Bypass, etc) but those firs basic control are reflecting my usage of the unit thus far. 
-Note that the Boost function by 20min increments is on the esp32 side only and we're not using the logic from the ComfoAir which has some limitations. Essentially, it set the fan speed on 3 for a period of time define by how many time one presses the Boost button. The boost button can be pressed at any time to increase the current count by 20min. 
-Pressing any other fan control interrupts the Boost mode and timer.
+> [!NOTE]
+>Note that the Boost function by 20min increments is on the esp32 side only and we're not using the logic from the ComfoAir which has some limitations. Essentially, it set the fan >speed on 3 for a period of time define by how many times one presses the Boost button. The boost button can be pressed at any time to increase the current count by 20min (capped at 99 min). 
+>Pressing any other fan control interrupts the Boost mode and timer.
+
+Here's an example in boost mode with the timer just started at 20min.
+
+<img width="300" alt="Screenshot 2025-11-01 at 20 25 42" src="https://github.com/user-attachments/assets/8b3d8986-1d7d-4480-a682-edb0600a9527" />
+
+
 Additional automation should be done through Home Assistant (such as changing fan speed depending on sensor data, time of the day, etc)
 
 ### Dimming the screen
