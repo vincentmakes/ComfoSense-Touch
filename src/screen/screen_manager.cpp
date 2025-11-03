@@ -23,7 +23,7 @@ ScreenManager::ScreenManager()
       pwm_state(false),
       pwm_on_time_us(0),
       pwm_period_us(16700),  // 80Hz = 12500us period OR 60Hz = 16700us
-                             // Flicker-free with R40=0Ω (no filtering), range is limited by R36
+                             // Flicker-free with R40=0Î© (no filtering), range is limited by R36
       ntm_enabled(NTM_ENABLED),
       permanent_ntm(NTM_PERMANENT),
       ntm_start_hour(NTM_START_HOUR),
@@ -54,7 +54,7 @@ void ScreenManager::begin(void (*backlightControlFn)(bool on),
             dimming_enabled = true;
             Serial.printf("Dimming: ENABLED on EXIO%d via I2C (Software PWM @ 80Hz)\n", exio_pwm_pin);
             Serial.printf("Default Brightness: %d%%\n", current_brightness);
-            Serial.println("Hardware: EXIO5 → AP3032 FB pin (R40=0Ω, direct connection)");
+            Serial.println("Hardware: EXIO5 â†’ AP3032 FB pin (R40=0Î©, direct connection)");
             Serial.println("Note: Using 80Hz PWM with inverted mapping (100=brightest, 0=darkest)");
             
             // CRITICAL: Set EXIO5 to a stable middle state during initialization
@@ -200,6 +200,12 @@ void ScreenManager::updatePWM() {
 void ScreenManager::setPWMPin(bool state) {
     if (!tca_write) return;
     
+    // CRITICAL SAFEGUARD: Don't modify TCA state if screen is off
+    // This prevents PWM from accidentally turning backlight back on
+    if (!screen_is_on) {
+        return;
+    }
+    
     // Update the TCA output state for EXIO5 (bit 4, since EXIO5 is pin 5, and pins are 1-indexed)
     uint8_t bit_position = exio_pwm_pin - 1;  // EXIO5 -> bit 4
     
@@ -235,7 +241,7 @@ void ScreenManager::setPWMPin(bool state) {
 void ScreenManager::calculatePWMTiming() {
     // Invert brightness for intuitive control:
     // AP3032 FB works opposite: HIGH = darker, LOW = brighter
-    // So we invert: user 100 → 0% duty (brightest), user 0 → 100% duty (darkest)
+    // So we invert: user 100 â†’ 0% duty (brightest), user 0 â†’ 100% duty (darkest)
     
     uint8_t inverted_brightness = 100 - current_brightness;
     pwm_on_time_us = (uint16_t)((inverted_brightness * pwm_period_us) / 100);
@@ -359,9 +365,19 @@ void ScreenManager::turnScreenOn() {
     
     Serial.println("[Screen] Turning ON");
     
+    // CRITICAL: Ensure backlight bit is set in tca_output_state
+    // This prevents PWM system from clearing the backlight bit
+    tca_output_state |= (1 << 1);  // Set EXIO2 (backlight) bit
+    
     // Turn on backlight (EXIO2 via TCA9554)
     if (backlight_control) {
-        backlight_control(true);
+        backlight_control(true);  // Sets EXIO2 (bit 1) in current_tca_state
+    }
+    
+    // Force write to ensure backlight is ON
+    if (tca_write) {
+        tca_write(TCA_REG_OUTPUT, tca_output_state);
+        Serial.printf("[Screen] TCA state after ON: 0x%02X\n", tca_output_state);
     }
     
     // If dimming enabled, start software PWM
@@ -383,15 +399,27 @@ void ScreenManager::turnScreenOff() {
     
     Serial.println("[Screen] Turning OFF");
     
-    // Turn off backlight (EXIO2 via TCA9554)
-    if (backlight_control) {
-        backlight_control(false);
-    }
-    
-    // If dimming enabled, stop PWM (set pin LOW)
+    // CRITICAL: Stop PWM FIRST (before turning off backlight)
+    // This prevents PWM from overwriting the backlight-off state
     if (dimming_enabled && tca_write) {
         pwm_state = false;
-        setPWMPin(false);
+        setPWMPin(false);  // Set EXIO5 low
+    }
+    
+    // Turn off backlight (EXIO2 via TCA9554)
+    // This must happen AFTER stopping PWM to ensure the state sticks
+    if (backlight_control) {
+        backlight_control(false);  // Clears EXIO2 (bit 1) in current_tca_state
+    }
+    
+    // CRITICAL FIX: Ensure backlight bit is cleared in tca_output_state too
+    // This prevents PWM system from accidentally turning backlight back on
+    tca_output_state &= ~(1 << 1);  // Clear EXIO2 (backlight) bit
+    
+    // Force final write to ensure backlight is OFF
+    if (tca_write) {
+        tca_write(TCA_REG_OUTPUT, tca_output_state);
+        Serial.printf("[Screen] TCA state after OFF: 0x%02X\n", tca_output_state);
     }
     
     screen_is_on = false;
