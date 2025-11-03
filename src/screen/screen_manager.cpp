@@ -369,23 +369,39 @@ void ScreenManager::turnScreenOn() {
     // This prevents PWM system from clearing the backlight bit
     tca_output_state |= (1 << 1);  // Set EXIO2 (backlight) bit
     
-    // Turn on backlight (EXIO2 via TCA9554)
+    // If dimming enabled, calculate PWM timing FIRST
+    // This ensures we start with the correct brightness level
+    if (dimming_enabled && tca_write) {
+        calculatePWMTiming();
+        
+        // CRITICAL: Set initial PWM state based on brightness
+        // For low brightness (high duty cycle), start with PWM LOW
+        // For high brightness (low duty cycle), start with PWM HIGH
+        if (current_brightness <= 50) {
+            // Low brightness = start with PWM LOW (darkest state)
+            pwm_state = false;
+            setPWMPin(false);
+            Serial.printf("[Screen] Starting with PWM LOW (brightness=%d%%)\n", current_brightness);
+        } else {
+            // High brightness = start with PWM HIGH 
+            pwm_state = true;
+            setPWMPin(true);
+            Serial.printf("[Screen] Starting with PWM HIGH (brightness=%d%%)\n", current_brightness);
+        }
+        
+        last_pwm_update = micros();
+    }
+    
+    // Turn on backlight (EXIO2 via TCA9554) AFTER setting PWM state
     if (backlight_control) {
         backlight_control(true);  // Sets EXIO2 (bit 1) in current_tca_state
     }
     
-    // Force write to ensure backlight is ON
+    // Final write to ensure both backlight and PWM state are correct
     if (tca_write) {
         tca_write(TCA_REG_OUTPUT, tca_output_state);
-        Serial.printf("[Screen] TCA state after ON: 0x%02X\n", tca_output_state);
-    }
-    
-    // If dimming enabled, start software PWM
-    if (dimming_enabled && tca_write) {
-        calculatePWMTiming();
-        last_pwm_update = micros();
-        pwm_state = true;
-        setPWMPin(true);  // Start with PWM pin high
+        Serial.printf("[Screen] TCA state after ON: 0x%02X (brightness=%d%%)\n", 
+                      tca_output_state, current_brightness);
     }
     
     screen_is_on = true;
