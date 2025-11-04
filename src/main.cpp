@@ -405,7 +405,7 @@ void setup() {
   #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
     if (mqtt) {
       controlMgr->setMQTT(mqtt);
-      Serial.println("ControlManager: MQTT linked for remote command sending âœ“");
+      Serial.println("ControlManager: MQTT linked for remote command sending");
     }
   #endif
   
@@ -442,7 +442,7 @@ void setup() {
           if (sensorData) {
             float temp = atof((char*)_2);
             sensorData->updateInsideTemp(temp);
-            Serial.printf("MQTT: Inside temp = %.1fÂ°C\n", temp);
+            Serial.printf("MQTT: Inside temp = %.1f°C\n", temp);
           }
         });
         
@@ -450,7 +450,7 @@ void setup() {
           if (sensorData) {
             float temp = atof((char*)_2);
             sensorData->updateOutsideTemp(temp);
-            Serial.printf("MQTT: Outside temp = %.1fÂ°C\n", temp);
+            Serial.printf("MQTT: Outside temp = %.1f°C\n", temp);
           }
         });
         
@@ -513,7 +513,7 @@ void setup() {
           }
         });
         
-        Serial.println("âœ“ MQTT sensor data subscriptions complete");
+        Serial.println("MQTT sensor data subscriptions complete");
       #endif
       // ========================================================================
     }
@@ -522,7 +522,7 @@ void setup() {
     // CAN BUS INITIALIZATION (only in non-remote client mode)
     // ============================================================================
     #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
-      Serial.println("âš ï¸  CAN bus initialization SKIPPED (Remote Client Mode)");
+      Serial.println("CAN bus initialization SKIPPED (Remote Client Mode)");
     #else
       // Initialize CAN bus with MQTT subscriptions if available
       if (mqtt) {
@@ -546,8 +546,8 @@ void setup() {
     Serial.println("No WiFi connection");
     
     #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
-      Serial.println("âš ï¸  CRITICAL: Remote Client Mode requires WiFi connection!");
-      Serial.println("âš ï¸  Device will not function without MQTT connectivity");
+      Serial.println("CRITICAL: Remote Client Mode requires WiFi connection!");
+      Serial.println("Device will not function without MQTT connectivity");
     #else
       Serial.println("Initializing CAN bus without MQTT subscriptions");
       comfo->setup();

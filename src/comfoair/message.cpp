@@ -6,7 +6,7 @@
 #define min(a,b) ((a) < (b) ? (a): (b))
 #define DEBUG true
 void printFrame(CAN_FRAME *message)
-{
+{/*
     Serial.print(message->id, HEX);
     Serial.print(" ");
     for (byte i = 0; i < message->length; i++) {
@@ -14,7 +14,7 @@ void printFrame(CAN_FRAME *message)
         Serial.print(message->data.byte[i], HEX);
         Serial.print(" ");
     }
-    Serial.println();
+    Serial.println();*/
 }
 CAN_FRAME message;
 #ifdef DEBUG
@@ -103,7 +103,7 @@ namespace comfoair {
   }
 
   bool ComfoMessage::sendCommand(char const * command) {
-    // Ã¢Å“â€¦ FIXED: Send command only ONCE (removed duplicate send and 1-second delay)
+    // FIXED: Send command only ONCE (removed duplicate send and 1-second delay)
     #define CMDIF(name) if (strcmp(command, #name) == 0) { \
                           return this->send(new std::vector<uint8_t>( CMD_ ## name )); \
                         } else 
@@ -151,7 +151,7 @@ namespace comfoair {
         strncpy(message->name, "device_time", 39);
         message->name[39] = '\0';
         
-        Serial.printf("ComfoMessage: âœ… Time response decoded: %u seconds\n", device_seconds);
+        Serial.printf("ComfoMessage: Time response decoded: %u seconds\n", device_seconds);
         return true;
       }
     }
@@ -384,11 +384,11 @@ namespace comfoair {
     bool success = CAN0.sendFrame(message);
     
     if (success) {
-      Serial.printf("ComfoMessage: âœ… Time set command sent to 0x10040001: [%02X %02X %02X %02X]\n",
+      Serial.printf("ComfoMessage: Time set command sent to 0x10040001: [%02X %02X %02X %02X]\n",
                    message.data.uint8[0], message.data.uint8[1], 
                    message.data.uint8[2], message.data.uint8[3]);
     } else {
-      Serial.println("ComfoMessage: âŒ Failed to send time set command");
+      Serial.println("ComfoMessage: Failed to send time set command");
     }
     
     return success;

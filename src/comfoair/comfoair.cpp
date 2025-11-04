@@ -15,7 +15,7 @@
 
 
 void printFrame2(CAN_FRAME *message)
-{
+{ /*
   Serial.print(message->id, HEX);
   if (message->extended) Serial.print(" X ");
   else Serial.print(" S ");   
@@ -23,9 +23,9 @@ void printFrame2(CAN_FRAME *message)
   for (int i = 0; i < message->length; i++) {
     Serial.print(" ");
     if (message->data.byte[i] < 0x10) Serial.print("0");
-    Serial.print(message->data.byte[i], HEX);
+    Serial.print(message->data.byte[i], HEX); 
   }
-  Serial.println();
+  Serial.println(); */
 }
 
 #define subscribe(command) if (mqtt) { mqtt->subscribeTo(MQTT_PREFIX "/commands/" command, [this](char const * _1,uint8_t const * _2, int _3) { \
