@@ -177,8 +177,8 @@ void GUI_initScreenTexts__screen () {
       lv_label_set_text( GUI_Label__screen__date, "2 Sept. 2025" );
       lv_label_set_text( GUI_Label__screen__filter, "Filter Change\n in 45 days" );
        lv_label_set_text( GUI_Label__screen__labelboost, "BOOST" );
-     lv_label_set_text( GUI_Label__screen__insideTemp, "22Â°C" );
-     lv_label_set_text( GUI_Label__screen__outsideTemp, "16Â°C" );
+     lv_label_set_text( GUI_Label__screen__insideTemp, "22°C" );
+     lv_label_set_text( GUI_Label__screen__outsideTemp, "16°C" );
      lv_label_set_text( GUI_Label__screen__insideHum, "45%" );
      lv_label_set_text( GUI_Label__screen__outsideHum, "85%" );
      lv_label_set_text( GUI_Label__screen__auto, "Auto" ); 

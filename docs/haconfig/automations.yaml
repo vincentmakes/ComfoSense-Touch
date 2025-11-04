@@ -1,46 +1,29 @@
-- id: "12345"
-  alias: "MVHR Speed Select Publish"
-  trigger:
-    platform: state
-    entity_id: sensor.mvhr_speed_select_state
-  action:
-    service: mqtt.publish
-    data_template:
-      topic: >
-        {% if states('sensor.mvhr_speed_select_state') == 'Speed 0 (Away)' %}
-          comfoair/commands/ventilation_level_0
-        {% elif states('sensor.mvhr_speed_select_state') == 'Speed 1' %}
-          comfoair/commands/ventilation_level_1
-        {% elif states('sensor.mvhr_speed_select_state') == 'Speed 2 (Default)' %}
-          comfoair/commands/ventilation_level_2
-        {% elif states('sensor.mvhr_speed_select_state') == 'Speed 3 (Boost)' %}
-          comfoair/commands/ventilation_level_3
-        {% else %}
-          comfoair/commands/ventilation_level_2
-        {% endif %}
-      payload: "on"
+- id: '12345'
+# Automation #1 - Send commands (only when user changes AND different from status)
+- alias: MVHR Speed Select Publish
+  triggers:
+  - entity_id: sensor.mvhr_speed_select_state
+    trigger: state
+  conditions:
+    - condition: template
+      value_template: "{{ trigger.to_state.state != states('sensor.mvhr_supply_fan_user_speed') }}"
+  actions:
+  - data_template:
+      topic: "comfoair/commands/ventilation_level_{{ states('sensor.mvhr_speed_select_state') }}"
+      payload: 'on'
+    action: mqtt.publish
 
-- id: "12346"
-  alias: "MVHR Speed Select Update"
-  trigger:
-    platform: state
-    entity_id: sensor.mvhr_supply_fan_user_speed
-  action:
-    service: input_select.select_option
-    data_template:
+# Automation #2 - Update display (keep as-is)
+- id: '12346'
+  alias: MVHR Speed Select Update
+  triggers:
+  - entity_id: sensor.mvhr_supply_fan_user_speed
+    trigger: state
+  actions:
+  - data_template:
       entity_id: input_select.mvhr_ventilation_speed
-      option: >
-        {% if states('sensor.mvhr_supply_fan_user_speed') == "0" %}
-          Speed 0 (Away)
-        {% elif states('sensor.mvhr_supply_fan_user_speed') == "1" %}
-          Speed 1
-        {% elif states('sensor.mvhr_supply_fan_user_speed') == "2" %}
-          Speed 2 (Default)
-        {% elif states('sensor.mvhr_supply_fan_user_speed') == "3" %}
-          Speed 3 (Boost)
-        {% else %}
-          Speed 2 (Default)
-        {% endif %}
+      option: "{{ states('sensor.mvhr_supply_fan_user_speed') }}"
+    action: input_select.select_option
 
 - id: "12347"
   alias: "MVHR Bypass Toggle Publish"

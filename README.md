@@ -369,6 +369,9 @@ Finally, load up the "automations.yaml" file provided in this project, or extend
 ```yaml
 automation: !include automations.yaml
 ```
+> [!IMPORTANT] - Note from vincentmakes
+> I've had some troubles with the original automations.yaml: with this more complex bridge, this was creating an echo or feedback which was driving the fan speed of the ComfoAir all over the place. This updated yaml fixes the issue with one caveat is that only actual user input can send MQTT commands. This means no automation or one would need to find another solution.
+
 
 First automation listens for changes to the created "input_select", which are triggered when choosing a different ventilation speed from the GUI using the drop down. It then runs an action (defined as a template) so that depending on the value chosen in the drop down, the MQTT topic published is the corredponding one.
 
