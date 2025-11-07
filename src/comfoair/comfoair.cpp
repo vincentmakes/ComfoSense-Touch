@@ -28,10 +28,28 @@ void printFrame2(CAN_FRAME *message)
   Serial.println(); */
 }
 
+// ============================================================================
+// ✅ FIXED: Command deduplication to prevent Home Assistant echo loop
+// Only send command if MVHR is not already at the requested state
+// ============================================================================
 #define subscribe(command) if (mqtt) { mqtt->subscribeTo(MQTT_PREFIX "/commands/" command, [this](char const * _1,uint8_t const * _2, int _3) { \
     Serial.print("Received: "); \
     Serial.println(command); \
-    this->comfoMessage.sendCommand(command); \
+    \
+    /* Extract requested speed from command */ \
+    uint8_t requested_speed = 255; /* 255 = not a speed command */ \
+    if (strcmp(command, "ventilation_level_0") == 0) requested_speed = 0; \
+    else if (strcmp(command, "ventilation_level_1") == 0) requested_speed = 1; \
+    else if (strcmp(command, "ventilation_level_2") == 0) requested_speed = 2; \
+    else if (strcmp(command, "ventilation_level_3") == 0) requested_speed = 3; \
+    \
+    /* Only send if different from current state (prevents echo loop) */ \
+    if (requested_speed != 255 && requested_speed == this->current_fan_speed) { \
+      Serial.printf("  ⏭️  Command ignored - MVHR already at speed %d\n", requested_speed); \
+    } else { \
+      Serial.printf("  📡 Sending command to MVHR\n"); \
+      this->comfoMessage.sendCommand(command); \
+    } \
   }); }
 
 extern comfoair::MQTT *mqtt;
@@ -46,7 +64,8 @@ namespace comfoair {
     filterManager(nullptr), 
     controlManager(nullptr),
     timeManager(nullptr),
-    errorManager(nullptr) {}  // ← MODIFIED (added errorManager)
+    errorManager(nullptr),
+    current_fan_speed(255) {}  // ← MODIFIED: 255 = unknown initial state
 
   void ComfoAir::setSensorDataManager(SensorDataManager* manager) {
     sensorManager = manager;
@@ -175,7 +194,15 @@ namespace comfoair {
             Serial.print("Received: ");
             Serial.println(_1);
             Serial.println(otherBuf);
-            return this->comfoMessage.sendCommand(otherBuf);
+            
+            // ✅ FIXED: Also check deduplication for generic ventilation_level command
+            uint8_t requested_speed = _2[0] - 48; // Convert ASCII to number
+            if (requested_speed <= 3 && requested_speed == this->current_fan_speed) {
+              Serial.printf("  ⏭️  Command ignored - MVHR already at speed %d\n", requested_speed);
+            } else {
+              Serial.printf("  📡 Sending command to MVHR\n");
+              return this->comfoMessage.sendCommand(otherBuf);
+            }
           });
           
           mqtt->subscribeTo(MQTT_PREFIX "/commands/" "set_mode", [this](char const * _1,uint8_t const * _2, int _3) {
@@ -318,7 +345,11 @@ namespace comfoair {
           if (controlManager) {
             if (strcmp(decoded_name, "fan_speed") == 0) {
               Serial.println("  ✓ MATCH: fan_speed - calling updateFanSpeedFromCAN()");
-              controlManager->updateFanSpeedFromCAN(atoi(decoded_val));
+              
+              // ✅ FIXED: Track current fan speed for deduplication
+              current_fan_speed = atoi(decoded_val);
+              
+              controlManager->updateFanSpeedFromCAN(current_fan_speed);
             }
             else if (strcmp(decoded_name, "temp_profile") == 0) {
               Serial.println("  ✓ MATCH: temp_profile - calling updateTempProfileFromCAN()");

@@ -40,6 +40,9 @@ namespace comfoair {
       TimeManager* timeManager;
       ErrorDataManager* errorManager;  // ← NEW
       
+      // ✅ FIXED: Track current fan speed for command deduplication
+      uint8_t current_fan_speed;  // 255 = unknown
+      
       // Handle device time response
       void handleDeviceTimeResponse(uint32_t device_seconds);
   };
