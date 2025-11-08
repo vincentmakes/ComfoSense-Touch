@@ -29,7 +29,7 @@ ScreenManager::ScreenManager()
       ntm_start_hour(NTM_START_HOUR),
       ntm_end_hour(NTM_END_HOUR),
       wake_duration_ms(NTM_WAKE_DURATION_SEC * 1000UL),
-      screen_is_on(true),
+      screen_is_on(!NTM_PERMANENT),  // FIXED: Start with screen OFF if permanent mode
       in_night_time_window(false),
       last_touch_time(0),
       screen_off_time(0)
@@ -95,8 +95,21 @@ void ScreenManager::begin(void (*backlightControlFn)(bool on),
         Serial.printf("Wake Duration: %lu seconds\n", wake_duration_ms / 1000);
     }
     
-    // Start with screen on
-    turnScreenOn();
+    // Initialize screen state based on NTM configuration
+    if (permanent_ntm) {
+        // In permanent night mode, screen starts OFF (waiting for touch)
+        Serial.println("[NTM] Starting with screen OFF (permanent mode)");
+        // Don't call turnScreenOff() here - just leave it off from hardware init
+        // The screen_is_on flag is already false from constructor
+        // We just need to ensure the backlight stays off
+        if (backlight_control) {
+            backlight_control(false);
+        }
+    } else {
+        // Not in permanent mode - start with screen ON
+        Serial.println("[Init] Starting with screen ON");
+        turnScreenOn();
+    }
 }
 
 void ScreenManager::loop() {
@@ -123,6 +136,17 @@ void ScreenManager::loop() {
         return; // NTM disabled, screen stays on always
     }
     
+    // Periodic diagnostic logging (every 60 seconds in permanent mode)
+    if (permanent_ntm) {
+        static unsigned long last_diagnostic = 0;
+        if (millis() - last_diagnostic >= 60000) {
+            Serial.printf("[NTM Diagnostic] screen_is_on=%d, last_touch_time=%lu, time_since_touch=%lu ms\n",
+                         screen_is_on, last_touch_time, 
+                         last_touch_time > 0 ? (millis() - last_touch_time) : 0);
+            last_diagnostic = millis();
+        }
+    }
+    
     // Update whether we're in the night time window
     updateNightTimeState();
     
@@ -138,7 +162,16 @@ void ScreenManager::loop() {
     
     // Check if we need to turn screen off after wake duration expires
     if (screen_is_on && last_touch_time > 0) {
-        unsigned long elapsed = millis() - last_touch_time;
+        unsigned long current_time = millis();
+        unsigned long elapsed;
+        
+        // Handle millis() overflow safely
+        if (current_time >= last_touch_time) {
+            elapsed = current_time - last_touch_time;
+        } else {
+            // Overflow occurred, wrap around
+            elapsed = (ULONG_MAX - last_touch_time) + current_time + 1;
+        }
         
         if (elapsed >= wake_duration_ms) {
             Serial.printf("[NTM] Wake duration expired (%lu ms), turning screen off\n", elapsed);
@@ -147,10 +180,19 @@ void ScreenManager::loop() {
         }
     }
     
-    // If screen is off and we're in NTM, it should stay off until touch
-    if (!screen_is_on && last_touch_time == 0) {
+    // CRITICAL: In permanent NTM, if screen is off with no active touch timer, keep it off
+    // This prevents the screen from mysteriously turning on after hours of inactivity
+    if ((permanent_ntm || in_night_time_window) && !screen_is_on && last_touch_time == 0) {
         // Screen is correctly off during NTM, waiting for touch
+        // Ensure it stays off even if other code tries to turn it on
         return;
+    }
+    
+    // Safety check: In permanent NTM, if screen is somehow on without a touch timer, turn it off
+    // This handles edge cases where screen state becomes inconsistent
+    if (permanent_ntm && screen_is_on && last_touch_time == 0) {
+        Serial.println("[NTM] WARNING: Screen on in permanent mode without touch timer - correcting");
+        turnScreenOff();
     }
 }
 
@@ -199,12 +241,6 @@ void ScreenManager::updatePWM() {
 
 void ScreenManager::setPWMPin(bool state) {
     if (!tca_write) return;
-    
-    // CRITICAL SAFEGUARD: Don't modify TCA state if screen is off
-    // This prevents PWM from accidentally turning backlight back on
-    if (!screen_is_on) {
-        return;
-    }
     
     // Update the TCA output state for EXIO5 (bit 4, since EXIO5 is pin 5, and pins are 1-indexed)
     uint8_t bit_position = exio_pwm_pin - 1;  // EXIO5 -> bit 4
@@ -365,43 +401,17 @@ void ScreenManager::turnScreenOn() {
     
     Serial.println("[Screen] Turning ON");
     
-    // CRITICAL: Ensure backlight bit is set in tca_output_state
-    // This prevents PWM system from clearing the backlight bit
-    tca_output_state |= (1 << 1);  // Set EXIO2 (backlight) bit
+    // Turn on backlight (EXIO2 via TCA9554)
+    if (backlight_control) {
+        backlight_control(true);
+    }
     
-    // If dimming enabled, calculate PWM timing FIRST
-    // This ensures we start with the correct brightness level
+    // If dimming enabled, start software PWM
     if (dimming_enabled && tca_write) {
         calculatePWMTiming();
-        
-        // CRITICAL: Set initial PWM state based on brightness
-        // For low brightness (high duty cycle), start with PWM LOW
-        // For high brightness (low duty cycle), start with PWM HIGH
-        if (current_brightness <= 50) {
-            // Low brightness = start with PWM LOW (darkest state)
-            pwm_state = false;
-            setPWMPin(false);
-            Serial.printf("[Screen] Starting with PWM LOW (brightness=%d%%)\n", current_brightness);
-        } else {
-            // High brightness = start with PWM HIGH 
-            pwm_state = true;
-            setPWMPin(true);
-            Serial.printf("[Screen] Starting with PWM HIGH (brightness=%d%%)\n", current_brightness);
-        }
-        
         last_pwm_update = micros();
-    }
-    
-    // Turn on backlight (EXIO2 via TCA9554) AFTER setting PWM state
-    if (backlight_control) {
-        backlight_control(true);  // Sets EXIO2 (bit 1) in current_tca_state
-    }
-    
-    // Final write to ensure both backlight and PWM state are correct
-    if (tca_write) {
-        tca_write(TCA_REG_OUTPUT, tca_output_state);
-        Serial.printf("[Screen] TCA state after ON: 0x%02X (brightness=%d%%)\n", 
-                      tca_output_state, current_brightness);
+        pwm_state = true;
+        setPWMPin(true);  // Start with PWM pin high
     }
     
     screen_is_on = true;
@@ -415,27 +425,15 @@ void ScreenManager::turnScreenOff() {
     
     Serial.println("[Screen] Turning OFF");
     
-    // CRITICAL: Stop PWM FIRST (before turning off backlight)
-    // This prevents PWM from overwriting the backlight-off state
+    // Turn off backlight (EXIO2 via TCA9554)
+    if (backlight_control) {
+        backlight_control(false);
+    }
+    
+    // If dimming enabled, stop PWM (set pin LOW)
     if (dimming_enabled && tca_write) {
         pwm_state = false;
-        setPWMPin(false);  // Set EXIO5 low
-    }
-    
-    // Turn off backlight (EXIO2 via TCA9554)
-    // This must happen AFTER stopping PWM to ensure the state sticks
-    if (backlight_control) {
-        backlight_control(false);  // Clears EXIO2 (bit 1) in current_tca_state
-    }
-    
-    // CRITICAL FIX: Ensure backlight bit is cleared in tca_output_state too
-    // This prevents PWM system from accidentally turning backlight back on
-    tca_output_state &= ~(1 << 1);  // Clear EXIO2 (backlight) bit
-    
-    // Force final write to ensure backlight is OFF
-    if (tca_write) {
-        tca_write(TCA_REG_OUTPUT, tca_output_state);
-        Serial.printf("[Screen] TCA state after OFF: 0x%02X\n", tca_output_state);
+        setPWMPin(false);
     }
     
     screen_is_on = false;

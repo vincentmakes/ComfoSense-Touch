@@ -7,60 +7,117 @@
 
 namespace comfoair {
   
+// Static members for log buffer
+String OTA::logBuffer[LOG_BUFFER_SIZE];
+int OTA::logIndex = 0;
+int OTA::logCount = 0;
+
+// Add log message to circular buffer
+void OTA::addLog(const char* message) {
+  logBuffer[logIndex] = String(millis()) + "ms: " + String(message);
+  logIndex = (logIndex + 1) % LOG_BUFFER_SIZE;
+  if (logCount < LOG_BUFFER_SIZE) logCount++;
+}
+
 /*
- * Server Index Page
+ * Server Index Page with Serial Logs
  */
 
 const char* serverIndex =
-"<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
+"<style>"
+"body { font-family: Arial; margin: 20px; }"
+"#logs { background: #000; color: #0f0; padding: 10px; height: 400px; overflow-y: scroll; font-family: monospace; font-size: 12px; }"
+"button { margin: 10px 5px; padding: 10px 20px; font-size: 14px; }"
+"</style>"
+"<h1>ComfoAir ESP32 - OTA Update & Debug</h1>"
+"<h2>Serial Logs (Last 100 messages)</h2>"
+"<div id='logs'>Loading logs...</div>"
+"<button onclick='refreshLogs()'>Refresh Logs</button>"
+"<button onclick='clearLogs()'>Clear Display</button>"
+"<button onclick='autoRefresh()' id='autoBtn'>Auto-Refresh: OFF</button>"
+"<h2>Firmware Update</h2>"
 "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
-   "<input type='file' name='update'>"
-        "<input type='submit' value='Update'>"
-    "</form>"
- "<div id='prg'>progress: 0%</div>"
- "<script>"
-  "$('form').submit(function(e){"
-  "e.preventDefault();"
-  "var form = $('#upload_form')[0];"
-  "var data = new FormData(form);"
-  " $.ajax({"
-  "url: '/update',"
-  "type: 'POST',"
-  "data: data,"
-  "contentType: false,"
-  "processData:false,"
-  "xhr: function() {"
-  "var xhr = new window.XMLHttpRequest();"
-  "xhr.upload.addEventListener('progress', function(evt) {"
-  "if (evt.lengthComputable) {"
-  "var per = evt.loaded / evt.total;"
-  "$('#prg').html('progress: ' + Math.round(per*100) + '%');"
-  "}"
-  "}, false);"
-  "return xhr;"
-  "},"
-  "success:function(d, s) {"
-  "console.log('success!')"
- "},"
- "error: function (a, b, c) {"
- "}"
- "});"
- "});"
- "</script>";
+"<input type='file' name='update'>"
+"<input type='submit' value='Update Firmware'>"
+"</form>"
+"<div id='prg'>progress: 0%</div>"
+"<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
+"<script>"
+"var autoRefreshInterval = null;"
+"function refreshLogs() {"
+"  $.get('/logs', function(data) {"
+"    $('#logs').html(data.replace(/\\n/g, '<br>'));"
+"    $('#logs').scrollTop($('#logs')[0].scrollHeight);"
+"  });"
+"}"
+"function clearLogs() {"
+"  $('#logs').html('');"
+"}"
+"function autoRefresh() {"
+"  if (autoRefreshInterval) {"
+"    clearInterval(autoRefreshInterval);"
+"    autoRefreshInterval = null;"
+"    $('#autoBtn').text('Auto-Refresh: OFF');"
+"  } else {"
+"    autoRefreshInterval = setInterval(refreshLogs, 1000);"
+"    $('#autoBtn').text('Auto-Refresh: ON');"
+"    refreshLogs();"
+"  }"
+"}"
+"refreshLogs();"
+"$('form').submit(function(e){"
+"  e.preventDefault();"
+"  var form = $('#upload_form')[0];"
+"  var data = new FormData(form);"
+"  $.ajax({"
+"    url: '/update',"
+"    type: 'POST',"
+"    data: data,"
+"    contentType: false,"
+"    processData:false,"
+"    xhr: function() {"
+"      var xhr = new window.XMLHttpRequest();"
+"      xhr.upload.addEventListener('progress', function(evt) {"
+"        if (evt.lengthComputable) {"
+"          var per = evt.loaded / evt.total;"
+"          $('#prg').html('progress: ' + Math.round(per*100) + '%');"
+"        }"
+"      }, false);"
+"      return xhr;"
+"    },"
+"    success:function(d, s) {"
+"      console.log('success!')"
+"    },"
+"    error: function (a, b, c) {"
+"    }"
+"  });"
+"});"
+"</script>";
   WebServer server(80);
 
   void OTA::setup() {
     /*use mdns for host name resolution*/
     if (!MDNS.begin("comfoesp32")) { //http://esp32.local
       Serial.println("Error setting up MDNS responder!");
-      // while (1) {
-      //   delay(1000);
-      // }
     }
+    
+    // Main page with logs and OTA
     server.on("/", HTTP_GET, []() {
       server.sendHeader("Connection", "close");
       server.send(200, "text/html", serverIndex);
     });
+    
+    // Logs endpoint - returns last N log messages
+    server.on("/logs", HTTP_GET, []() {
+      String response = "";
+      int start = (logCount < LOG_BUFFER_SIZE) ? 0 : logIndex;
+      for (int i = 0; i < logCount; i++) {
+        int idx = (start + i) % LOG_BUFFER_SIZE;
+        response += logBuffer[idx] + "\n";
+      }
+      server.send(200, "text/plain", response);
+    });
+    
     /*handling uploading firmware file */
     server.on("/update", HTTP_POST, []() {
       server.sendHeader("Connection", "close");

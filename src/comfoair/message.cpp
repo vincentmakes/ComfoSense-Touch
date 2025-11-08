@@ -103,7 +103,7 @@ namespace comfoair {
   }
 
   bool ComfoMessage::sendCommand(char const * command) {
-    // FIXED: Send command only ONCE (removed duplicate send and 1-second delay)
+    // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ FIXED: Send command only ONCE (removed duplicate send and 1-second delay)
     #define CMDIF(name) if (strcmp(command, #name) == 0) { \
                           return this->send(new std::vector<uint8_t>( CMD_ ## name )); \
                         } else 
@@ -151,7 +151,7 @@ namespace comfoair {
         strncpy(message->name, "device_time", 39);
         message->name[39] = '\0';
         
-        Serial.printf("ComfoMessage: Time response decoded: %u seconds\n", device_seconds);
+        Serial.printf("ComfoMessage: ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Time response decoded: %u seconds\n", device_seconds);
         return true;
       }
     }
@@ -207,15 +207,15 @@ namespace comfoair {
       LAZYSWITCH(227, "bypass_state", "%d", vals[0])  // %
 
       // temps
-      LAZYSWITCH(209, "rmot", "%.1f", int16/ 10.0)  // CÃ‚Â°
-      LAZYSWITCH(212, "target_temp", "%.1f", uint16/ 10.0)  // CÃ‚Â°
-      LAZYSWITCH(220, "pre_heater_temp_before", "%.1f", int16/10.0) // CÃ‚Â°
-      LAZYSWITCH(221, "post_heater_temp_after", "%.1f", int16/10.0)  // CÃ‚Â°
-      LAZYSWITCH(274, "extract_air_temp", "%.1f", int16 /10.0)  // CÃ‚Â°   
-      LAZYSWITCH(275, "exhaust_air_temp", "%.1f", int16 /10.0)  // CÃ‚Â°   
-      LAZYSWITCH(276, "outdoor_air_temp", "%.1f", int16 /10.0)  // CÃ‚Â°   
-      LAZYSWITCH(277, "pre_heater_temp_after", "%.1f", int16 /10.0)  // CÃ‚Â°
-      LAZYSWITCH(278, "post_heater_temp_before", "%.1f", int16 /10.0)  // CÃ‚Â°   
+      LAZYSWITCH(209, "rmot", "%.1f", int16/ 10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
+      LAZYSWITCH(212, "target_temp", "%.1f", uint16/ 10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
+      LAZYSWITCH(220, "pre_heater_temp_before", "%.1f", int16/10.0) // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
+      LAZYSWITCH(221, "post_heater_temp_after", "%.1f", int16/10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
+      LAZYSWITCH(274, "extract_air_temp", "%.1f", int16 /10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°   
+      LAZYSWITCH(275, "exhaust_air_temp", "%.1f", int16 /10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°   
+      LAZYSWITCH(276, "outdoor_air_temp", "%.1f", int16 /10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°   
+      LAZYSWITCH(277, "pre_heater_temp_after", "%.1f", int16 /10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
+      LAZYSWITCH(278, "post_heater_temp_before", "%.1f", int16 /10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°   
       // Humidity
       LAZYSWITCH(290, "extract_air_humidity", "%d", vals[0])  // %
       LAZYSWITCH(291, "exhaust_air_humidity", "%d", vals[0])  // %   
@@ -281,6 +281,7 @@ namespace comfoair {
     this->sequence++;
     this->sequence = this->sequence & 0x3;
     message.extended = true;
+    message.rtr = false;  // âœ… Safety: Ensure RTR is always cleared for regular commands
     if (length > 8) {
       CanAddress addr = CanAddress(0x11, 0x1, 0, 1, 0, 1, this->sequence);
       uint8_t dataGrams = length / 7;
@@ -346,13 +347,43 @@ namespace comfoair {
     bool success = CAN0.sendFrame(rtr_message);
     
     if (success) {
-      Serial.println("ComfoMessage: ✅ Time request sent (1 RTR, non-blocking)");
+      Serial.println("ComfoMessage: Ã¢Å“â€¦ Time request sent (1 RTR, non-blocking)");
       Serial.println("ComfoMessage:    Response expected on 0x10040001 within 5s");
     } else {
-      Serial.println("ComfoMessage: ❌ Time request failed (no CAN ACK)");
+      Serial.println("ComfoMessage: Ã¢ÂÅ’ Time request failed (no CAN ACK)");
     }
     
     // Global 'message' variable is untouched - regular commands will work!
+    
+    return success;
+  }
+
+  // ============================================================================
+  // âœ… NEW: Request Filter Days Remaining (PDOID 192)
+  // ============================================================================
+  bool ComfoMessage::requestFilterDays() {
+    Serial.println("ComfoMessage: Requesting filter days (RTR for PDOID 192)");
+    
+    // PDOID 192 = remaining_days_filter_replacement
+    // Calculate CAN ID from PDOID: (PDOID << 14) | other_bits
+    // For PDOID 192: (192 << 14) = 0x00300000
+    // Full CAN ID: 0x00300041 (observed from protocol docs)
+    
+    CAN_FRAME rtr_message;
+    rtr_message.id = 0x00300041;  // PDOID 192 in extended format
+    rtr_message.extended = true;
+    rtr_message.rtr = true;  // Remote Transmission Request (no data)
+    rtr_message.length = 0;
+    memset(rtr_message.data.byte, 0, 8);
+    
+    bool success = CAN0.sendFrame(rtr_message);
+    
+    if (success) {
+      Serial.println("ComfoMessage: âœ… Filter days request sent (RTR to 0x00300041)");
+      Serial.println("ComfoMessage:    Response expected within 5s");
+    } else {
+      Serial.println("ComfoMessage: âŒ Filter days request failed (no CAN ACK)");
+    }
     
     return success;
   }
@@ -370,7 +401,7 @@ namespace comfoair {
     // NOTE: MVHR expects UTC time, not local time with timezone!
     // ====================================================================
     
-    message.id = 0x10040001;  // âœ… CONFIRMED WORKING
+    message.id = 0x10040001;  // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CONFIRMED WORKING
     message.extended = true;
     message.rtr = false;  // Not RTR - we're sending data
     message.length = 4;
@@ -384,11 +415,11 @@ namespace comfoair {
     bool success = CAN0.sendFrame(message);
     
     if (success) {
-      Serial.printf("ComfoMessage: Time set command sent to 0x10040001: [%02X %02X %02X %02X]\n",
+      Serial.printf("ComfoMessage: ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Time set command sent to 0x10040001: [%02X %02X %02X %02X]\n",
                    message.data.uint8[0], message.data.uint8[1], 
                    message.data.uint8[2], message.data.uint8[3]);
     } else {
-      Serial.println("ComfoMessage: Failed to send time set command");
+      Serial.println("ComfoMessage: ÃƒÂ¢Ã‚ÂÃ…â€™ Failed to send time set command");
     }
     
     return success;

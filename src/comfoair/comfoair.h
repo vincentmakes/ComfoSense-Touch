@@ -30,6 +30,9 @@ namespace comfoair {
       void requestDeviceTime();
       void setDeviceTime(uint32_t device_seconds);
       
+      // ✅ NEW: Request filter days remaining
+      void requestFilterDays();
+      
     private:
       CAN_FRAME canMessage;
       ComfoMessage comfoMessage;
@@ -40,8 +43,10 @@ namespace comfoair {
       TimeManager* timeManager;
       ErrorDataManager* errorManager;  // ← NEW
       
-      // ✅ FIXED: Track current fan speed for command deduplication
-      uint8_t current_fan_speed;  // 255 = unknown
+      // ✅ Time-based deduplication (tracks SENT commands, not CAN state)
+      uint8_t last_sent_fan_speed;  // Last speed we SENT via command
+      unsigned long last_fan_speed_command_time;  // When we sent it
+      uint8_t current_fan_speed;  // Current speed from CAN (for display)
       
       // Handle device time response
       void handleDeviceTimeResponse(uint32_t device_seconds);
