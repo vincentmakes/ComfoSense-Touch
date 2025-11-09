@@ -194,6 +194,16 @@ Another manual mentions 150mA max which means 1.8W and is a bit close to the lim
 Testing live, I was able to power the Waveshare at full brightness and existing ComfoSense at once.
 I have not tested the case if more devices than that are connected to it (sensors, other modules).
 
+### OTA Serial Display
+
+Adding the following includes in a cpp file allows any serial output coming out of it to also be displayed in the web interface, also used for OTA updated. 
+
+There's also an added feature to remotely soft reset the device.
+<img width="400" alt="Screenshot 2025-11-09 at 21 10 43" src="https://github.com/user-attachments/assets/0d147cff-d914-4e40-a085-106e00a5769a" />
+
+
+
+
 ## Advanced explanations and troubleshooting I went through
 
 ### Display & Touch
