@@ -3,6 +3,9 @@
 #include "CanAddress.h"
 #include "commands.h"
 
+#include "../serial_logger.h"
+#define Serial LogSerial 
+
 #define min(a,b) ((a) < (b) ? (a): (b))
 #define DEBUG true
 void printFrame(CAN_FRAME *message)
@@ -103,7 +106,7 @@ namespace comfoair {
   }
 
   bool ComfoMessage::sendCommand(char const * command) {
-    // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ FIXED: Send command only ONCE (removed duplicate send and 1-second delay)
+    // FIXED: Send command only ONCE (removed duplicate send and 1-second delay)
     #define CMDIF(name) if (strcmp(command, #name) == 0) { \
                           return this->send(new std::vector<uint8_t>( CMD_ ## name )); \
                         } else 
@@ -151,7 +154,7 @@ namespace comfoair {
         strncpy(message->name, "device_time", 39);
         message->name[39] = '\0';
         
-        Serial.printf("ComfoMessage: ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Time response decoded: %u seconds\n", device_seconds);
+        Serial.printf("ComfoMessage: Time response decoded: %u seconds\n", device_seconds);
         return true;
       }
     }
@@ -192,7 +195,44 @@ namespace comfoair {
       LAZYSWITCH(129, "power_consumption_ytd", "%d", uint16)  // kWh
       LAZYSWITCH(130, "power_consumption_since_start", "%d", uint16)  // kWh
 
-      LAZYSWITCH(192, "remaining_days_filter_replacement", "%d", uint16)
+      // PDOID 192: Filter Days - with debug logging and bulletproof buffer handling
+      case 192: {
+        // ✅ VERBOSE: Log every PDOID 192 frame and filtering decisions
+        Serial.println("═══════════════════════════════════════");
+        Serial.printf("🔍 PDOID 192 Frame Received\n");
+        Serial.printf("   CAN ID: 0x%08X\n", frame->id);
+        Serial.printf("   Frame length: %d bytes\n", frame->length);
+        
+        // Show raw bytes (even if length=0, show buffer contents)
+        Serial.print("   Raw buffer: [");
+        for (int i = 0; i < 8; i++) {
+          Serial.printf("0x%02X", vals[i]);
+          if (i < 7) Serial.print(", ");
+        }
+        Serial.println("]");
+        
+        // Check if frame has valid data
+        if (frame->length < 2) {
+          Serial.printf("   ❌ FILTERED OUT: Frame length (%d) < 2 (empty RTR ACK or invalid)\n", frame->length);
+          Serial.printf("   Buffer garbage value would have been: %u\n", vals[0] + (vals[1] << 8));
+          Serial.println("═══════════════════════════════════════");
+          return false;
+        }
+        
+        // Valid frame with data - decode it
+        uint16_t raw_value = vals[0] + (vals[1] << 8);
+        Serial.printf("   ✅ ACCEPTED: Valid frame with data\n");
+        Serial.printf("   Decoded value: %u days\n", raw_value);
+        Serial.printf("   Bytes used: [0x%02X, 0x%02X]\n", vals[0], vals[1]);
+        Serial.println("═══════════════════════════════════════");
+        
+        memset(message->val, 0, 15);
+        snprintf(message->val, 15, "%d", raw_value);
+        strncpy(message->name, "remaining_days_filter_replacement", 39);
+        message->name[39] = '\0';
+        
+        return true;
+      }
       
       
       // Avoided heating section
@@ -207,15 +247,15 @@ namespace comfoair {
       LAZYSWITCH(227, "bypass_state", "%d", vals[0])  // %
 
       // temps
-      LAZYSWITCH(209, "rmot", "%.1f", int16/ 10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
-      LAZYSWITCH(212, "target_temp", "%.1f", uint16/ 10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
-      LAZYSWITCH(220, "pre_heater_temp_before", "%.1f", int16/10.0) // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
-      LAZYSWITCH(221, "post_heater_temp_after", "%.1f", int16/10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
-      LAZYSWITCH(274, "extract_air_temp", "%.1f", int16 /10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°   
-      LAZYSWITCH(275, "exhaust_air_temp", "%.1f", int16 /10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°   
-      LAZYSWITCH(276, "outdoor_air_temp", "%.1f", int16 /10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°   
-      LAZYSWITCH(277, "pre_heater_temp_after", "%.1f", int16 /10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°
-      LAZYSWITCH(278, "post_heater_temp_before", "%.1f", int16 /10.0)  // CÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°   
+      LAZYSWITCH(209, "rmot", "%.1f", int16/ 10.0)  // C
+      LAZYSWITCH(212, "target_temp", "%.1f", uint16/ 10.0)  // C
+      LAZYSWITCH(220, "pre_heater_temp_before", "%.1f", int16/10.0) // C
+      LAZYSWITCH(221, "post_heater_temp_after", "%.1f", int16/10.0)  // C
+      LAZYSWITCH(274, "extract_air_temp", "%.1f", int16 /10.0)  // C
+      LAZYSWITCH(275, "exhaust_air_temp", "%.1f", int16 /10.0)  // C
+      LAZYSWITCH(276, "outdoor_air_temp", "%.1f", int16 /10.0)  // C
+      LAZYSWITCH(277, "pre_heater_temp_after", "%.1f", int16 /10.0)  // C
+      LAZYSWITCH(278, "post_heater_temp_before", "%.1f", int16 /10.0)  // C
       // Humidity
       LAZYSWITCH(290, "extract_air_humidity", "%d", vals[0])  // %
       LAZYSWITCH(291, "exhaust_air_humidity", "%d", vals[0])  // %   
@@ -347,10 +387,10 @@ namespace comfoair {
     bool success = CAN0.sendFrame(rtr_message);
     
     if (success) {
-      Serial.println("ComfoMessage: Ã¢Å“â€¦ Time request sent (1 RTR, non-blocking)");
+      Serial.println("ComfoMessage:  Time request sent (1 RTR, non-blocking)");
       Serial.println("ComfoMessage:    Response expected on 0x10040001 within 5s");
     } else {
-      Serial.println("ComfoMessage: Ã¢ÂÅ’ Time request failed (no CAN ACK)");
+      Serial.println("ComfoMessage:Time request failed (no CAN ACK)");
     }
     
     // Global 'message' variable is untouched - regular commands will work!
@@ -379,14 +419,15 @@ namespace comfoair {
     bool success = CAN0.sendFrame(rtr_message);
     
     if (success) {
-      Serial.println("ComfoMessage: âœ… Filter days request sent (RTR to 0x00300041)");
+      Serial.println("ComfoMessage: Filter days request sent (RTR to 0x00300041)");
       Serial.println("ComfoMessage:    Response expected within 5s");
     } else {
-      Serial.println("ComfoMessage: âŒ Filter days request failed (no CAN ACK)");
+      Serial.println("ComfoMessage: Filter days request failed (no CAN ACK)");
     }
     
     return success;
   }
+
 
   bool ComfoMessage::setTime(uint32_t secondsSince2000) {
     Serial.printf("ComfoMessage: Setting device time to %u seconds since 2000-01-01\n", secondsSince2000);
@@ -401,7 +442,7 @@ namespace comfoair {
     // NOTE: MVHR expects UTC time, not local time with timezone!
     // ====================================================================
     
-    message.id = 0x10040001;  // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ CONFIRMED WORKING
+    message.id = 0x10040001;  // CONFIRMED WORKING
     message.extended = true;
     message.rtr = false;  // Not RTR - we're sending data
     message.length = 4;
@@ -415,11 +456,11 @@ namespace comfoair {
     bool success = CAN0.sendFrame(message);
     
     if (success) {
-      Serial.printf("ComfoMessage: ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Time set command sent to 0x10040001: [%02X %02X %02X %02X]\n",
+      Serial.printf("ComfoMessage:  Time set command sent to 0x10040001: [%02X %02X %02X %02X]\n",
                    message.data.uint8[0], message.data.uint8[1], 
                    message.data.uint8[2], message.data.uint8[3]);
     } else {
-      Serial.println("ComfoMessage: ÃƒÂ¢Ã‚ÂÃ…â€™ Failed to send time set command");
+      Serial.println("ComfoMessage: Failed to send time set command");
     }
     
     return success;

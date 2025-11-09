@@ -8,13 +8,14 @@
 namespace comfoair {
   
 // Static members for log buffer
-String OTA::logBuffer[LOG_BUFFER_SIZE];
+char OTA::logBuffer[LOG_BUFFER_SIZE][LOG_MESSAGE_MAX_LEN];
 int OTA::logIndex = 0;
 int OTA::logCount = 0;
 
 // Add log message to circular buffer
 void OTA::addLog(const char* message) {
-  logBuffer[logIndex] = String(millis()) + "ms: " + String(message);
+  // Format: timestamp + message, truncated to buffer size
+  snprintf(logBuffer[logIndex], LOG_MESSAGE_MAX_LEN, "%lums: %s", millis(), message);
   logIndex = (logIndex + 1) % LOG_BUFFER_SIZE;
   if (logCount < LOG_BUFFER_SIZE) logCount++;
 }
@@ -28,6 +29,8 @@ const char* serverIndex =
 "body { font-family: Arial; margin: 20px; }"
 "#logs { background: #000; color: #0f0; padding: 10px; height: 400px; overflow-y: scroll; font-family: monospace; font-size: 12px; }"
 "button { margin: 10px 5px; padding: 10px 20px; font-size: 14px; }"
+".restart-btn { background-color: #ff6b6b; color: white; border: none; cursor: pointer; }"
+".restart-btn:hover { background-color: #ff5252; }"
 "</style>"
 "<h1>ComfoAir ESP32 - OTA Update & Debug</h1>"
 "<h2>Serial Logs (Last 100 messages)</h2>"
@@ -35,6 +38,7 @@ const char* serverIndex =
 "<button onclick='refreshLogs()'>Refresh Logs</button>"
 "<button onclick='clearLogs()'>Clear Display</button>"
 "<button onclick='autoRefresh()' id='autoBtn'>Auto-Refresh: OFF</button>"
+"<button class='restart-btn' onclick='restartDevice()'>Restart Device</button>"
 "<h2>Firmware Update</h2>"
 "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
 "<input type='file' name='update'>"
@@ -62,6 +66,14 @@ const char* serverIndex =
 "    autoRefreshInterval = setInterval(refreshLogs, 1000);"
 "    $('#autoBtn').text('Auto-Refresh: ON');"
 "    refreshLogs();"
+"  }"
+"}"
+"function restartDevice() {"
+"  if (confirm('Are you sure you want to restart the device?')) {"
+"    $.post('/restart', function(data) {"
+"      alert('Device is restarting... Page will reload in 10 seconds.');"
+"      setTimeout(function() { location.reload(); }, 10000);"
+"    });"
 "  }"
 "}"
 "refreshLogs();"
@@ -110,12 +122,21 @@ const char* serverIndex =
     // Logs endpoint - returns last N log messages
     server.on("/logs", HTTP_GET, []() {
       String response = "";
+      response.reserve(LOG_BUFFER_SIZE * 128);  // Pre-allocate approximate size
       int start = (logCount < LOG_BUFFER_SIZE) ? 0 : logIndex;
       for (int i = 0; i < logCount; i++) {
         int idx = (start + i) % LOG_BUFFER_SIZE;
-        response += logBuffer[idx] + "\n";
+        response += logBuffer[idx];
+        response += "\n";
       }
       server.send(200, "text/plain", response);
+    });
+    
+    // Restart endpoint - soft reset the device
+    server.on("/restart", HTTP_POST, []() {
+      server.send(200, "text/plain", "Restarting...");
+      delay(500);  // Give time for response to be sent
+      ESP.restart();
     });
     
     /*handling uploading firmware file */

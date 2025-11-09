@@ -6,8 +6,10 @@
 #include "error_data.h" 
 #include "../time/time_manager.h"
 #include "../mqtt/mqtt.h"
-#include "../ota/ota.h"  // â† ADD THIS for web logging
 #include "../secrets.h"
+
+#include "../serial_logger.h"
+#define Serial LogSerial 
 
 // Only include TWAI wrapper in non-remote client mode
 #if !defined(REMOTE_CLIENT_MODE) || !REMOTE_CLIENT_MODE
@@ -36,7 +38,6 @@ void printFrame2(CAN_FRAME *message)
 #define subscribe(command) if (mqtt) { mqtt->subscribeTo(MQTT_PREFIX "/commands/" command, [this](char const * _1,uint8_t const * _2, int _3) { \
     Serial.print("Received: "); \
     Serial.println(command); \
-    OTA::addLog(("RX: " + String(command)).c_str()); \
     \
     /* Extract requested speed from command */ \
     uint8_t requested_speed = 255; /* 255 = not a speed command */ \
@@ -52,12 +53,10 @@ void printFrame2(CAN_FRAME *message)
                         now - this->last_fan_speed_command_time < 2000); /* 2 second window */ \
     \
     if (is_duplicate) { \
-      Serial.printf("  â­ï¸  Duplicate ignored - just sent speed %d %lu ms ago\n", \
+      Serial.printf("    Duplicate ignored - just sent speed %d %lu ms ago\n", \
                     requested_speed, now - this->last_fan_speed_command_time); \
-      OTA::addLog("  IGNORED (duplicate)"); \
     } else { \
-      Serial.printf("  ðŸ“¡ Sending command to MVHR\n"); \
-      OTA::addLog("  SENDING to MVHR"); \
+      Serial.printf("  Sending command to MVHR\n"); \
       this->comfoMessage.sendCommand(command); \
       \
       /* Track this command */ \
@@ -169,7 +168,7 @@ namespace comfoair {
   }
 
   void ComfoAir::setup() {
-    OTA::addLog("=== ComfoAir Starting ===");
+
     
     #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
       // ========================================================================
@@ -228,7 +227,7 @@ namespace comfoair {
             Serial.print("Received: ");
             Serial.println(_1);
             Serial.println(otherBuf);
-            OTA::addLog(("RX: " + String(otherBuf)).c_str());
+
             
             // Check for duplicate
             uint8_t requested_speed = _2[0] - 48;
@@ -238,12 +237,12 @@ namespace comfoair {
                                 now - this->last_fan_speed_command_time < 2000);
             
             if (is_duplicate) {
-              Serial.printf("  â­ï¸  Duplicate ignored - just sent speed %d %lu ms ago\n", 
+              Serial.printf(" Duplicate ignored - just sent speed %d %lu ms ago\n", 
                             requested_speed, now - this->last_fan_speed_command_time);
-              OTA::addLog("  IGNORED (duplicate)");
+
             } else {
-              Serial.printf("  ðŸ“¡ Sending command to MVHR\n");
-              OTA::addLog("  SENDING to MVHR");
+              Serial.printf("  Sending command to MVHR\n");
+
               this->last_sent_fan_speed = requested_speed;
               this->last_fan_speed_command_time = now;
               return this->comfoMessage.sendCommand(otherBuf);
@@ -259,18 +258,18 @@ namespace comfoair {
               return this->comfoMessage.sendCommand("manual");
             }
           });
-             Serial.println("âœ“ MQTT subscriptions complete");
-             OTA::addLog("MQTT subscriptions ready");
+             Serial.println("MQTT subscriptions complete");
+
       } else {
-        Serial.println("âš ï¸ MQTT disabled - skipping subscriptions");
+        Serial.println(" MQTT disabled - skipping subscriptions");
       }
       
-      // âœ… Request filter days at startup (but wait longer to avoid conflicts)
+      // ✅ Request filter days at startup (after 10 seconds)
       // Filter data changes very slowly, so no rush to get it immediately
-      Serial.println("ComfoAir: Waiting 5s before requesting filter days...");
-      delay(5000);
+      Serial.println("ComfoAir: Waiting 8s before requesting filter days...");
+      delay(8000);
       requestFilterDays();
-      OTA::addLog("=== System Ready ===");
+
     #endif
   }
   
@@ -287,10 +286,18 @@ namespace comfoair {
       static unsigned long last_can_rx_report = 0;
       static int can_rx_count = 0;
       
-      // âœ… Request filter days periodically (every 6 hours)
+      // ✅ Request filter days periodically (every 6 hours)
       // Filter data changes very slowly (days), so hourly requests are excessive
       static unsigned long last_filter_request = 0;
-      if (millis() - last_filter_request >= 21600000) {  // 21600000ms = 6 hours
+      static bool filter_request_initialized = false;
+      
+      // Initialize on first loop to prevent immediate request after startup
+      if (!filter_request_initialized) {
+        last_filter_request = millis();
+        filter_request_initialized = true;
+      }
+      
+      if (millis() - last_filter_request >= 14400000) {  // 21600000ms = 6 hours // 14400000 = 4he
         Serial.println("ComfoAir: 6-hour filter days request...");
         requestFilterDays();
         last_filter_request = millis();
@@ -302,7 +309,7 @@ namespace comfoair {
         
         // Report CAN RX rate every 10 seconds
         if (millis() - last_can_rx_report >= 10000) {
-          Serial.printf("[CAN] âœ“ Received %d frames in last 10s (%.1f/sec)\n", 
+          Serial.printf("[CAN] Received %d frames in last 10s (%.1f/sec)\n", 
                         can_rx_count, can_rx_count / 10.0);
           can_rx_count = 0;
           last_can_rx_report = millis();
@@ -311,7 +318,7 @@ namespace comfoair {
         this->canMessage = incoming;
         
         if (first_message) {
-          Serial.println("\nâœ“âœ“âœ“ FIRST CAN FRAME RECEIVED! âœ“âœ“âœ“");
+          Serial.println("\nFIRST CAN FRAME RECEIVED! ");
           first_message = false;
         }
         
@@ -347,7 +354,7 @@ namespace comfoair {
           // **Check for device time response**
           if (strcmp(decoded_name, "device_time") == 0) {
             uint32_t device_seconds = strtoul(decoded_val, NULL, 10);
-            Serial.printf("  â†’ Device time: %u seconds since 2000\n", device_seconds);
+            Serial.printf(" Device time: %u seconds since 2000\n", device_seconds);
             handleDeviceTimeResponse(device_seconds);
           }
           
@@ -373,32 +380,32 @@ namespace comfoair {
           // Route sensor data
           if (sensorManager) {
             if (strcmp(decoded_name, "extract_air_temp") == 0) {
-              Serial.println("  âœ“ MATCH: extract_air_temp - calling updateInsideTemp()");
+              Serial.println(" MATCH: extract_air_temp - calling updateInsideTemp()");
               sensorManager->updateInsideTemp(atof(decoded_val));
             }
             else if (strcmp(decoded_name, "outdoor_air_temp") == 0) {
-              Serial.println("  âœ“ MATCH: outdoor_air_temp - calling updateOutsideTemp()");
+              Serial.println("  MATCH: outdoor_air_temp - calling updateOutsideTemp()");
               sensorManager->updateOutsideTemp(atof(decoded_val));
             }
             else if (strcmp(decoded_name, "extract_air_humidity") == 0) {
-              Serial.println("  âœ“ MATCH: extract_air_humidity - calling updateInsideHumidity()");
+              Serial.println("  MATCH: extract_air_humidity - calling updateInsideHumidity()");
               sensorManager->updateInsideHumidity(atof(decoded_val));
             }
             else if (strcmp(decoded_name, "outdoor_air_humidity") == 0) {
-              Serial.println("  âœ“ MATCH: outdoor_air_humidity - calling updateOutsideHumidity()");
+              Serial.println("  MATCH: outdoor_air_humidity - calling updateOutsideHumidity()");
               sensorManager->updateOutsideHumidity(atof(decoded_val));
             }
             else {
               //Serial.printf("  âœ— NO MATCH: '%s' is not a sensor data message\n", decoded_name);
             }
           } else {
-            Serial.println("  âœ— sensorManager is NULL!");
+            Serial.println("  sensorManager is NULL!");
           }
           
           // Route filter data
           if (filterManager) {
             if (strcmp(decoded_name, "remaining_days_filter_replacement") == 0) {
-              Serial.println("  âœ“ MATCH: remaining_days_filter_replacement - calling updateFilterDays()");
+              Serial.println("  MATCH: remaining_days_filter_replacement - calling updateFilterDays()");
               filterManager->updateFilterDays(atoi(decoded_val));
             }
           }
@@ -406,7 +413,7 @@ namespace comfoair {
           // Route control feedback
           if (controlManager) {
             if (strcmp(decoded_name, "fan_speed") == 0) {
-              Serial.println("  âœ“ MATCH: fan_speed - calling updateFanSpeedFromCAN()");
+              Serial.println("  MATCH: fan_speed - calling updateFanSpeedFromCAN()");
               
               // âœ… FIXED: Track current fan speed for deduplication
               current_fan_speed = atoi(decoded_val);
@@ -414,7 +421,7 @@ namespace comfoair {
               controlManager->updateFanSpeedFromCAN(current_fan_speed);
             }
             else if (strcmp(decoded_name, "temp_profile") == 0) {
-              Serial.println("  âœ“ MATCH: temp_profile - calling updateTempProfileFromCAN()");
+              Serial.println(" MATCH: temp_profile - calling updateTempProfileFromCAN()");
               uint8_t profile = 0;
               if (strcmp(decoded_val, "cold") == 0) profile = 1;
               else if (strcmp(decoded_val, "warm") == 0) profile = 2;

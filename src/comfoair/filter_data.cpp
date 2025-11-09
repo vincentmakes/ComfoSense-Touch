@@ -35,6 +35,20 @@ void FilterDataManager::loop() {
 }
 
 void FilterDataManager::updateFilterDays(int days) {
+    // ✅ DEDUPLICATION: Ignore if same value received within 5 seconds
+    // This prevents issues when MVHR sends multiple responses to RTR
+    static int last_days_value = -1;
+    static unsigned long last_update_time = 0;
+    unsigned long now = millis();
+    
+    if (days == last_days_value && (now - last_update_time) < 5000) {
+        Serial.printf("FilterDataManager: Ignoring duplicate value %d (< 5s since last update)\n", days);
+        return;
+    }
+    
+    last_days_value = days;
+    last_update_time = now;
+    
     filter_days_remaining = days;
     has_data = true;
     last_update = millis();

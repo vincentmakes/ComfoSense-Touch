@@ -3,6 +3,9 @@
 #include <Wire.h>
 #include "TouchDrvGT911.hpp"
 
+#include "serial_logger.h"
+#define Serial LogSerial 
+
 // Configuration
 #include "secrets.h"  // CRITICAL: Must include for MQTT_ENABLED and NTM_* defines
 
