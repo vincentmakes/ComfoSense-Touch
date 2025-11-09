@@ -4,6 +4,7 @@
 #include <WebServer.h>
 #include <ESPmDNS.h>
 #include <Update.h>
+#include <time.h>
 
 namespace comfoair {
   
@@ -14,8 +15,22 @@ int OTA::logCount = 0;
 
 // Add log message to circular buffer
 void OTA::addLog(const char* message) {
-  // Format: timestamp + message, truncated to buffer size
-  snprintf(logBuffer[logIndex], LOG_MESSAGE_MAX_LEN, "%lums: %s", millis(), message);
+  // Get current time
+  time_t now;
+  struct tm timeinfo;
+  time(&now);
+  localtime_r(&now, &timeinfo);
+  
+  // Format: HH:MM:SS - message
+  // If time is not synced yet (year < 2020), fall back to milliseconds
+  if (timeinfo.tm_year > (2020 - 1900)) {
+    snprintf(logBuffer[logIndex], LOG_MESSAGE_MAX_LEN, "%02d:%02d:%02d - %s", 
+             timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec, message);
+  } else {
+    // Fallback to milliseconds if time not synced yet
+    snprintf(logBuffer[logIndex], LOG_MESSAGE_MAX_LEN, "%lums: %s", millis(), message);
+  }
+  
   logIndex = (logIndex + 1) % LOG_BUFFER_SIZE;
   if (logCount < LOG_BUFFER_SIZE) logCount++;
 }
