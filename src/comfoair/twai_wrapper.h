@@ -10,8 +10,8 @@
 #include "driver/twai.h"
 
 // GPIO pins for Waveshare board
-#define TX_GPIO_NUM GPIO_NUM_6
-#define RX_GPIO_NUM GPIO_NUM_0
+#define TX_GPIO_NUM GPIO_NUM_6 //GPIO_NUM_15 w Waveshare CAN device / GPIO_NUM_6 w Waveshare LCD Touch Device
+#define RX_GPIO_NUM GPIO_NUM_0 //GPIO_NUM_16 w Waveshare CAN device / GPIO_NUM_0 w Waveshare LCD Touch Device
 
 // CAN_FRAME structure compatible with old esp32_can library
 typedef struct {
@@ -101,36 +101,34 @@ public:
     }
     
     // Read a CAN frame (convert TWAI message to CAN_FRAME)
+    // IMPROVED: Direct queue polling instead of relying solely on alerts
     bool read(CAN_FRAME &frame) {
         if (!initialized) return false;
         
+        // Try direct receive first (non-blocking, 0 timeout)
+        // This polls the receive queue directly regardless of alert state
+        twai_message_t rx_msg;
+        if (twai_receive(&rx_msg, 0) == ESP_OK) {
+            // Convert TWAI message to CAN_FRAME
+            frame.id = rx_msg.identifier;
+            frame.extended = rx_msg.extd;
+            frame.rtr = rx_msg.rtr;
+            frame.length = rx_msg.data_length_code;
+            memcpy(frame.data.byte, rx_msg.data, rx_msg.data_length_code);
+            return true;
+        }
+        
+        // Check for alerts (bus errors, etc.) even if no data received
         uint32_t alerts;
         if (twai_read_alerts(&alerts, 0) == ESP_OK) {
-            // Handle alerts
+            // Handle critical alerts
             if (alerts & TWAI_ALERT_BUS_OFF) {
                 Serial.println("E (Alert) TWAI: Alert 4096");
                 twai_initiate_recovery();
-                return false;
             }
             
             if (alerts & TWAI_ALERT_TX_FAILED) {
                 Serial.println("E (Alert) TWAI: Alert 1024");
-            }
-            
-            // Check for RX data
-            if (alerts & TWAI_ALERT_RX_DATA) {
-                twai_message_t rx_msg;
-                if (twai_receive(&rx_msg, 0) == ESP_OK) {
-                    // Convert TWAI message to CAN_FRAME
-                    frame.id = rx_msg.identifier;
-                    frame.extended = rx_msg.extd;
-                    frame.rtr = rx_msg.rtr;
-                    frame.length = rx_msg.data_length_code;
-                    memcpy(frame.data.byte, rx_msg.data, rx_msg.data_length_code);
-                    
-   //                 Serial.println("Alerts reconfigured");  // For compatibility with your logs
-                    return true;
-                }
             }
         }
         
