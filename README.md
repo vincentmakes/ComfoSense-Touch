@@ -209,8 +209,13 @@ I have not tested the case if more devices than that are connected to it (sensor
 
 Adding the following includes in a cpp file allows any serial output coming out of it to also be displayed in the web interface, also used for OTA updated. 
 
+``` cpp
+#include "../serial_logger.h"
+#define Serial LogSerial 
+```
+
 There's also an added feature to remotely soft reset the device.
-<img width="400" alt="Screenshot 2025-11-09 at 21 10 43" src="https://github.com/user-attachments/assets/0d147cff-d914-4e40-a085-106e00a5769a" />
+<img width="400" src="https://github.com/user-attachments/assets/0d147cff-d914-4e40-a085-106e00a5769a" />
 
 
 
