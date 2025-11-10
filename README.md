@@ -47,7 +47,18 @@ Watchout that Waveshare also has a 4.3in device which wouldn't work for this pro
 
 2. Optionnally: two SMD resistors, size 0402 (0R or a wire and a 100k value) in order for the dimming feature to work (see Dimming section for more details.)
 
-See Power section for more details, but tldr; the device can be installed in place of the ComfoSense controller.
+### Power ###
+
+If you are planning to use the device fully in place of the ComfoSense device : it seems the MVHR has enough power throughput to power this Waveshare device however I noticed it drops during the night and requires to press a button to restart it. There might be several reasons behind it:
+    1. MHVR reset the power to external devices at a set time (3am ?)
+    2. Device draws too much power for some reason and gets cutoff
+
+The safest option is to add an external small AC-DC converter and power the Waveshare using it: 
+    1. Connect +VCC of the AC-DC converter to the 12V wire of the ComfoNet cable (*NOT* to the ComfoAir itself, only the 12V wire which needs to be *disconnected* from the ComfoAir)
+    2. Connect the GND from the AC-DC converter to ComfoNet port (in addition to existing)
+    3. Connect the Waveshare using the end of the modified ComfoNet cable.
+
+Alternatively, use this as a bridge using the same firmware than this repo but with slight modification to platformio.ini
 
 
 ## How to use : Flashing the firmware in the ESP32 development board
