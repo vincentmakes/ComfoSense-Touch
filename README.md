@@ -47,7 +47,18 @@ Watchout that Waveshare also has a 4.3in device which wouldn't work for this pro
 
 2. Optionnally: two SMD resistors, size 0402 (0R or a wire and a 100k value) in order for the dimming feature to work (see Dimming section for more details.)
 
-See Power section for more details, but tldr; the device can be installed in place of the ComfoSense controller.
+### Power ###
+
+If you are planning to use the device fully in place of the ComfoSense device : it seems the MVHR has enough power throughput to power this Waveshare device however I noticed it drops during the night and requires to press a button to restart it. There might be several reasons behind it:
+    1. MHVR reset the power to external devices at a set time (3am ?)
+    2. Device draws too much power for some reason and gets cutoff
+
+The safest option is to add an external small AC-DC converter and power the Waveshare using it: 
+    1. Connect +VCC of the AC-DC converter to the 12V wire of the ComfoNet cable (*NOT* to the ComfoAir itself, only the 12V wire which needs to be *disconnected* from the ComfoAir)
+    2. Connect the GND from the AC-DC converter to ComfoNet port (in addition to existing)
+    3. Connect the Waveshare using the end of the modified ComfoNet cable.
+
+Alternatively, use this as a bridge using the same firmware than this repo but with slight modification to platformio.ini
 
 
 ## How to use : Flashing the firmware in the ESP32 development board
@@ -193,6 +204,21 @@ Another manual mentions 150mA max which means 1.8W and is a bit close to the lim
 
 Testing live, I was able to power the Waveshare at full brightness and existing ComfoSense at once.
 I have not tested the case if more devices than that are connected to it (sensors, other modules).
+
+### OTA Serial Display
+
+Adding the following includes in a cpp file allows any serial output coming out of it to also be displayed in the web interface, also used for OTA updated. 
+
+``` cpp
+#include "../serial_logger.h"
+#define Serial LogSerial 
+```
+
+There's also an added feature to remotely soft reset the device.
+<img width="400" src="https://github.com/user-attachments/assets/0d147cff-d914-4e40-a085-106e00a5769a" />
+
+
+
 
 ## Advanced explanations and troubleshooting I went through
 
