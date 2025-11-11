@@ -33,6 +33,7 @@ static uint32_t event_fire_counter = 0;
 #define SCREEN_WIDTH   480
 #define SCREEN_HEIGHT  480
 
+/* for Waveshare LCD Touch
 // I2C Expander TCA9554 for backlight and reset control
 #define EXPA_I2C_SDA   15
 #define EXPA_I2C_SCL   7
@@ -49,7 +50,30 @@ static uint32_t event_fire_counter = 0;
 #define TOUCH_SDA  15
 #define TOUCH_SCL  7
 #define TOUCH_INT  16
+*/
+
+
+// For RS485 CAN board
+// I2C Expander TCA9554 for backlight and reset control
+#define EXPA_I2C_SDA   39
+#define EXPA_I2C_SCL   38
+#define TCA9554_ADDR   0x20
+
+#define EXIO_TP_RST    1    // Touch reset
+#define EXIO_BL_EN     2    // Backlight enable
+#define EXIO_LCD_RST   3    // LCD reset
+
+#define TCA_REG_OUTPUT 0x01
+#define TCA_REG_CONFIG 0x03
+
+// Touch controller GT911
+#define TOUCH_SDA  39
+#define TOUCH_SCL  38
+#define TOUCH_INT  40
+
+/////////
 #define TOUCH_RST  -1  // Controlled via TCA9554 EXIO1
+
 
 // GT911 touch controller
 TouchDrvGT911 touch;

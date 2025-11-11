@@ -3,15 +3,14 @@
 #include "wifi.h"
 #include "../ui/GUI.h"
 
-
-
 namespace comfoair {
   
   WiFi::WiFi() : connected(false), 
                  last_status_check(0), 
                  last_reconnect_attempt(0),
                  connection_lost_time(0),
-                 reconnect_attempts(0) {
+                 reconnect_attempts(0),
+                 wifi_event_registered(false) {
   }
   
   void WiFi::setup() {
@@ -19,12 +18,20 @@ namespace comfoair {
     Serial.print("WiFi: Connecting to ");
     Serial.println(WIFI_SSID);
     
+    // Register WiFi event handlers BEFORE connecting
+    if (!wifi_event_registered) {
+      ::WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
+        this->onWiFiEvent(event, info);
+      });
+      wifi_event_registered = true;
+    }
+    
     // Configure WiFi before connecting
     ::WiFi.mode(WIFI_STA);
     ::WiFi.persistent(false);           // Don't save WiFi config to flash (reduces wear)
     ::WiFi.setAutoReconnect(true);      // Enable ESP32's built-in reconnection
     ::WiFi.setSleep(false);             // Disable WiFi sleep for better reliability
-    ::WiFi.setTxPower(WIFI_POWER_19_5dBm);  // Maximum power for better range (was 8.5dBm)
+    ::WiFi.setTxPower(WIFI_POWER_19_5dBm);  // Maximum power for better range
     ::WiFi.setHostname("comfoair-bridge");
     
     // Start connection
@@ -64,45 +71,91 @@ namespace comfoair {
     }
   }
 
-  void WiFi::loop() {
-    unsigned long now = millis();
-    
-    // Periodically check WiFi status
-    if (now - last_status_check >= STATUS_CHECK_INTERVAL) {
-      wl_status_t status = ::WiFi.status();
-      bool current_status = (status == WL_CONNECTED);
-      
-      // Connection state changed
-      if (current_status != connected) {
-        if (current_status) {
-          // Just connected!
-          Serial.println("WiFi: Connection restored!");
-          connected = true;
-          reconnect_attempts = 0;
-          logConnectionStats();
-          updateWiFiIcon();
-        } else {
-          // Just disconnected
-          Serial.printf("WiFi: Connection lost (reason: ");
-          switch(status) {
-            case WL_NO_SSID_AVAIL:
-              Serial.print("SSID not available");
+  void WiFi::onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
+    switch(event) {
+      case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+        Serial.println("WiFi: Event - Connected to AP");
+        break;
+        
+      case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+        Serial.println("WiFi: Event - Got IP address");
+        connected = true;
+        reconnect_attempts = 0;
+        logConnectionStats();
+        updateWiFiIcon();
+        break;
+        
+      case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+        {
+          wifi_err_reason_t reason = (wifi_err_reason_t)info.wifi_sta_disconnected.reason;
+          Serial.printf("WiFi: Event - Disconnected (reason: %d - ", reason);
+          
+          switch(reason) {
+            case WIFI_REASON_AUTH_EXPIRE:
+            case WIFI_REASON_AUTH_LEAVE:
+              Serial.print("Authentication expired/left");
               break;
-            case WL_CONNECT_FAILED:
-              Serial.print("connection failed");
+            case WIFI_REASON_ASSOC_EXPIRE:
+            case WIFI_REASON_ASSOC_LEAVE:
+              Serial.print("Association expired/left");
               break;
-            case WL_CONNECTION_LOST:
-              Serial.print("connection lost");
+            case WIFI_REASON_BEACON_TIMEOUT:
+              Serial.print("Beacon timeout");
               break;
-            case WL_DISCONNECTED:
-              Serial.print("disconnected");
+            case WIFI_REASON_NO_AP_FOUND:
+              Serial.print("AP not found");
+              break;
+            case WIFI_REASON_HANDSHAKE_TIMEOUT:
+              Serial.print("Handshake timeout");
+              break;
+            case WIFI_REASON_CONNECTION_FAIL:
+              Serial.print("Connection failed");
               break;
             default:
-              Serial.printf("unknown status %d", status);
+              Serial.printf("Other - %d", reason);
               break;
           }
           Serial.println(")");
           
+          if (connected) {
+            connected = false;
+            connection_lost_time = millis();
+            reconnect_attempts = 0;
+            updateWiFiIcon();
+            
+            // ESP32's setAutoReconnect(true) will handle reconnection automatically
+            Serial.println("WiFi: Auto-reconnect will attempt to restore connection...");
+          }
+        }
+        break;
+        
+      case ARDUINO_EVENT_WIFI_STA_LOST_IP:
+        Serial.println("WiFi: Event - Lost IP address");
+        break;
+        
+      default:
+        break;
+    }
+  }
+
+  void WiFi::loop() {
+    unsigned long now = millis();
+    
+    // Periodically check WiFi status (less frequently now, as events handle most state changes)
+    if (now - last_status_check >= STATUS_CHECK_INTERVAL) {
+      wl_status_t status = ::WiFi.status();
+      bool current_status = (status == WL_CONNECTED);
+      
+      // Only handle state changes not caught by events (redundant safety check)
+      if (current_status != connected) {
+        if (current_status) {
+          Serial.println("WiFi: Status check detected connection (missed event?)");
+          connected = true;
+          reconnect_attempts = 0;
+          logConnectionStats();
+          updateWiFiIcon();
+        } else if (connected) {
+          Serial.println("WiFi: Status check detected disconnection (missed event?)");
           connected = false;
           connection_lost_time = now;
           reconnect_attempts = 0;
@@ -110,9 +163,35 @@ namespace comfoair {
         }
       }
       
-      // If disconnected, attempt reconnection
+      // If disconnected for extended period, force a manual reconnection attempt
+      // This is a fallback in case auto-reconnect gets stuck
       if (!connected) {
-        attemptReconnect();
+        unsigned long disconnected_duration = now - connection_lost_time;
+        
+        // After 2 minutes of failed auto-reconnect, try manual intervention
+        if (disconnected_duration >= MANUAL_RECONNECT_THRESHOLD) {
+          if (now - last_reconnect_attempt >= RECONNECT_INTERVAL) {
+            reconnect_attempts++;
+            Serial.printf("WiFi: Manual reconnection attempt #%d (auto-reconnect may be stuck)\n", 
+                         reconnect_attempts);
+            
+            // Full reset and reconnect
+            ::WiFi.disconnect(true, true);  // Erase config and turn off WiFi
+            delay(1000);  // Allow proper shutdown
+            
+            // Reconfigure and reconnect
+            ::WiFi.mode(WIFI_STA);
+            ::WiFi.setAutoReconnect(true);
+            ::WiFi.setSleep(false);
+            ::WiFi.setTxPower(WIFI_POWER_19_5dBm);
+            ::WiFi.begin(WIFI_SSID, WIFI_PASS);
+            
+            last_reconnect_attempt = now;
+            connection_lost_time = now;  // Reset disconnection timer
+            
+            Serial.printf("WiFi: Total downtime: %lu seconds\n", disconnected_duration / 1000);
+          }
+        }
       } else {
         // Connected - log signal strength periodically (every 30 seconds)
         static unsigned long last_rssi_log = 0;
@@ -129,39 +208,6 @@ namespace comfoair {
     }
   }
   
-  void WiFi::attemptReconnect() {
-    unsigned long now = millis();
-    
-    // Determine reconnect interval (fast for first attempts, slower after)
-    unsigned long interval = (reconnect_attempts < MAX_FAST_RECONNECT_ATTEMPTS) 
-                             ? RECONNECT_FAST_INTERVAL 
-                             : RECONNECT_INTERVAL;
-    
-    // Time to try reconnecting?
-    if (now - last_reconnect_attempt >= interval) {
-      reconnect_attempts++;
-      
-      Serial.printf("WiFi: Reconnection attempt #%d", reconnect_attempts);
-      if (reconnect_attempts <= MAX_FAST_RECONNECT_ATTEMPTS) {
-        Serial.print(" (fast mode)");
-      }
-      Serial.println();
-      
-      // Disconnect first to clean up state
-      ::WiFi.disconnect(false, false);  // Don't erase config, don't turn off WiFi
-      delay(100);
-      
-      // Attempt to reconnect
-      ::WiFi.begin(WIFI_SSID, WIFI_PASS);
-      
-      last_reconnect_attempt = now;
-      
-      // Log how long we've been disconnected
-      unsigned long disconnected_duration = (now - connection_lost_time) / 1000;
-      Serial.printf("WiFi: Disconnected for %lu seconds\n", disconnected_duration);
-    }
-  }
-  
   bool WiFi::isConnected() {
     return connected;
   }
@@ -174,9 +220,9 @@ namespace comfoair {
   }
   
   void WiFi::logConnectionStats() {
-    Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    Serial.println("================================================");
     Serial.println("WiFi: CONNECTION ESTABLISHED");
-    Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    Serial.println("================================================");
     Serial.print("  IP Address:    ");
     Serial.println(::WiFi.localIP());
     Serial.print("  Gateway:       ");
@@ -213,7 +259,7 @@ namespace comfoair {
                     reconnect_attempts, downtime);
     }
     
-    Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    Serial.println("================================================");
   }
   
   void WiFi::updateWiFiIcon() {
