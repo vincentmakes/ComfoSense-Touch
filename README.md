@@ -1,12 +1,13 @@
 # Zehnder Comfoair Q350 MQTT bridge + Touch Screen
 
+## Introduction
 This project is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver, namely those ones in particular : https://github.com/vekexasia/comfoair-esp32 & https://github.com/dardhal/comfoair-esp32 and leveraging the excellent work from Michael Arnauts on mapping the CAN frames : https://github.com/michaelarnauts/aiocomfoconnect
 
 This new device is meant to not only replace the ComfoConnect LAN but also the ComfoSense controller display which is the default display typically installed in the house to interact with the ComfoAir. On top of having a much better UI, it's been optimized to be very snappy and responsive.
 
 This device can function in two modes: Directly connected to the ComfoAir, in place of the ComfoSense or as a Remote Client.
 
-Remote Client requires a simpler MQTT bridge - alternatively, have a second esp32 display acting as a bridge, with night time mode permanently on. This way only one firmware is needed for both devices.
+Remote Client requires a simpler MQTT bridge, using the same firmware with slightly different settings
 
 <img width="869" height="443" alt="image" src="https://github.com/user-attachments/assets/0ac9e52d-0ce7-4bae-bc95-ab738f8bc27c" />
 
@@ -47,18 +48,8 @@ Watchout that Waveshare also has a 4.3in device which wouldn't work for this pro
 
 2. Optionnally: two SMD resistors, size 0402 (0R or a wire and a 100k value) in order for the dimming feature to work (see Dimming section for more details.)
 
-### Power ###
+3. For the Bridge, this device is ideal: https://www.waveshare.com/esp32-s3-rs485-can.htm . This firmware is fully compatible with it and requires few adjustments of the PINs in twai_wrapper and main.cpp to be fully functional.
 
-If you are planning to use the device fully in place of the ComfoSense device : it seems the MVHR has enough power throughput to power this Waveshare device however I noticed it drops during the night and requires to press a button to restart it. There might be several reasons behind it:
-    1. MHVR reset the power to external devices at a set time (3am ?)
-    2. Device draws too much power for some reason and gets cutoff
-
-The safest option is to add an external small AC-DC converter and power the Waveshare using it: 
-    1. Connect +VCC of the AC-DC converter to the 12V wire of the ComfoNet cable (*NOT* to the ComfoAir itself, only the 12V wire which needs to be *disconnected* from the ComfoAir)
-    2. Connect the GND from the AC-DC converter to ComfoNet port (in addition to existing)
-    3. Connect the Waveshare using the end of the modified ComfoNet cable.
-
-Alternatively, use this as a bridge using the same firmware than this repo but with slight modification to platformio.ini
 
 
 ## How to use : Flashing the firmware in the ESP32 development board
@@ -115,13 +106,12 @@ If you are using a straight cable, you can use the alternative decorative frame 
 
 This device can also be used as a pure MQTT bridge, connected to the ComfoAir : simply set the night time mode to be permanent in secrets.h, this way the screen will be turned off permanently (can be waken up with a tap). It is a more expensive option (35$) than putting together a esp32, DC DC buck converter and CAN transceiver (15-20$) but it's also an easy "plug and play" one.
 
-In a next iteration, I will provide a 3d printed model for this type of usage: one that integrates a RJ45 female port connected to the display so it can be connected/disconnected easily.
-
 The downside of this setup is in case of a power reboot, the power button on the side of the screen needs to be pressed manually so it boots up. 
 
-An alternative plug and play option is this product from Waveshare as well :  https://www.waveshare.com/esp32-s3-rs485-can.htm (19$). This has the benefit that no power button needs to be pressed for reboot and it accept an external antenna in case your MVHR is in a not so well wifi covered area.
+A recommended alternative plug and play option is this product from Waveshare as well :  https://www.waveshare.com/esp32-s3-rs485-can.htm (19$). This has the benefit that no power button needs to be pressed for reboot and it accept an external antenna in case your MVHR is in a not so well wifi covered area.
 
-It will run this firmware just fine, but the platformio.ini file may need to be adjusted - I will provide this option in the future.
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/3cf62829-d028-40a8-b2a6-b7910ed16da8" />
+
 
 ## Features and logic
 ### Time Management
