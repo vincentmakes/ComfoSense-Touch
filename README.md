@@ -114,11 +114,18 @@ This has several benefits over the touch screen device :
 
 The current firmware is fully compatible: simply set the Remote Client mode to false in secrets.h and disable the night time modes and dimming features. The firmware will automatically detect the board and adjust the pins accordingly.
 
-Version 1 of the packaging:
+### Version 2 of the packaging ###
+To install it: Pop out the board from the DIN case, remove the LED in the middle, and lower the two other LED untill they are 20mm above the PCB.  
+Get a RJ45 Terminal Block 8P Connector Ethernet Rj45 Male Female To 8 Pin from Aliexpress: https://a.aliexpress.com/_EIlz7ko  
+Install an external antenna in the mounting hole and plug into the board  
+Connect wires from the RJ45 to the board, starting from the right side (pin 1 to 4) : CANL, CANH, GND, VCC:  
 
-<img width="400" alt="image" src="https://github.com/user-attachments/assets/3cf62829-d028-40a8-b2a6-b7910ed16da8" />
+<img width="400"  src="https://github.com/user-attachments/assets/519f91d7-6628-4846-a235-c883f4311f65"  />  
 
-Version 2 will follow, with the original casing stripped out for a minimal footprint.
+<img width="300"  src="https://github.com/user-attachments/assets/ba1bb092-00bc-405b-8ed2-6522ef8efe5b"  />  
+
+
+It is then ready to be plugged into the ComfoAir using a RJ45 cable and the ComfoNet port (the RJ45 is not for ethernet). I would advise to double check the connection to not short anything.
 
 ## Features and logic
 ### Time Management
