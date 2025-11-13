@@ -1,6 +1,9 @@
 /*
  * TWAI Wrapper - Replaces esp32_can library with native ESP-IDF TWAI
- * For Waveshare ESP32-S3-Touch-LCD-4
+ * Uses centralized board_config.h for automatic pin configuration
+ * Supports:
+ *   - Waveshare ESP32-S3-Touch-LCD-4.0 (CAN: TX=GPIO6, RX=GPIO0)
+ *   - Waveshare ESP32-S3-RS485-CAN (CAN: TX=GPIO15, RX=GPIO16)
  */
 
 #ifndef TWAI_WRAPPER_H
@@ -8,10 +11,7 @@
 
 #include <Arduino.h>
 #include "driver/twai.h"
-
-// GPIO pins for Waveshare board
-#define TX_GPIO_NUM GPIO_NUM_6 //GPIO_NUM_15 w Waveshare CAN device / GPIO_NUM_6 w Waveshare LCD Touch Device
-#define RX_GPIO_NUM GPIO_NUM_0 //GPIO_NUM_16 w Waveshare CAN device / GPIO_NUM_0 w Waveshare LCD Touch Device
+#include "../board_config.h"  // Centralized board detection and pin config
 
 // CAN_FRAME structure compatible with old esp32_can library
 typedef struct {
@@ -29,15 +29,33 @@ typedef struct {
 class TWAIWrapper {
 private:
     bool initialized;
+    gpio_num_t tx_pin;
+    gpio_num_t rx_pin;
     
 public:
-    TWAIWrapper() : initialized(false) {}
+    TWAIWrapper() : initialized(false), tx_pin(GPIO_NUM_NC), rx_pin(GPIO_NUM_NC) {}
     
-    // Initialize TWAI driver
+    // Get detected board type (for debugging/logging)
+    BoardType getBoardType() const {
+        return g_board_type;
+    }
+    
+    // Initialize TWAI driver using centralized board config
     bool begin(uint32_t baudrate) {
-        // GPIO0 pull-up (strapping pin fix)
-        pinMode(0, INPUT_PULLUP);
-        delay(10);
+        // Get pins from centralized board config
+        tx_pin = getCAN_TX();
+        rx_pin = getCAN_RX();
+        
+        Serial.print("🚌 Initializing CAN bus on TX=GPIO");
+        Serial.print((int)tx_pin);
+        Serial.print(", RX=GPIO");
+        Serial.println((int)rx_pin);
+        
+        // GPIO0 pull-up if used (Touch LCD board)
+        if (rx_pin == GPIO_NUM_0) {
+            pinMode(0, INPUT_PULLUP);
+            delay(10);
+        }
         
         // Select timing config based on baudrate
         twai_timing_config_t t_config;
@@ -57,36 +75,33 @@ public:
         // Accept all messages
         twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
         
-    // Differs from default config given by Waveshare in their demo code. (longer queues here)
-    twai_general_config_t g_config = {
-        .mode = TWAI_MODE_NORMAL,
-        .tx_io = TX_GPIO_NUM,
-        .rx_io = RX_GPIO_NUM,
-        .clkout_io = (gpio_num_t)TWAI_IO_UNUSED,
-        .bus_off_io = (gpio_num_t)TWAI_IO_UNUSED,
-        .tx_queue_len = 32,
-        .rx_queue_len = 32,
-        .alerts_enabled = TWAI_ALERT_RX_DATA | TWAI_ALERT_TX_SUCCESS | TWAI_ALERT_TX_FAILED | TWAI_ALERT_BUS_OFF,
-        .clkout_divider = 0
-};
-        
-        // Enable all alerts
-        g_config.alerts_enabled = TWAI_ALERT_ALL;
+        // Configure TWAI with detected pins
+        twai_general_config_t g_config = {
+            .mode = TWAI_MODE_NORMAL,
+            .tx_io = tx_pin,
+            .rx_io = rx_pin,
+            .clkout_io = (gpio_num_t)TWAI_IO_UNUSED,
+            .bus_off_io = (gpio_num_t)TWAI_IO_UNUSED,
+            .tx_queue_len = 32,
+            .rx_queue_len = 32,
+            .alerts_enabled = TWAI_ALERT_ALL,
+            .clkout_divider = 0
+        };
         
         // Install driver
         if (twai_driver_install(&g_config, &t_config, &f_config) != ESP_OK) {
-            Serial.println("TWAI: Failed to install driver");
+            Serial.println("❌ TWAI: Failed to install driver");
             return false;
         }
         
         // Start driver
         if (twai_start() != ESP_OK) {
-            Serial.println("TWAI: Failed to start driver");
+            Serial.println("❌ TWAI: Failed to start driver");
             return false;
         }
         
         initialized = true;
-        Serial.println("TWAI Driver started");
+        Serial.println("✅ TWAI Driver started successfully");
         return true;
     }
     
@@ -146,7 +161,7 @@ public:
         tx_msg.data_length_code = frame.length;
         memcpy(tx_msg.data, frame.data.byte, frame.length);
         
-        // Try to send with 1 second timeout
+        // Try to send with 5ms timeout
         if (twai_transmit(&tx_msg, pdMS_TO_TICKS(5)) == ESP_OK) {
             return true;
         }
