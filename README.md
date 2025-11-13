@@ -106,11 +106,11 @@ If you are using a straight cable, you can use the alternative decorative frame 
 
 One could use this touch screen device as a pure MQTT bridge, but my recommendation is to use this product instead (from Waveshare as well) :  https://www.waveshare.com/esp32-s3-rs485-can.htm (19$).
 
-This has several benefits over the touch screen device :
-    1. 15$ cheaper
-    2. no power button which means it boots back up automatically in case of interruption of power
-    3. more energy efficient since no screen, which means less strain on the ComfoAir unit
-    4. it has an external antenna port available - for when the wifi coverage is not optimal 
+This has several benefits over the touch screen device :  
+        1. 15$ cheaper  
+        2. no power button which means it boots back up automatically in case of interruption of power  
+        3. more energy efficient since no screen, which means less strain on the ComfoAir unit  
+        4. it has an external antenna port available - for when the wifi coverage is not optimal   
 
 The current firmware is fully compatible: simply set the Remote Client mode to false in secrets.h and disable the night time modes and dimming features. The firmware will automatically detect the board and adjust the pins accordingly.
 
