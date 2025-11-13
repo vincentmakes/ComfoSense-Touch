@@ -1,5 +1,6 @@
 #include "sensor_data.h"
 #include "../ui/GUI.h"
+#include "../board_config.h"  // For hasDisplay()
 
 namespace comfoair {
 
@@ -22,6 +23,9 @@ void SensorDataManager::setup() {
     
     // Start with dummy data displayed
     useDummyData();
+     if (!hasDisplay()) {
+        return;
+    }
     updateDisplay();
     
     Serial.println("SensorDataManager: Ready (using dummy data until CAN data available)");
@@ -124,6 +128,8 @@ void SensorDataManager::useDummyData() {
 }
 
 void SensorDataManager::updateDisplay() {
+    // CRITICAL: Only update display if it exists (prevents crash on headless boards)
+
     // Format temperature and humidity strings
     char inside_temp_str[16];
     char outside_temp_str[16];
@@ -139,6 +145,11 @@ void SensorDataManager::updateDisplay() {
                   inside_temp_str, inside_hum_str,
                   outside_temp_str, outside_hum_str,
                   current_data.valid ? "(CAN)" : "(DUMMY)");
+    
+
+    if (!hasDisplay()) {
+        return;
+    }
     
     //  **STRATEGY 5 PATTERN** with 2-second batching
     // 1. Set the text

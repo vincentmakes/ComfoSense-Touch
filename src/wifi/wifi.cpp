@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include "wifi.h"
 #include "../ui/GUI.h"
+#include "../board_config.h"  // For hasDisplay()
 
 namespace comfoair {
   
@@ -263,6 +264,11 @@ namespace comfoair {
   }
   
   void WiFi::updateWiFiIcon() {
+    // CRITICAL: Only update display if it exists (prevents crash on headless boards)
+    if (!hasDisplay()) {
+      return;
+    }
+    
     // Set opacity based on connection status
     lv_opa_t opacity = connected ? LV_OPA_COVER : LV_OPA_50;
     

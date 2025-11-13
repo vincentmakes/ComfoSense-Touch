@@ -31,7 +31,7 @@ private:
     // OPTIMIZED: NTP sync every 8 hours instead of every hour
     static const unsigned long SYNC_CHECK_INTERVAL = 28800000; // 8 hours (8 * 60 * 60 * 1000)
     
-    static const int TIME_DIFFERENCE_THRESHOLD = 60; // 60 seconds = 1 minute
+    static const int TIME_DIFFERENCE_THRESHOLD = 20; // 60 seconds = 1 minute
     
     ComfoAir* comfoair;
     bool waiting_for_device_time;

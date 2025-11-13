@@ -6,6 +6,11 @@
 #include "serial_logger.h"
 #define Serial LogSerial 
 
+// ============================================================================
+// CRITICAL: Board detection MUST come first!
+// ============================================================================
+#include "board_config.h"  // Auto-detects Touch LCD vs RS485-CAN board
+
 // Configuration
 #include "secrets.h"  // CRITICAL: Must include for MQTT_ENABLED and NTM_* defines
 
@@ -15,8 +20,8 @@
 #include "comfoair/sensor_data.h"
 #include "comfoair/filter_data.h"
 #include "comfoair/control_manager.h"
-#include "comfoair/error_data.h"  // â† NEW: Error data manager
-#include "screen/screen_manager.h"  // NEW: Screen manager for NTM
+#include "comfoair/error_data.h"
+#include "screen/screen_manager.h"
 #include "mqtt/mqtt.h"
 #include "ota/ota.h"
 
@@ -33,67 +38,25 @@ static uint32_t event_fire_counter = 0;
 #define SCREEN_WIDTH   480
 #define SCREEN_HEIGHT  480
 
-/* for Waveshare LCD Touch
-// I2C Expander TCA9554 for backlight and reset control
-#define EXPA_I2C_SDA   15
-#define EXPA_I2C_SCL   7
-#define TCA9554_ADDR   0x20
-
-#define EXIO_TP_RST    1    // Touch reset
-#define EXIO_BL_EN     2    // Backlight enable
-#define EXIO_LCD_RST   3    // LCD reset
-
-#define TCA_REG_OUTPUT 0x01
-#define TCA_REG_CONFIG 0x03
-
-// Touch controller GT911
-#define TOUCH_SDA  15
-#define TOUCH_SCL  7
-#define TOUCH_INT  16
-*/
-
-
-// For RS485 CAN board
-// I2C Expander TCA9554 for backlight and reset control
-#define EXPA_I2C_SDA   39
-#define EXPA_I2C_SCL   38
-#define TCA9554_ADDR   0x20
-
-#define EXIO_TP_RST    1    // Touch reset
-#define EXIO_BL_EN     2    // Backlight enable
-#define EXIO_LCD_RST   3    // LCD reset
-
-#define TCA_REG_OUTPUT 0x01
-#define TCA_REG_CONFIG 0x03
-
-// Touch controller GT911
-#define TOUCH_SDA  39
-#define TOUCH_SCL  38
-#define TOUCH_INT  40
-
-/////////
-#define TOUCH_RST  -1  // Controlled via TCA9554 EXIO1
-
+// ============================================================================
+// PIN DEFINITIONS - Now handled by board_config.h!
+// The macros EXPA_I2C_SDA, EXPA_I2C_SCL, etc. are automatically configured
+// based on detected board type. No more hardcoded pins!
+// ============================================================================
 
 // GT911 touch controller
 TouchDrvGT911 touch;
 
-// Arduino_GFX setup for Waveshare ESP32-S3 Touch LCD 4.0"
-Arduino_DataBus *bus = new Arduino_SWSPI(
-    GFX_NOT_DEFINED /* DC */, 42 /* CS */,
-    2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
-
-Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(
-    40 /* DE */, 39 /* VSYNC */, 38 /* HSYNC */, 41 /* PCLK */,
-    46 /* R0 */, 3 /* R1 */, 8 /* R2 */, 18 /* R3 */, 17 /* R4 */,
-    14 /* G0 */, 13 /* G1 */, 12 /* G2 */, 11 /* G3 */, 10 /* G4 */, 9 /* G5 */,
-    5 /* B0 */, 45 /* B1 */, 48 /* B2 */, 47 /* B3 */, 21 /* B4 */,
-    1 /* hsync_polarity */, 10 /* hsync_front_porch */, 8 /* hsync_pulse_width */, 50 /* hsync_back_porch */,
-    1 /* vsync_polarity */, 10 /* vsync_front_porch */, 8 /* vsync_pulse_width */, 20 /* vsync_back_porch */);
-
-Arduino_RGB_Display *gfx = new Arduino_RGB_Display(
-    480 /* width */, 480 /* height */, rgbpanel, 0 /* rotation */, true /* auto_flush */,
-    bus, GFX_NOT_DEFINED /* RST */, st7701_type1_init_operations, sizeof(st7701_type1_init_operations));
+// ============================================================================
+// ============================================================================
+// DISPLAY OBJECTS - Only created/initialized on Touch LCD board
+// CRITICAL: These objects are NULL pointers on RS485-CAN board to prevent
+// GPIO17/18/21 from being initialized by RGB panel constructor, as those
+// pins are connected to RS485 transceiver hardware and must stay LOW.
+// ============================================================================
+Arduino_DataBus *bus = nullptr;
+Arduino_ESP32RGBPanel *rgbpanel = nullptr;
+Arduino_RGB_Display *gfx = nullptr;
 
 // LVGL display buffers
 static lv_color_t *lv_buf1 = nullptr;
@@ -109,8 +72,8 @@ comfoair::TimeManager *timeMgr = nullptr;
 comfoair::SensorDataManager *sensorData = nullptr;
 comfoair::FilterDataManager *filterData = nullptr;
 comfoair::ControlManager *controlMgr = nullptr;
-comfoair::ErrorDataManager *errorData = nullptr;  // â† NEW: Error data manager
-comfoair::ScreenManager *screenMgr = nullptr;  // NEW: Screen manager
+comfoair::ErrorDataManager *errorData = nullptr;
+comfoair::ScreenManager *screenMgr = nullptr;
 
 // Track current backlight state for TCA9554
 static uint8_t current_tca_state = 0x0E;  // Default: all high (backlight on, LCD on, touch on)
@@ -160,6 +123,7 @@ static void control_backlight(bool on) {
 }
 
 static void init_expander() {
+  // Use board-detected I2C pins (EXPA_I2C_SDA and EXPA_I2C_SCL are auto-configured)
   Wire.begin(EXPA_I2C_SDA, EXPA_I2C_SCL, 400000);
   delay(50);
   
@@ -198,7 +162,7 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   static unsigned long last_touch_seen = 0;
   static unsigned long touch_start_time = 0;
   
-  // âš¡ OPTIMIZED TIMING - Faster response!
+  // ⚡ OPTIMIZED TIMING - Faster response!
   static const unsigned long RELEASE_DELAY_MS = 20;      // Reduced from 30ms
   static const unsigned long MIN_PRESS_DURATION_MS = 50; // Reduced from 80ms
   
@@ -235,189 +199,181 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
     data->point.x = last_x;
     data->point.y = last_y;
     
-    Serial.printf("[%lu] PRESS START at (%d, %d)\n", now, last_x, last_y);
+    touch_read_counter++;
+    return;
   }
-  else if (touch_active && time_since_touch < RELEASE_DELAY_MS) {
-    // PRESS HELD - Keep reporting pressed
+  
+  if (touch_active && time_since_touch < RELEASE_DELAY_MS) {
+    // STILL PRESSED (or recently pressed) - Continue reporting press
     
     data->state = LV_INDEV_STATE_PRESSED;
     data->point.x = last_x;
     data->point.y = last_y;
+    return;
   }
-  else if (touch_active && time_since_touch >= RELEASE_DELAY_MS) {
-    // PRESS RELEASED - Faster release detection!
+  
+  if (touch_active && time_since_touch >= RELEASE_DELAY_MS) {
+    // RELEASE CONFIRMED - Finger definitely gone
     
     unsigned long press_duration = now - touch_start_time;
     
-    // ALWAYS release regardless of duration - let LVGL handle debouncing
+    // Only count as valid press if held long enough (debouncing)
+    if (press_duration >= MIN_PRESS_DURATION_MS) {
+      event_fire_counter++;
+    }
+    
+    touch_active = false;
+    
     data->state = LV_INDEV_STATE_RELEASED;
     data->point.x = last_x;
     data->point.y = last_y;
-    
-    Serial.printf("ðŸ”´ [%lu] PRESS RELEASED after %lums\n", now, press_duration);
-    
-    touch_active = false;
+    return;
   }
-  else {
-    // NO TOUCH
-    data->state = LV_INDEV_STATE_RELEASED;
-  }
+  
+  // DEFAULT: Not pressed
+  data->state = LV_INDEV_STATE_RELEASED;
+  data->point.x = last_x;
+  data->point.y = last_y;
 }
+
+// ============================================================================
+// SETUP - WITH AUTO BOARD DETECTION!
+// ============================================================================
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);
+  delay(500);
   
-  // ============================================================================
-  // REMOTE CLIENT MODE CHECK
-  // ============================================================================
-  #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
-    Serial.println("REMOTE CLIENT MODE ENABLED ");
-  #else
-    Serial.println("NORMAL MODE - Direct CAN Communication ");
-  #endif
+  Serial.println("\n\n");
+  Serial.println("╔════════════════════════════════════════╗");
+  Serial.println("║   ComfoSense-Touch - Starting...      ║");
+  Serial.println("╚════════════════════════════════════════╝");
+  Serial.println("");
   
-  Serial.println("=== ESP32-S3 Touch LCD 4.0\" MVHR Controller ===");
-  Serial.printf("CPU Frequency: %d MHz\n", getCpuFrequencyMhz());
+  // ========================================================================
+  // STEP 1: AUTO-DETECT BOARD TYPE - MUST BE FIRST!
+  // This configures ALL pins (I2C, CAN, Touch) based on detected hardware
+  // ========================================================================
+  initBoardConfig();
   
-  setCpuFrequencyMhz(240);
+  // ========================================================================
+  // STEP 2: CONDITIONAL DISPLAY INITIALIZATION
+  // Only initialize display hardware if we're on Touch LCD board
+  // ========================================================================
   
-  if (psramFound()) {
-    Serial.printf("PSRAM: %d KB\n", ESP.getPsramSize() / 1024);
-  }
-  
-  // 1. Initialize I2C expander (backlight, LCD reset)
-  init_expander();
-  
-  // 2. Initialize display
-  if (!gfx->begin()) {
-    Serial.println("ERROR: Display init failed!");
-    while(1) delay(1000);
-  }
-  gfx->fillScreen(BLACK);
-  
-  // 3. Initialize LVGL
-  lv_init();
-  
-  lv_buf1 = (lv_color_t*)heap_caps_malloc(lv_buf_pixels * sizeof(lv_color_t),
-                                          MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-  lv_buf2 = (lv_color_t*)heap_caps_malloc(lv_buf_pixels * sizeof(lv_color_t),
-                                          MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-  
-  if (!lv_buf1 || !lv_buf2) {
-    Serial.println("ERROR: Failed to allocate LVGL buffers!");
-    while(1) delay(1000);
-  }
-  
-  lv_display_t *disp = lv_display_create(SCREEN_WIDTH, SCREEN_HEIGHT);
-  lv_display_set_buffers(disp, lv_buf1, lv_buf2,
-                         lv_buf_pixels * sizeof(lv_color_t),
-                         LV_DISPLAY_RENDER_MODE_PARTIAL);
-  lv_display_set_flush_cb(disp, lvgl_flush_cb);
-  
-  // 4. Initialize touch controller
-  Serial.println("Initializing touch...");
-  
-  pinMode(TOUCH_INT, INPUT);
-  touch.setPins(-1, TOUCH_INT);
-  
-  if (touch.begin(Wire, GT911_SLAVE_ADDRESS_L, TOUCH_SDA, TOUCH_SCL)) {
-    Serial.println("Touch initialized successfully");
+  if (hasDisplay()) {
+    Serial.println("\n🖥️  DISPLAY INITIALIZATION (Touch LCD Board)");
+    Serial.println("════════════════════════════════════════");
     
-    // âœ… Keep setMaxTouchPoint(5) - this is fine
-    touch.setMaxTouchPoint(5);
+    // Initialize I2C expander for backlight/reset control
+    init_expander();
     
-    Serial.println("Touch configuration:");
-    Serial.println("  - Max touch points: 5");
-    Serial.println("  - Debounce: 150ms (in callback)");
-    Serial.println("  - Polling: 5ms (200Hz)");
+    
+    // Create display objects NOW (after board detection, before display init)
+    // This ensures GPIO17/18/21 are only configured on Touch LCD board
+    Serial.println("Creating RGB panel objects...");
+    bus = new Arduino_SWSPI(
+        GFX_NOT_DEFINED /* DC */, 42 /* CS */,
+        2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
+    
+    rgbpanel = new Arduino_ESP32RGBPanel(
+        40 /* DE */, 39 /* VSYNC */, 38 /* HSYNC */, 41 /* PCLK */,
+        46 /* R0 */, 3 /* R1 */, 8 /* R2 */, 18 /* R3 */, 17 /* R4 */,
+        14 /* G0 */, 13 /* G1 */, 12 /* G2 */, 11 /* G3 */, 10 /* G4 */, 9 /* G5 */,
+        5 /* B0 */, 45 /* B1 */, 48 /* B2 */, 47 /* B3 */, 21 /* B4 */,
+        1 /* hsync_polarity */, 10 /* hsync_front_porch */, 8 /* hsync_pulse_width */, 50 /* hsync_back_porch */,
+        1 /* vsync_polarity */, 10 /* vsync_front_porch */, 8 /* vsync_pulse_width */, 20 /* vsync_back_porch */);
+    
+    gfx = new Arduino_RGB_Display(
+        480 /* width */, 480 /* height */, rgbpanel, 0 /* rotation */, true /* auto_flush */,
+        bus, GFX_NOT_DEFINED /* RST */, st7701_type1_init_operations, sizeof(st7701_type1_init_operations));
+    Serial.println("✅ RGB panel objects created");
+    
+    // Initialize display
+    gfx->begin();
+    gfx->fillScreen(BLACK);
+    Serial.println("✅ Display initialized");
+    
+    // Initialize touch controller with board-detected pins
+    touch.setPins(-1, TOUCH_RST);  // TOUCH_RST is auto-configured
+    if (!touch.begin(Wire, GT911_SLAVE_ADDRESS_L, TOUCH_SDA, TOUCH_SCL)) {
+      Serial.println("❌ GT911 touch initialization failed!");
+      while (1) delay(1000);
+    }
+    Serial.println("✅ GT911 touch controller initialized");
+    
+    // Allocate LVGL buffers in PSRAM
+    lv_buf1 = (lv_color_t *)heap_caps_malloc(lv_buf_pixels * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+    lv_buf2 = (lv_color_t *)heap_caps_malloc(lv_buf_pixels * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+    
+    if (!lv_buf1 || !lv_buf2) {
+      Serial.println("❌ Failed to allocate LVGL buffers in PSRAM!");
+      while (1) delay(1000);
+    }
+    Serial.println("✅ LVGL buffers allocated in PSRAM");
+    
+    // Initialize LVGL
+    lv_init();
+    
+    // Create LVGL display
+    lv_display_t *disp = lv_display_create(SCREEN_WIDTH, SCREEN_HEIGHT);
+    lv_display_set_flush_cb(disp, lvgl_flush_cb);
+    lv_display_set_buffers(disp, lv_buf1, lv_buf2, lv_buf_pixels * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    
+    // Create LVGL touch input device
+    lv_indev_t *indev = lv_indev_create();
+    lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(indev, lvgl_touch_read_cb);
+    global_touch_indev = indev;
+    
+    Serial.println("✅ LVGL initialized");
+    
+    // Initialize GUI
+    GUI_init();
+    Serial.println("✅ GUI loaded");
+    
   } else {
-    Serial.println("ERROR: Touch initialization failed");
+    Serial.println("\n⊘  NO DISPLAY (RS485-CAN Board - Bridge Mode)");
+    Serial.println("════════════════════════════════════════");
+    Serial.println("Running in headless mode - display initialization skipped");
+    
+    // CRITICAL: Re-initialize I2C on correct pins for RS485-CAN board
+    // The board detection left I2C in Wire.end() state, which can interfere with WiFi
+    Serial.println("Re-initializing I2C on RS485-CAN pins...");
+    Wire.begin(EXPA_I2C_SDA, EXPA_I2C_SCL, 400000);
+    Serial.printf("✅ I2C re-initialized: SDA=GPIO%d, SCL=GPIO%d\n", EXPA_I2C_SDA, EXPA_I2C_SCL);
+    Serial.println("");
   }
   
-  // 5. Load GUI
-  Serial.println("Loading GUI...");
-  GUI_init();
-  Serial.println("GUI loaded");
+  // ========================================================================
+  // STEP 3: INITIALIZE SUBSYSTEMS (common to both boards)
+  // ========================================================================
   
-  // Initialize GUI displays (moved to GUI_Events.c)
-  GUI_init_fan_speed_display();
-  GUI_init_dropdown_styling();
+  Serial.println("\n🔧 SUBSYSTEM INITIALIZATION");
+  Serial.println("════════════════════════════════════════");
   
-  // Force initial render
-  lv_timer_handler();
-  delay(100);
-  
-  // 6. Register touch input device AFTER GUI is loaded
-  Serial.println("Registering touch input device...");
-  lv_display_t *disp_touch = lv_display_get_default();
-  
-  lv_indev_t *touch_indev = lv_indev_create();
-  lv_indev_set_type(touch_indev, LV_INDEV_TYPE_POINTER);
-  lv_indev_set_read_cb(touch_indev, lvgl_touch_read_cb);
-  lv_indev_set_display(touch_indev, disp_touch);
-  
-  global_touch_indev = touch_indev;
-  Serial.println("Touch registered with LVGL");
-  
-  // Force a few LVGL updates
-  for (int i = 0; i < 5; i++) {
-    lv_timer_handler();
-    delay(10);
-  }
-
-  // 7. Initialize subsystems
-  Serial.println("\nInitializing subsystems...");
-  
-  wifi = new comfoair::WiFi();
-  
-  // ============================================================================
-  // MQTT CONFIGURATION
-  // ============================================================================
-  #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
-    // In remote client mode, MQTT is MANDATORY
-    mqtt = new comfoair::MQTT();
-    Serial.println("MQTT client enabled (REQUIRED for Remote Client Mode)");
-  #else
-    // In normal mode, MQTT is optional
-    #ifdef MQTT_ENABLED
-      #if MQTT_ENABLED
-        mqtt = new comfoair::MQTT();
-        Serial.println("MQTT client enabled");
-      #else
-        mqtt = nullptr;
-        Serial.println("MQTT client disabled (MQTT_ENABLED = false)");
-      #endif
-    #else
-      mqtt = nullptr;
-      Serial.println("MQTT client disabled (MQTT_ENABLED not defined)");
-    #endif
-  #endif
-  
+  // Create subsystem instances
   comfo = new comfoair::ComfoAir();
+  wifi = new comfoair::WiFi();
   ota = new comfoair::OTA();
   timeMgr = new comfoair::TimeManager();
-  
   sensorData = new comfoair::SensorDataManager();
   filterData = new comfoair::FilterDataManager();
   controlMgr = new comfoair::ControlManager();
-  errorData = new comfoair::ErrorDataManager();  // â† NEW: Create error data manager
-  screenMgr = new comfoair::ScreenManager();  // NEW: Screen manager
+  errorData = new comfoair::ErrorDataManager();
+  screenMgr = new comfoair::ScreenManager();
   
-  // Link managers to CAN handler
-  comfo->setSensorDataManager(sensorData);
-  comfo->setFilterDataManager(filterData);
-  comfo->setControlManager(controlMgr);
-  comfo->setErrorDataManager(errorData);  // â† NEW: Link error data manager
+  // Initialize MQTT if enabled
+  #if MQTT_ENABLED
+    mqtt = new comfoair::MQTT();
+  #endif
   
-  // ============================================================================
-  // TIME MANAGER LINKING
-  // ============================================================================
+  // ========================================================================
+  // TIME MANAGER CONFIGURATION (Remote Client vs Normal Mode)
+  // ========================================================================
   #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
-    // In remote client mode: NTP only, no device time sync
-    // TimeManager is still created and used for NTP time display
-    // But we don't link it to ComfoAir (no CAN time sync)
-    Serial.println("TimeManager: NTP mode only (no device sync in Remote Client Mode)");
+    // In remote client mode: NTP only (no device time sync via CAN)
+    Serial.println("⚠️  REMOTE CLIENT MODE: NTP time only (no CAN time sync)");
   #else
     // In normal mode: NTP + device time sync via CAN
     // CRITICAL: Link TimeManager to ComfoAir for time sync
@@ -437,19 +393,54 @@ void setup() {
   #endif
   
   // Initialize managers
-  sensorData->setup();
-  filterData->setup();
-  controlMgr->setup();
-  errorData->setup();  // â† NEW: Initialize error data manager
+  // Note: In headless bridge mode, we still need sensorData for MQTT data storage,
+  // but it must not call any LVGL display functions
   
-
-  // NEW: Initialize screen manager with backlight control AND TCA write function for dimming
-  screenMgr->begin(control_backlight, tca_write);
-
- 
+  #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+    // Remote client mode: Needs sensorData/filterData for MQTT data, but no display
+    Serial.println("📊 Initializing data managers for MQTT (no display updates)");
+    // TODO: These managers need a hasDisplay() check in their code to skip LVGL calls
+    // For now, skip them to prevent crashes - data will come via MQTT directly
+    Serial.println("⚠️  Manager setup skipped - will receive data via MQTT subscriptions");
+  #else
+    // Normal mode: Full manager initialization with display updates
+    if (hasDisplay()) {
+      sensorData->setup();
+      filterData->setup();
+      errorData->setup();
+      Serial.println("✅ Display-dependent managers initialized");
+    } else {
+      Serial.println("⚠️  Display-dependent managers skipped (headless mode)");
+    }
+  #endif
+  
+  // Control manager works in both modes (sends commands, doesn't update display directly)
+  controlMgr->setup();
+  
+  // NEW: Initialize screen manager with backlight control (only if display present)
+  if (hasDisplay()) {
+    screenMgr->begin(control_backlight, tca_write);
+  } else {
+    // Still initialize screen manager but with null callbacks (no hardware control)
+    screenMgr->begin(nullptr, nullptr);
+  }
   
   // Start WiFi connection (non-blocking, max 20 sec)
+  Serial.println("\n📡 STARTING WIFI CONNECTION");
+  #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+    Serial.println("   Mode: REMOTE_CLIENT_MODE (Bridge)");
+  #else
+    Serial.println("   Mode: NORMAL_MODE");
+  #endif
+  
+  // Small delay to let peripherals settle after I2C init
+  // Critical for reliability - I2C and WiFi share system resources
+  delay(200);  // 200ms ensures stable peripheral state
+  
+  Serial.println("   Calling wifi->setup()...");
   wifi->setup();
+  Serial.printf("   WiFi setup complete. Connected: %s\n", wifi->isConnected() ? "YES" : "NO");
+  Serial.println("");
   
   // Only initialize network-dependent services if WiFi connected
   if (wifi->isConnected()) {
@@ -522,8 +513,6 @@ void setup() {
             Serial.printf("MQTT: Temp profile = %s (%d)\n", (char*)_2, profile);
           }
         });
-        //
-
 
         // Subscribe to error/alarm messages
         mqtt->subscribeTo(MQTT_PREFIX "/error_overheating", [](char const * _1, uint8_t const * _2, int _3) {
@@ -595,42 +584,51 @@ void loop() {
   static unsigned long last_touch_read = 0;
   static unsigned long last_can_process = 0;
   
-  // âœ… PRIORITY 1: LVGL timer handler (MUST be called frequently)
-  lv_timer_handler();
-  
-  // âœ… PRIORITY 2: Process display refreshes (instant for button presses)
-  GUI_process_display_refresh();
-  
-  // âœ… PRIORITY 3: Touch polling every 5ms (CRITICAL for responsiveness)
-  unsigned long now = millis();
-  if (now - last_touch_read >= 5) {  // â† 5ms = 200Hz polling
-    if (global_touch_indev) {
-      lv_indev_read(global_touch_indev);
+  // ============================================================================
+  // CONDITIONAL DISPLAY UPDATES (only on Touch LCD board)
+  // ============================================================================
+  if (hasDisplay()) {
+    // ✅ PRIORITY 1: LVGL timer handler (MUST be called frequently)
+    lv_timer_handler();
+    
+    // ✅ PRIORITY 2: Process display refreshes (instant for button presses)
+    GUI_process_display_refresh();
+    
+    // ✅ PRIORITY 3: Touch polling every 5ms (CRITICAL for responsiveness)
+    unsigned long now = millis();
+    if (now - last_touch_read >= 5) {  // ← 5ms = 200Hz polling
+      if (global_touch_indev) {
+        lv_indev_read(global_touch_indev);
+      }
+      last_touch_read = now;
     }
-    last_touch_read = now;
+    
+    // ✅ NEW: Screen manager loop (handles NTM state transitions)
+    if (screenMgr) screenMgr->loop();
   }
-  
-  // âœ… NEW: Screen manager loop (handles NTM state transitions)
-  if (screenMgr) screenMgr->loop();
   
   // ============================================================================
   // CAN PROCESSING (only in non-remote client mode)
   // ============================================================================
   #if !defined(REMOTE_CLIENT_MODE) || !REMOTE_CLIENT_MODE
-    // âœ… PRIORITY 4: CAN processing throttled to 10ms (prevent flooding)
+    // ✅ PRIORITY 4: CAN processing throttled to 10ms (prevent flooding)
+    unsigned long now = millis();
     if (now - last_can_process >= 10) {
       if (comfo) comfo->loop();
       last_can_process = now;
     }
   #endif
   
-  // âœ… PRIORITY 5: Manager loops (these handle batched updates)
-  if (sensorData) sensorData->loop();      // Batches display updates to 5 sec
-  if (filterData) filterData->loop();
-  if (controlMgr) controlMgr->loop(); 
-  if (errorData) errorData->loop();        // â† NEW: Error data manager loop
+  // ✅ PRIORITY 5: Manager loops (these handle batched updates)
+  // Display-dependent managers only run if display exists
+  if (hasDisplay()) {
+    if (sensorData) sensorData->loop();      // Batches display updates to 5 sec
+    if (filterData) filterData->loop();
+    if (errorData) errorData->loop();
+  }
+  if (controlMgr) controlMgr->loop();  // Works in both modes
   
-  // âœ… PRIORITY 6: Network services (lower priority)
+  // ✅ PRIORITY 6: Network services (lower priority)
   if (wifi) wifi->loop();
   
   // Only process network services if WiFi is connected
@@ -646,6 +644,5 @@ void loop() {
   
   // Small delay to allow other tasks
   delay(1);
-
 
 }

@@ -1,5 +1,6 @@
 #include "filter_data.h"
 #include "../ui/GUI.h"
+#include "../board_config.h"  // For hasDisplay()
 
 namespace comfoair {
 
@@ -83,6 +84,11 @@ bool FilterDataManager::shouldUseDummyData() {
 }
 
 void FilterDataManager::updateDisplay() {
+    // CRITICAL: Only update display if it exists (prevents crash on headless boards)
+    if (!hasDisplay()) {
+        return;
+    }
+    
     char filter_text[32];
     
     // Format: "Filter Change\nin XX days"
@@ -104,6 +110,11 @@ void FilterDataManager::updateDisplay() {
 }
 
 void FilterDataManager::updateWarningIcon() {
+    // CRITICAL: Only update display if it exists (prevents crash on headless boards)
+    if (!hasDisplay()) {
+        return;
+    }
+    
     // Show warning icon only when filter needs change within WARNING_THRESHOLD days
     bool should_show_warning = (filter_days_remaining <= WARNING_THRESHOLD);
     

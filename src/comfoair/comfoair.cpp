@@ -86,22 +86,22 @@ namespace comfoair {
 
   void ComfoAir::setSensorDataManager(SensorDataManager* manager) {
     sensorManager = manager;
-    Serial.println("ComfoAir: SensorDataManager linked âœ“");
+    Serial.println("ComfoAir: SensorDataManager linked ");
   }
 
   void ComfoAir::setFilterDataManager(FilterDataManager* manager) {
     filterManager = manager;
-    Serial.println("ComfoAir: FilterDataManager linked âœ“");
+    Serial.println("ComfoAir: FilterDataManager linked ");
   }
 
   void ComfoAir::setControlManager(ControlManager* manager) {
     controlManager = manager;
-    Serial.println("ComfoAir: ControlManager linked âœ“");
+    Serial.println("ComfoAir: ControlManager linked ");
   }
 
   void ComfoAir::setTimeManager(TimeManager* manager) {
     timeManager = manager;
-    Serial.println("ComfoAir: TimeManager linked âœ“");
+    Serial.println("ComfoAir: TimeManager linked ");
   }
 
   // ============================================================================
@@ -109,7 +109,7 @@ namespace comfoair {
   // ============================================================================
   void ComfoAir::setErrorDataManager(ErrorDataManager* manager) {
     errorManager = manager;
-    Serial.println("ComfoAir: ErrorDataManager linked âœ“");
+    Serial.println("ComfoAir: ErrorDataManager linked ");
   }
   // ============================================================================
 
@@ -189,12 +189,12 @@ namespace comfoair {
       
       // CAN pins set in twai_wrapper.h (GPIO6 TX, GPIO0 RX)
       if (!CAN0.begin(50000)) {
-        Serial.println("âŒ CAN init FAILED!");
+        Serial.println("CAN init FAILED!");
         return;
       }
       CAN0.watchFor();
       
-      Serial.println("âœ“ CAN initialized at 50 kbps");
+      Serial.println("CAN initialized at 50 kbps");
       Serial.println("=== CAN Bus Ready ===\n");
       
       // Subscribe to MQTT commands (only if MQTT is enabled)
@@ -342,7 +342,7 @@ namespace comfoair {
           Serial.print(" = ");
           Serial.println(decoded_val);
           */
-          /* âœ… DEBUG: Print manager status and message details
+          /* DEBUG: Print manager status and message details
           Serial.printf("  â†’ Manager status: sensorManager=%s, filterManager=%s, controlManager=%s\n",
                         sensorManager ? "LINKED" : "NULL",
                         filterManager ? "LINKED" : "NULL",
@@ -358,7 +358,7 @@ namespace comfoair {
             handleDeviceTimeResponse(device_seconds);
           }
           
-          /*âœ… DEBUG: Print manager status and message details 
+          /*DEBUG: Print manager status and message details 
           Serial.printf("  â†’ Manager status: sensorManager=%s, filterManager=%s, controlManager=%s\n",
                         sensorManager ? "LINKED" : "NULL",
                         filterManager ? "LINKED" : "NULL",
@@ -399,7 +399,7 @@ namespace comfoair {
               //Serial.printf("  âœ— NO MATCH: '%s' is not a sensor data message\n", decoded_name);
             }
           } else {
-            Serial.println("  sensorManager is NULL!");
+            // Serial.println("  sensorManager is NULL!"); // Note: sensorManager is NULL in bridge mode (headless) - this is expected
           }
           
           // Route filter data

@@ -1,5 +1,6 @@
 #include "error_data.h"
 #include "../ui/GUI.h"
+#include "../board_config.h"  // For hasDisplay()
 
 namespace comfoair {
 
@@ -236,6 +237,11 @@ bool ErrorDataManager::shouldClearErrors() {
 }
 
 void ErrorDataManager::updateWarningIcon() {
+    // CRITICAL: Only update display if it exists (prevents crash on headless boards)
+    if (!hasDisplay()) {
+        return;
+    }
+    
     // Show warning icon if ANY error is active
     bool should_show_warning = hasAnyActiveError();
     

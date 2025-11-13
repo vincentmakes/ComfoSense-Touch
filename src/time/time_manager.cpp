@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <time.h>
 #include <sys/time.h>
+#include "../board_config.h"  // For hasDisplay()
 
 namespace comfoair {
 
@@ -295,7 +296,10 @@ void TimeManager::loop() {
     // Update display every 1 second (just reads local clock, very fast)
     unsigned long now = millis();
     if (now - last_update >= UPDATE_INTERVAL) {
+            if (hasDisplay()) {
         updateDisplay();
+    }
+ 
         last_update = now;
     }
     
