@@ -104,14 +104,21 @@ If you are using a straight cable, you can use the alternative decorative frame 
 
 ## Other option : as a pure MQTT bridge
 
-This device can also be used as a pure MQTT bridge, connected to the ComfoAir : simply set the night time mode to be permanent in secrets.h, this way the screen will be turned off permanently (can be waken up with a tap). It is a more expensive option (35$) than putting together a esp32, DC DC buck converter and CAN transceiver (15-20$) but it's also an easy "plug and play" one.
+One could use this touch screen device as a pure MQTT bridge, but my recommendation is to use this product instead (from Waveshare as well) :  https://www.waveshare.com/esp32-s3-rs485-can.htm (19$).
 
-The downside of this setup is in case of a power reboot, the power button on the side of the screen needs to be pressed manually so it boots up. 
+This has several benefits over the touch screen device :
+    1. 15$ cheaper
+    2. no power button which means it boots back up automatically in case of interruption of power
+    3. more energy efficient since no screen, which means less strain on the ComfoAir unit
+    4. it has an external antenna port available - for when the wifi coverage is not optimal 
 
-A recommended alternative plug and play option is this product from Waveshare as well :  https://www.waveshare.com/esp32-s3-rs485-can.htm (19$). This has the benefit that no power button needs to be pressed for reboot and it accept an external antenna in case your MVHR is in a not so well wifi covered area.
+The current firmware is fully compatible: simply set the Remote Client mode to false in secrets.h and disable the night time modes and dimming features. The firmware will automatically detect the board and adjust the pins accordingly.
+
+Version 1 of the packaging:
 
 <img width="400" alt="image" src="https://github.com/user-attachments/assets/3cf62829-d028-40a8-b2a6-b7910ed16da8" />
 
+Version 2 will follow, with the original casing stripped out for a minimal footprint.
 
 ## Features and logic
 ### Time Management
