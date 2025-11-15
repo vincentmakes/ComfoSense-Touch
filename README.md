@@ -12,7 +12,8 @@ Remote Client requires a simpler MQTT bridge, using the same firmware with sligh
 <img width="869" height="443" alt="image" src="https://github.com/user-attachments/assets/0ac9e52d-0ce7-4bae-bc95-ab738f8bc27c" />
 
 
-<img width="1090" height="534" alt="image" src="https://github.com/user-attachments/assets/a7de1947-1972-4ca2-af93-a847c2907c84" />
+<img width="869"  alt="image" src="https://github.com/user-attachments/assets/ad29c069-3cab-4e7a-9899-cef812fbbe6c" />
+
 
 
 
