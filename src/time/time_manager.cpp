@@ -7,6 +7,9 @@
 #include <sys/time.h>
 #include "../board_config.h"  // For hasDisplay()
 
+#include "../serial_logger.h"
+#define Serial LogSerial 
+
 namespace comfoair {
 
 TimeManager::TimeManager()

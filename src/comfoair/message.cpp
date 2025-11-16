@@ -428,6 +428,96 @@ namespace comfoair {
     return success;
   }
 
+  // ============================================================================
+  // ✅ NEW: Request Target Temperature (PDOID 212)
+  // ============================================================================
+  bool ComfoMessage::requestTargetTemp() {
+    Serial.println("ComfoMessage: Requesting target temp (RTR for PDOID 212)");
+    
+    // PDOID 212 = target_temp
+    // Calculate CAN ID from PDOID: (PDOID << 14) | 0x41
+    // For PDOID 212: (212 << 14) = 0x00350000
+    // Full CAN ID: 0x00350041
+    
+    CAN_FRAME rtr_message;
+    rtr_message.id = 0x00350041;  // PDOID 212 in extended format
+    rtr_message.extended = true;
+    rtr_message.rtr = true;  // Remote Transmission Request (no data)
+    rtr_message.length = 0;
+    memset(rtr_message.data.byte, 0, 8);
+    
+    bool success = CAN0.sendFrame(rtr_message);
+    
+    if (success) {
+      Serial.println("ComfoMessage: Target temp request sent (RTR to 0x00350041)");
+      Serial.println("ComfoMessage:    Response expected within 5s");
+    } else {
+      Serial.println("ComfoMessage: Target temp request failed (no CAN ACK)");
+    }
+    
+    return success;
+  }
+
+  // ============================================================================
+  // ✅ NEW: Request Bypass Status (PDOID 66)
+  // ============================================================================
+  bool ComfoMessage::requestBypassStatus() {
+    Serial.println("ComfoMessage: Requesting bypass status (RTR for PDOID 66)");
+    
+    // PDOID 66 = bypass_activation_mode
+    // Calculate CAN ID from PDOID: (PDOID << 14) | 0x41
+    // For PDOID 66: (66 << 14) = 0x00108000
+    // Full CAN ID: 0x00108041
+    
+    CAN_FRAME rtr_message;
+    rtr_message.id = 0x00108041;  // PDOID 66 in extended format
+    rtr_message.extended = true;
+    rtr_message.rtr = true;  // Remote Transmission Request (no data)
+    rtr_message.length = 0;
+    memset(rtr_message.data.byte, 0, 8);
+    
+    bool success = CAN0.sendFrame(rtr_message);
+    
+    if (success) {
+      Serial.println("ComfoMessage: Bypass status request sent (RTR to 0x00108041)");
+      Serial.println("ComfoMessage:    Response expected within 5s");
+    } else {
+      Serial.println("ComfoMessage: Bypass status request failed (no CAN ACK)");
+    }
+    
+    return success;
+  }
+
+  // ============================================================================
+  // ✅ NEW: Request Operating Mode (PDOID 49)
+  // ============================================================================
+  bool ComfoMessage::requestOperatingMode() {
+    Serial.println("ComfoMessage: Requesting operating mode (RTR for PDOID 49)");
+    
+    // PDOID 49 = operating_mode
+    // Calculate CAN ID from PDOID: (PDOID << 14) | 0x41
+    // For PDOID 49: (49 << 14) = 0x000C4000
+    // Full CAN ID: 0x000C4041
+    
+    CAN_FRAME rtr_message;
+    rtr_message.id = 0x000C4041;  // PDOID 49 in extended format
+    rtr_message.extended = true;
+    rtr_message.rtr = true;  // Remote Transmission Request (no data)
+    rtr_message.length = 0;
+    memset(rtr_message.data.byte, 0, 8);
+    
+    bool success = CAN0.sendFrame(rtr_message);
+    
+    if (success) {
+      Serial.println("ComfoMessage: Operating mode request sent (RTR to 0x000C4041)");
+      Serial.println("ComfoMessage:    Response expected within 5s");
+    } else {
+      Serial.println("ComfoMessage: Operating mode request failed (no CAN ACK)");
+    }
+    
+    return success;
+  }
+
 
   bool ComfoMessage::setTime(uint32_t secondsSince2000) {
     Serial.printf("ComfoMessage: Setting device time to %u seconds since 2000-01-01\n", secondsSince2000);

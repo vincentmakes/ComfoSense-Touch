@@ -154,7 +154,7 @@ namespace comfoair {
   }
 
   // ============================================================================
-  // âœ… NEW: Request filter days remaining
+  // ✅ NEW: Request filter days remaining
   // ============================================================================
   void ComfoAir::requestFilterDays() {
     #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
@@ -164,6 +164,42 @@ namespace comfoair {
       // Send RTR - uses local variable, won't pollute global message state
       // MVHR will respond when ready, we don't wait for response here
       comfoMessage.requestFilterDays();
+    #endif
+  }
+
+  // ============================================================================
+  // ✅ NEW: Request target temperature
+  // ============================================================================
+  void ComfoAir::requestTargetTemp() {
+    #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+      Serial.println("ComfoAir: requestTargetTemp() not supported in Remote Client Mode");
+    #else
+      Serial.println("ComfoAir: Requesting target temp via CAN...");
+      comfoMessage.requestTargetTemp();
+    #endif
+  }
+
+  // ============================================================================
+  // ✅ NEW: Request bypass status
+  // ============================================================================
+  void ComfoAir::requestBypassStatus() {
+    #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+      Serial.println("ComfoAir: requestBypassStatus() not supported in Remote Client Mode");
+    #else
+      Serial.println("ComfoAir: Requesting bypass status via CAN...");
+      comfoMessage.requestBypassStatus();
+    #endif
+  }
+
+  // ============================================================================
+  // ✅ NEW: Request operating mode
+  // ============================================================================
+  void ComfoAir::requestOperatingMode() {
+    #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+      Serial.println("ComfoAir: requestOperatingMode() not supported in Remote Client Mode");
+    #else
+      Serial.println("ComfoAir: Requesting operating mode via CAN...");
+      comfoMessage.requestOperatingMode();
     #endif
   }
 
@@ -264,11 +300,18 @@ namespace comfoair {
         Serial.println(" MQTT disabled - skipping subscriptions");
       }
       
-      // ✅ Request filter days at startup (after 10 seconds)
-      // Filter data changes very slowly, so no rush to get it immediately
-      Serial.println("ComfoAir: Waiting 8s before requesting filter days...");
+      // ✅ Request slow-changing data at startup (after 8 seconds)
+      // Filter days, target temp, bypass status, and operating mode change very slowly
+      Serial.println("ComfoAir: Waiting 8s before requesting slow-changing data...");
       delay(8000);
       requestFilterDays();
+      delay(2000);
+      requestTargetTemp();
+      delay(2000);
+      requestBypassStatus();
+      delay(2000);
+      requestOperatingMode();
+      delay(2000);
 
     #endif
   }
@@ -286,21 +329,28 @@ namespace comfoair {
       static unsigned long last_can_rx_report = 0;
       static int can_rx_count = 0;
       
-      // ✅ Request filter days periodically (every 6 hours)
-      // Filter data changes very slowly (days), so hourly requests are excessive
-      static unsigned long last_filter_request = 0;
-      static bool filter_request_initialized = false;
+      // ✅ Request slow-changing data periodically (every 4 hours)
+      // Filter days, target temp, bypass status, and operating mode change very slowly
+      static unsigned long last_slow_data_request = 0;
+      static bool slow_data_request_initialized = false;
       
       // Initialize on first loop to prevent immediate request after startup
-      if (!filter_request_initialized) {
-        last_filter_request = millis();
-        filter_request_initialized = true;
+      if (!slow_data_request_initialized) {
+        last_slow_data_request = millis();
+        slow_data_request_initialized = true;
       }
       
-      if (millis() - last_filter_request >= 14400000) {  // 21600000ms = 6 hours // 14400000 = 4he
-        Serial.println("ComfoAir: 6-hour filter days request...");
+      if (millis() - last_slow_data_request >= 600000) {  // 14400000ms = 4 hours - 3600000 =1 hr
+        Serial.println("ComfoAir: 30min slow-changing data request...");
         requestFilterDays();
-        last_filter_request = millis();
+           delay(2000);
+        requestTargetTemp();
+           delay(2000);
+        requestBypassStatus();
+           delay(2000);
+        requestOperatingMode();
+           delay(2000);
+        last_slow_data_request = millis();
       }
       
       CAN_FRAME incoming;

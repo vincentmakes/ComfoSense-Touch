@@ -29,8 +29,11 @@ namespace comfoair {
       bool setTimeFromDateTime(uint16_t year, uint8_t month, uint8_t day, 
                                uint8_t hour, uint8_t minute, uint8_t second);
       
-      // ✅ NEW: Request filter days remaining (PDOID 192)
-      bool requestFilterDays();
+      // Data request methods (RTR)
+      bool requestFilterDays();        // PDOID 192 - Filter days remaining
+      bool requestTargetTemp();        // PDOID 212 - Target temperature
+      bool requestBypassStatus();      // PDOID 66  - Bypass activation mode
+      bool requestOperatingMode();     // PDOID 49  - Operating mode
 
     private:
       uint8_t sequence;
