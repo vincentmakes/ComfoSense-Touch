@@ -30,8 +30,11 @@ namespace comfoair {
       void requestDeviceTime();
       void setDeviceTime(uint32_t device_seconds);
       
-      // ✅ NEW: Request filter days remaining
-      void requestFilterDays();
+      // Data request methods (RTR)
+      void requestFilterDays();        // PDOID 192 - Filter days remaining
+      void requestTargetTemp();        // PDOID 212 - Target temperature
+      void requestBypassStatus();      // PDOID 66  - Bypass activation mode
+      void requestOperatingMode();     // PDOID 49  - Operating mode
       
     private:
       CAN_FRAME canMessage;
