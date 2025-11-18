@@ -48,7 +48,7 @@ const char* serverIndex =
 ".restart-btn:hover { background-color: #ff5252; }"
 "</style>"
 "<h1>ComfoAir ESP32 - OTA Update & Debug</h1>"
-"<h2>Serial Logs (Last 100 messages)</h2>"
+"<h2>Serial Logs (Last 300 messages)</h2>"
 "<div id='logs'>Loading logs...</div>"
 "<button onclick='refreshLogs()'>Refresh Logs</button>"
 "<button onclick='clearLogs()'>Clear Display</button>"

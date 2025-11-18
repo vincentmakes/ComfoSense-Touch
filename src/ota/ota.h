@@ -13,7 +13,7 @@ namespace comfoair {
       static void addLog(const char* message);
       
     private:
-      static const int LOG_BUFFER_SIZE = 100;  // Keep last 100 messages
+      static const int LOG_BUFFER_SIZE = 300;  // Keep last 500 messages
       static const int LOG_MESSAGE_MAX_LEN = 256;  // Max length per message
       static char logBuffer[LOG_BUFFER_SIZE][LOG_MESSAGE_MAX_LEN];  // Fixed-size buffer
       static int logIndex;

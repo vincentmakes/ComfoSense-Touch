@@ -173,11 +173,49 @@ namespace comfoair {
 
 // For documentation on PDOID's see: https://github.com/michaelarnauts/comfoconnect/blob/master/PROTOCOL-PDO.md
     switch (PDOID) {
-      LAZYSWITCH(1, "device_time", "%u", uint32)  // Device time in seconds since 2000-01-01
+     LAZYSWITCH(1, "device_time", "%u", uint32)  // Device time in seconds since 2000-01-01
       LAZYSWITCH(16, "away_indicator", "%s", vals[0] == 0x07 ? "true" : "false")
-      LAZYSWITCH(49, "operating_mode", "%s", vals[0] == 1 ? "limited_manual": (vals[0] == 0xff ? "auto": "unlimited_manual"))  // 01 = limited_manual, FF = auto, 05 = unlimited_manual
+      //LAZYSWITCH(49, "operating_mode", "%s", vals[0] == 1 ? "limited_manual": (vals[0] == 0xff ? "auto": "unlimited_manual"))  // 01 = limited_manual, FF = auto, 05 = unlimited_manual
+      // PDOID 49: Operating Mode
+      // Filter out empty RTR ACK frames (length=0)
+      case 49: {
+        if (frame->length < 1) {
+          return false;  // Ignore empty RTR ACK
+        }
+        const char* mode_str;
+        if (vals[0] == 1) {
+          mode_str = "limited_manual";
+        } else if (vals[0] == 0xff) {
+          mode_str = "auto";
+        } else {
+          mode_str = "unlimited_manual";
+        }
+        snprintf(message->val, 15, "%s", mode_str);
+        strncpy(message->name, "operating_mode", 39);
+        message->name[39] = '\0';
+        return true;
+      }
       LAZYSWITCH(65, "fan_speed", "%d", vals[0])
-      LAZYSWITCH(66, "bypass_activation_mode", "%s", vals[0] == 0 ? "auto": (vals[0] == 1 ? "activated": "deactivated")) // 0 auto, 1 activated, 2 deactivated
+      //LAZYSWITCH(66, "bypass_activation_mode", "%s", vals[0] == 0 ? "auto": (vals[0] == 1 ? "activated": "deactivated")) // 0 auto, 1 activated, 2 deactivated
+      // PDOID 66: Bypass Activation Mode
+      // Filter out empty RTR ACK frames (length=0)
+      case 66: {
+        if (frame->length < 1) {
+          return false;  // Ignore empty RTR ACK
+        }
+        const char* mode_str;
+        if (vals[0] == 0) {
+          mode_str = "auto";
+        } else if (vals[0] == 1) {
+          mode_str = "activated";
+        } else {
+          mode_str = "deactivated";
+        }
+        snprintf(message->val, 15, "%s", mode_str);
+        strncpy(message->name, "bypass_activation_mode", 39);
+        message->name[39] = '\0';
+        return true;
+      }
       LAZYSWITCH(67, "temp_profile", "%s", vals[0] == 0 ? "auto": (vals[0] == 1 ? "cold": "warm")) // 0 auto, 1 cold, 2 warm
       LAZYSWITCH(81, "next_fan_change", "%d", uint32)
       LAZYSWITCH(82, "next_bypass_change", "%d", uint32)
@@ -195,42 +233,17 @@ namespace comfoair {
       LAZYSWITCH(129, "power_consumption_ytd", "%d", uint16)  // kWh
       LAZYSWITCH(130, "power_consumption_since_start", "%d", uint16)  // kWh
 
-      // PDOID 192: Filter Days - with debug logging and bulletproof buffer handling
+   
+     // PDOID 192: Filter Days Remaining
+      // Filter out empty RTR ACK frames (length=0)
       case 192: {
-        // ✅ VERBOSE: Log every PDOID 192 frame and filtering decisions
-        Serial.println("═══════════════════════════════════════");
-        Serial.printf("🔍 PDOID 192 Frame Received\n");
-        Serial.printf("   CAN ID: 0x%08X\n", frame->id);
-        Serial.printf("   Frame length: %d bytes\n", frame->length);
-        
-        // Show raw bytes (even if length=0, show buffer contents)
-        Serial.print("   Raw buffer: [");
-        for (int i = 0; i < 8; i++) {
-          Serial.printf("0x%02X", vals[i]);
-          if (i < 7) Serial.print(", ");
-        }
-        Serial.println("]");
-        
-        // Check if frame has valid data
         if (frame->length < 2) {
-          Serial.printf("   ❌ FILTERED OUT: Frame length (%d) < 2 (empty RTR ACK or invalid)\n", frame->length);
-          Serial.printf("   Buffer garbage value would have been: %u\n", vals[0] + (vals[1] << 8));
-          Serial.println("═══════════════════════════════════════");
-          return false;
+          return false;  // Ignore empty RTR ACK
         }
-        
-        // Valid frame with data - decode it
         uint16_t raw_value = vals[0] + (vals[1] << 8);
-        Serial.printf("   ✅ ACCEPTED: Valid frame with data\n");
-        Serial.printf("   Decoded value: %u days\n", raw_value);
-        Serial.printf("   Bytes used: [0x%02X, 0x%02X]\n", vals[0], vals[1]);
-        Serial.println("═══════════════════════════════════════");
-        
-        memset(message->val, 0, 15);
         snprintf(message->val, 15, "%d", raw_value);
         strncpy(message->name, "remaining_days_filter_replacement", 39);
         message->name[39] = '\0';
-        
         return true;
       }
       
@@ -244,11 +257,40 @@ namespace comfoair {
       LAZYSWITCH(217, "ac_ytd", "%d", uint16)  // wh
       LAZYSWITCH(218, "ac_total", "%d", uint16)  // wh   
       
-      LAZYSWITCH(227, "bypass_state", "%d", vals[0])  // %
-
+      //LAZYSWITCH(227, "bypass_state", "%d", vals[0])  // %
+      // PDOID 227: Bypass State (open percentage)
+      // Filter out empty RTR ACK frames (length=0)
+      case 227: {
+        if (frame->length < 1) {
+          return false;  // Ignore empty RTR ACK
+        }
+        snprintf(message->val, 15, "%d", vals[0]);
+        strncpy(message->name, "bypass_state", 39);
+        message->name[39] = '\0';
+        return true;
+      }
+      
       // temps
       LAZYSWITCH(209, "rmot", "%.1f", int16/ 10.0)  // C
-      LAZYSWITCH(212, "target_temp", "%.1f", uint16/ 10.0)  // C
+      //LAZYSWITCH(212, "target_temp", "%.1f", uint16/ 10.0)  // C
+
+      
+      // PDOID 212: Target Temperature
+      // Filter out empty RTR ACK frames (length=0)
+      case 212: {
+        if (frame->length < 2) {
+          return false;  // Ignore empty RTR ACK
+        }
+        uint16_t raw_value = vals[0] + (vals[1] << 8);
+        float temp_c = raw_value / 10.0f;
+        snprintf(message->val, 15, "%.1f", temp_c);
+        strncpy(message->name, "target_temp", 39);
+        message->name[39] = '\0';
+        return true;
+      }
+      
+
+
       LAZYSWITCH(220, "pre_heater_temp_before", "%.1f", int16/10.0) // C
       LAZYSWITCH(221, "post_heater_temp_after", "%.1f", int16/10.0)  // C
       LAZYSWITCH(274, "extract_air_temp", "%.1f", int16 /10.0)  // C
