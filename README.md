@@ -1,5 +1,5 @@
 # Zehnder Comfoair Q350 MQTT bridge + Touch Screen
-
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/vincentvt)  
 ## Introduction
 This project is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver, namely those ones in particular : https://github.com/vekexasia/comfoair-esp32 & https://github.com/dardhal/comfoair-esp32 and leveraging the excellent work from Michael Arnauts on mapping the CAN frames : https://github.com/michaelarnauts/aiocomfoconnect
 
