@@ -46,6 +46,8 @@ This means this display can be used also by people who are not interested in the
 
 1. Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 Watchout that Waveshare also has a 4.3in device which wouldn't work for this project, both from a power and lack of CAN transceiver pov.
+> [!IMPORTANT]  
+>Important to note that since the publication of this firmware, Waveshare has published a Rev 4. of the board. This firmware only works with Rev 3. so far: the differences in hardware and pins are quite significant between the two boards.
 
 2. Optionnally: two SMD resistors, size 0402 (0R or a wire and a 100k value) in order for the dimming feature to work (see Dimming section for more details.)
 
