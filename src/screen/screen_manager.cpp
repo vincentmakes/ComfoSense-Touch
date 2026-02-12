@@ -1,4 +1,5 @@
 #include "screen_manager.h"
+#include "../board_config.h"
 #include "../secrets.h"
 #include <time.h>
 
@@ -6,28 +7,25 @@
 #define Serial LogSerial 
 
 
-// TCA9554 register addresses
-#define TCA_REG_OUTPUT 0x01
-#define TCA_REG_CONFIG 0x03
-
-// EXIO pin definitions (1-based, so subtract 1 for bit position)
-#define EXIO_PWM 5  // EXIO5 connected to AP3032 FB pin
+// EXIO pin definitions for V3 software PWM (1-based, subtract 1 for bit position)
+#define EXIO_PWM 5  // EXIO5 connected to AP3032 FB pin (V3 only)
 
 namespace comfoair {
 
 ScreenManager::ScreenManager() 
     : backlight_control(nullptr),
-      tca_write(nullptr),
-      tca_output_state(0x0E),  // CRITICAL: Initialize with backlight ON (bit 1,2,3 = 1)
-                                // 0x0E = 0b00001110 = EXIO2(BL), EXIO3(LCD_RST), EXIO4 ON
+      io_write(nullptr),
+      io_output_state(0x0E),   // V3 default: backlight+LCD+touch on (0b00001110)
+                                // V4: overwritten during begin() to 0xFF
       dimming_enabled(false),
+      use_hardware_pwm(false),
       exio_pwm_pin(EXIO_PWM),
       current_brightness(DIMMING_DEFAULT_BRIGHTNESS),
       last_pwm_update(0),
       pwm_state(false),
       pwm_on_time_us(0),
-      pwm_period_us(16700),  // 80Hz = 12500us period OR 60Hz = 16700us
-                             // Flicker-free with R40=0Î© (no filtering), range is limited by R36
+      pwm_period_us(16700),  // 60Hz = 16700us period
+                             // Flicker-free with R40=0Ω (no filtering), range is limited by R36
       ntm_enabled(NTM_ENABLED),
       permanent_ntm(NTM_PERMANENT),
       ntm_start_hour(NTM_START_HOUR),
@@ -41,50 +39,71 @@ ScreenManager::ScreenManager()
 }
 
 void ScreenManager::begin(void (*backlightControlFn)(bool on),
-                           void (*tcaWriteFn)(uint8_t reg, uint8_t val)) {
+                           void (*ioWriteFn)(uint8_t reg, uint8_t val)) {
     backlight_control = backlightControlFn;
-    tca_write = tcaWriteFn;
+    io_write = ioWriteFn;
     
     Serial.println("\n=== Screen Manager Initialized ===");
-    Serial.printf("TCA Output State: 0x%02X (preserves backlight)\n", tca_output_state);
     
-    // DEBUG: Show brightness value from secrets.h
-    //Serial.printf("Current Brightness Value: %d%% (from DIMMING_DEFAULT_BRIGHTNESS)\n", current_brightness);
+    // Set initial IO output state based on board version
+    if (isTouchLCDv4()) {
+        io_output_state = 0xFF;  // V4: CH32V003 starts with all high
+    }
+    Serial.printf("IO Output State: 0x%02X\n", io_output_state);
     
-    // Check if dimming is enabled
+    // ================================================================
+    // DIMMING CONFIGURATION — version-aware
+    // ================================================================
     #ifdef DIMMING_ENABLED
       #if DIMMING_ENABLED
-        if (tca_write) {
+        if (isTouchLCDv3() && io_write) {
+            // ---- V3: Software PWM via TCA9554 EXIO5 ----
             dimming_enabled = true;
-            Serial.printf("Dimming: ENABLED on EXIO%d via I2C (Software PWM @ 80Hz)\n", exio_pwm_pin);
+            use_hardware_pwm = false;
+            Serial.printf("Dimming: SOFTWARE PWM on EXIO%d via I2C (V3, 60Hz)\n", exio_pwm_pin);
             Serial.printf("Default Brightness: %d%%\n", current_brightness);
-            Serial.println("Hardware: EXIO5 â†’ AP3032 FB pin (R40=0Î©, direct connection)");
-            Serial.println("Note: Using 80Hz PWM with inverted mapping (100=brightest, 0=darkest)");
+            Serial.println("Hardware: EXIO5 → AP3032 FB pin (R40=0Ω, direct connection)");
+            Serial.println("Note: Using inverted mapping (100=brightest, 0=darkest)");
             
-            // CRITICAL: Set EXIO5 to a stable middle state during initialization
-            // This prevents AP3032 oscillation with low R40 values
+            // Initialize PWM timing
             calculatePWMTiming();
             
-            // Initialize EXIO5 to LOW state (brightest/most stable)
-            // This gives AP3032 time to stabilize before PWM starts
+            // Start EXIO5 LOW (brightest/most stable) during init
             Serial.println("[Init] Setting EXIO5 LOW for stable startup");
             setPWMPin(false);
             pwm_state = false;
             last_pwm_update = micros();
             
-            delay(100);  // Give AP3032 time to stabilize with low R40
-            
+            delay(100);  // Give AP3032 time to stabilize
             Serial.println("[Init] AP3032 stabilized, PWM will start in loop()");
+            
+        } else if (isTouchLCDv4() && io_write) {
+            // ---- V4: Hardware PWM via CH32V003 register 0x05 ----
+            // R36=62K and R40=10K are factory-populated on V4
+            // The CH32V003 generates flicker-free PWM on its dedicated EXIO_PWM pin
+            dimming_enabled = true;
+            use_hardware_pwm = true;
+            Serial.println("Dimming: HARDWARE PWM via CH32V003 reg 0x05 (V4)");
+            Serial.printf("Default Brightness: %d%%\n", current_brightness);
+            Serial.println("Hardware: CH32V003 EXIO_PWM → R40(10K) → AP3032 FB");
+            Serial.printf("PWM range: 0–%d (safe max)\n", CH32V003_PWM_MAX);
+            
+            // Set initial brightness
+            setHardwareBrightness(current_brightness);
+            
         } else {
             dimming_enabled = false;
-            Serial.println("Dimming: DISABLED (no TCA write function provided)");
+            use_hardware_pwm = false;
+            Serial.println("Dimming: DISABLED (no IO write function provided)");
         }
       #else
         dimming_enabled = false;
+        use_hardware_pwm = false;
         Serial.println("Dimming: DISABLED (DIMMING_ENABLED = false)");
       #endif
     #else
       dimming_enabled = false;
+      use_hardware_pwm = false;
       Serial.println("Dimming: DISABLED (DIMMING_ENABLED not defined)");
     #endif
     
@@ -104,17 +123,17 @@ void ScreenManager::begin(void (*backlightControlFn)(bool on),
 }
 
 void ScreenManager::loop() {
-    // CRITICAL: Update PWM if dimming is enabled and screen is on
-    // This MUST be called frequently (every loop iteration) for stable PWM
-    // At 80Hz, we need updates at least every 6ms (half the 12.5ms period)
-    
-    // STARTUP DELAY: Don't start PWM for first 2 seconds to allow display init
-    static bool pwm_started = false;
-    static unsigned long start_time = millis();
-    
-    if (dimming_enabled && screen_is_on) {
+    // ================================================================
+    // V3 SOFTWARE PWM — must be called every loop iteration
+    // V4: No processing needed — CH32V003 handles PWM in hardware
+    // ================================================================
+    if (dimming_enabled && !use_hardware_pwm && screen_is_on) {
+        // V3 only: Software PWM with startup delay
+        static bool pwm_started = false;
+        static unsigned long start_time = millis();
+        
         if (!pwm_started && (millis() - start_time) > 2000) {
-            Serial.println("[PWM] Starting PWM after initialization delay");
+            Serial.println("[PWM] Starting V3 software PWM after initialization delay");
             pwm_started = true;
         }
         
@@ -123,6 +142,9 @@ void ScreenManager::loop() {
         }
     }
     
+    // ================================================================
+    // NIGHT TIME MODE — common to both V3 and V4
+    // ================================================================
     if (!ntm_enabled) {
         return; // NTM disabled, screen stays on always
     }
@@ -158,8 +180,13 @@ void ScreenManager::loop() {
     }
 }
 
+// ============================================================================
+// V3 SOFTWARE PWM FUNCTIONS
+// These are only used on V3 boards — guarded by use_hardware_pwm check
+// ============================================================================
+
 void ScreenManager::updatePWM() {
-    if (!tca_write || !dimming_enabled) return;
+    if (!io_write || !dimming_enabled || use_hardware_pwm) return;
     
     unsigned long now = micros();
     unsigned long elapsed = now - last_pwm_update;
@@ -202,25 +229,24 @@ void ScreenManager::updatePWM() {
 }
 
 void ScreenManager::setPWMPin(bool state) {
-    if (!tca_write) return;
+    // V3 software PWM only — do NOT call on V4!
+    if (!io_write || use_hardware_pwm) return;
     
-    // CRITICAL SAFEGUARD: Don't modify TCA state if screen is off
+    // CRITICAL SAFEGUARD: Don't modify IO state if screen is off
     // This prevents PWM from accidentally turning backlight back on
     if (!screen_is_on) {
         return;
     }
     
-    // Update the TCA output state for EXIO5 (bit 4, since EXIO5 is pin 5, and pins are 1-indexed)
+    // Update the TCA output state for EXIO5 (bit 4, since EXIO5 is pin 5, 1-indexed)
     uint8_t bit_position = exio_pwm_pin - 1;  // EXIO5 -> bit 4
     
-    uint8_t old_state = tca_output_state;
+    uint8_t old_state = io_output_state;
     
     if (state) {
-        // Set bit high
-        tca_output_state |= (1 << bit_position);
+        io_output_state |= (1 << bit_position);
     } else {
-        // Set bit low
-        tca_output_state &= ~(1 << bit_position);
+        io_output_state &= ~(1 << bit_position);
     }
     
     // DEBUG: Log state changes periodically (first 10 seconds)
@@ -231,29 +257,49 @@ void ScreenManager::setPWMPin(bool state) {
     toggle_count++;
     
     if (millis() - last_debug >= 2000 && (millis() - start_time) < 20000) {
-        Serial.printf("[PWM DEBUG] Toggles in last 2s: %d, State=%d, TCA: 0x%02X -> 0x%02X, Brightness=%d%%, ON_time=%dus\n", 
-                      toggle_count, state, old_state, tca_output_state, 
+        Serial.printf("[PWM DEBUG V3] Toggles/2s: %d, State=%d, IO: 0x%02X -> 0x%02X, Bri=%d%%, ON=%dus\n", 
+                      toggle_count, state, old_state, io_output_state, 
                       current_brightness, pwm_on_time_us);
         last_debug = millis();
         toggle_count = 0;
     }
     
     // Write to TCA9554 output register
-    tca_write(TCA_REG_OUTPUT, tca_output_state);
+    io_write(TCA9554_REG_OUTPUT, io_output_state);
 }
 
 void ScreenManager::calculatePWMTiming() {
-    // Invert brightness for intuitive control:
+    // V3 only: Invert brightness for intuitive control
     // AP3032 FB works opposite: HIGH = darker, LOW = brighter
-    // So we invert: user 100 â†’ 0% duty (brightest), user 0 â†’ 100% duty (darkest)
+    // So we invert: user 100 → 0% duty (brightest), user 0 → 100% duty (darkest)
     
     uint8_t inverted_brightness = 100 - current_brightness;
     pwm_on_time_us = (uint16_t)((inverted_brightness * pwm_period_us) / 100);
     
-    Serial.printf("[Dimming] Brightness: %d%% -> Inverted: %d%% -> ON time: %dus/%dus (%.1f%% duty)\n",
+    Serial.printf("[Dimming V3] Brightness: %d%% -> Inverted: %d%% -> ON time: %dus/%dus (%.1f%% duty)\n",
                   current_brightness, inverted_brightness, pwm_on_time_us, pwm_period_us,
                   (pwm_on_time_us * 100.0f) / pwm_period_us);
 }
+
+// ============================================================================
+// V4 HARDWARE PWM FUNCTION
+// Single I2C write to CH32V003 register 0x05 — flicker-free, instant
+// ============================================================================
+
+void ScreenManager::setHardwareBrightness(uint8_t percent) {
+    if (!io_write || !use_hardware_pwm) return;
+    
+    // Map 0–100% to 0–247 (CH32V003 safe maximum)
+    uint8_t duty = (uint8_t)(((uint16_t)percent * CH32V003_PWM_MAX) / 100);
+    io_write(CH32V003_REG_PWM, duty);
+    
+    Serial.printf("[Dimming V4] Brightness: %d%% → PWM duty: %d/%d\n", 
+                  percent, duty, CH32V003_PWM_MAX);
+}
+
+// ============================================================================
+// COMMON FUNCTIONS — work on both V3 and V4
+// ============================================================================
 
 void ScreenManager::onTouchDetected() {
     if (!ntm_enabled) {
@@ -286,11 +332,16 @@ void ScreenManager::setBrightness(uint8_t brightness) {
     
     if (current_brightness != brightness) {
         current_brightness = brightness;
-        calculatePWMTiming();
         
-        if (dimming_enabled) {
-            Serial.printf("[Dimming] Brightness changed to %d%%\n", brightness);
+        if (use_hardware_pwm) {
+            // V4: One I2C write, done
+            setHardwareBrightness(brightness);
+        } else if (dimming_enabled) {
+            // V3: Recalculate software PWM timing
+            calculatePWMTiming();
         }
+        
+        Serial.printf("[Dimming] Brightness changed to %d%%\n", brightness);
     }
 }
 
@@ -362,6 +413,10 @@ void ScreenManager::updateNightTimeState() {
     }
 }
 
+// ============================================================================
+// SCREEN ON/OFF — version-aware
+// ============================================================================
+
 void ScreenManager::turnScreenOn() {
     if (screen_is_on) {
         return; // Already on
@@ -369,43 +424,45 @@ void ScreenManager::turnScreenOn() {
     
     Serial.println("[Screen] Turning ON");
     
-    // CRITICAL: Ensure backlight bit is set in tca_output_state
-    // This prevents PWM system from clearing the backlight bit
-    tca_output_state |= (1 << 1);  // Set EXIO2 (backlight) bit
-    
-    // If dimming enabled, calculate PWM timing FIRST
-    // This ensures we start with the correct brightness level
-    if (dimming_enabled && tca_write) {
-        calculatePWMTiming();
+    if (use_hardware_pwm) {
+        // ---- V4: Hardware PWM — just set brightness ----
+        setHardwareBrightness(current_brightness);
         
-        // CRITICAL: Set initial PWM state based on brightness
-        // For low brightness (high duty cycle), start with PWM LOW
-        // For high brightness (low duty cycle), start with PWM HIGH
-        if (current_brightness <= 50) {
-            // Low brightness = start with PWM LOW (darkest state)
-            pwm_state = false;
-            setPWMPin(false);
-            Serial.printf("[Screen] Starting with PWM LOW (brightness=%d%%)\n", current_brightness);
-        } else {
-            // High brightness = start with PWM HIGH 
-            pwm_state = true;
-            setPWMPin(true);
-            Serial.printf("[Screen] Starting with PWM HIGH (brightness=%d%%)\n", current_brightness);
+    } else {
+        // ---- V3: Software PWM + backlight bit ----
+        
+        // Ensure backlight bit is set in io_output_state
+        io_output_state |= (1 << V3_BIT_BL_EN);
+        
+        // If dimming enabled, calculate PWM timing FIRST
+        if (dimming_enabled && io_write) {
+            calculatePWMTiming();
+            
+            // Set initial PWM state based on brightness
+            if (current_brightness <= 50) {
+                pwm_state = false;
+                setPWMPin(false);
+                Serial.printf("[Screen] Starting with PWM LOW (brightness=%d%%)\n", current_brightness);
+            } else {
+                pwm_state = true;
+                setPWMPin(true);
+                Serial.printf("[Screen] Starting with PWM HIGH (brightness=%d%%)\n", current_brightness);
+            }
+            
+            last_pwm_update = micros();
         }
         
-        last_pwm_update = micros();
-    }
-    
-    // Turn on backlight (EXIO2 via TCA9554) AFTER setting PWM state
-    if (backlight_control) {
-        backlight_control(true);  // Sets EXIO2 (bit 1) in current_tca_state
-    }
-    
-    // Final write to ensure both backlight and PWM state are correct
-    if (tca_write) {
-        tca_write(TCA_REG_OUTPUT, tca_output_state);
-        Serial.printf("[Screen] TCA state after ON: 0x%02X (brightness=%d%%)\n", 
-                      tca_output_state, current_brightness);
+        // Turn on backlight (EXIO2 via TCA9554) AFTER setting PWM state
+        if (backlight_control) {
+            backlight_control(true);
+        }
+        
+        // Final write to ensure both backlight and PWM state are correct
+        if (io_write) {
+            io_write(TCA9554_REG_OUTPUT, io_output_state);
+            Serial.printf("[Screen] IO state after ON: 0x%02X (brightness=%d%%)\n", 
+                          io_output_state, current_brightness);
+        }
     }
     
     screen_is_on = true;
@@ -419,27 +476,34 @@ void ScreenManager::turnScreenOff() {
     
     Serial.println("[Screen] Turning OFF");
     
-    // CRITICAL: Stop PWM FIRST (before turning off backlight)
-    // This prevents PWM from overwriting the backlight-off state
-    if (dimming_enabled && tca_write) {
-        pwm_state = false;
-        setPWMPin(false);  // Set EXIO5 low
-    }
-    
-    // Turn off backlight (EXIO2 via TCA9554)
-    // This must happen AFTER stopping PWM to ensure the state sticks
-    if (backlight_control) {
-        backlight_control(false);  // Clears EXIO2 (bit 1) in current_tca_state
-    }
-    
-    // CRITICAL FIX: Ensure backlight bit is cleared in tca_output_state too
-    // This prevents PWM system from accidentally turning backlight back on
-    tca_output_state &= ~(1 << 1);  // Clear EXIO2 (backlight) bit
-    
-    // Force final write to ensure backlight is OFF
-    if (tca_write) {
-        tca_write(TCA_REG_OUTPUT, tca_output_state);
-        Serial.printf("[Screen] TCA state after OFF: 0x%02X\n", tca_output_state);
+    if (use_hardware_pwm) {
+        // ---- V4: Hardware PWM — just set duty to 0 ----
+        if (io_write) {
+            io_write(CH32V003_REG_PWM, 0);
+        }
+        
+    } else {
+        // ---- V3: Stop software PWM + clear backlight bit ----
+        
+        // Stop PWM FIRST (before turning off backlight)
+        if (dimming_enabled && io_write) {
+            pwm_state = false;
+            setPWMPin(false);  // Set EXIO5 low
+        }
+        
+        // Turn off backlight (EXIO2 via TCA9554)
+        if (backlight_control) {
+            backlight_control(false);
+        }
+        
+        // Ensure backlight bit is cleared in io_output_state
+        io_output_state &= ~(1 << V3_BIT_BL_EN);
+        
+        // Force final write to ensure backlight is OFF
+        if (io_write) {
+            io_write(TCA9554_REG_OUTPUT, io_output_state);
+            Serial.printf("[Screen] IO state after OFF: 0x%02X\n", io_output_state);
+        }
     }
     
     screen_is_on = false;

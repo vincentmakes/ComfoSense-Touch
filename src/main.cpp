@@ -9,7 +9,7 @@
 // ============================================================================
 // CRITICAL: Board detection MUST come first!
 // ============================================================================
-#include "board_config.h"  // Auto-detects Touch LCD vs RS485-CAN board
+#include "board_config.h"  // Auto-detects Touch LCD V3/V4 vs RS485-CAN board
 
 // Configuration
 #include "secrets.h"  // CRITICAL: Must include for MQTT_ENABLED and NTM_* defines
@@ -48,7 +48,6 @@ static uint32_t event_fire_counter = 0;
 TouchDrvGT911 touch;
 
 // ============================================================================
-// ============================================================================
 // DISPLAY OBJECTS - Only created/initialized on Touch LCD board
 // CRITICAL: These objects are NULL pointers on RS485-CAN board to prevent
 // GPIO17/18/21 from being initialized by RGB panel constructor, as those
@@ -75,8 +74,10 @@ comfoair::ControlManager *controlMgr = nullptr;
 comfoair::ErrorDataManager *errorData = nullptr;
 comfoair::ScreenManager *screenMgr = nullptr;
 
-// Track current backlight state for TCA9554
-static uint8_t current_tca_state = 0x0E;  // Default: all high (backlight on, LCD on, touch on)
+// Track current IO expander GPIO output state
+// V3: maps to TCA9554 output register 0x01 (default 0x0E = backlight+LCD+touch on)
+// V4: maps to CH32V003 output register 0x03 (default 0xFF = all high)
+static uint8_t current_io_output_state = 0x0E;
 
 // C interface functions for GUI to call control manager
 extern "C" {
@@ -100,50 +101,100 @@ extern "C" {
 // Global touch input device for manual polling
 static lv_indev_t *global_touch_indev = nullptr;
 
-// TCA9554 I2C expander control
-static void tca_write(uint8_t reg, uint8_t val) {
-  Wire.beginTransmission(TCA9554_ADDR);
+// ============================================================================
+// IO EXPANDER ABSTRACTION
+// Routes writes to correct I2C address based on detected board version
+// ============================================================================
+static void io_expander_write(uint8_t reg, uint8_t val) {
+  Wire.beginTransmission(getIOExpanderAddr());
   Wire.write(reg);
   Wire.write(val);
   Wire.endTransmission();
 }
 
-// NEW: Backlight control function for ScreenManager
+// ============================================================================
+// BACKLIGHT CONTROL — version-aware
+// V3: Toggle BL_EN bit (bit 1) in TCA9554 output register
+// V4: Write PWM duty to CH32V003 register 0x05 (0=off, 200=normal)
+// ============================================================================
 static void control_backlight(bool on) {
-  if (on) {
-    // Turn backlight on (EXIO2 = bit 2)
-    current_tca_state |= (1 << (EXIO_BL_EN - 1));
-    Serial.println("[Backlight] ON");
-  } else {
-    // Turn backlight off (EXIO2 = bit 2)
-    current_tca_state &= ~(1 << (EXIO_BL_EN - 1));
-    Serial.println("[Backlight] OFF");
+  if (isTouchLCDv3()) {
+    // V3: Toggle EXIO2/BL_EN (bit 1) in TCA9554 output register
+    if (on) {
+      current_io_output_state |= (1 << V3_BIT_BL_EN);
+      Serial.println("[Backlight V3] ON");
+    } else {
+      current_io_output_state &= ~(1 << V3_BIT_BL_EN);
+      Serial.println("[Backlight V3] OFF");
+    }
+    io_expander_write(TCA9554_REG_OUTPUT, current_io_output_state);
+    
+  } else if (isTouchLCDv4()) {
+    // V4: Backlight is controlled via dedicated PWM register (0x05)
+    // NOT a bit in the GPIO output register!
+    if (on) {
+      io_expander_write(CH32V003_REG_PWM, 200);  // Restore default brightness
+      Serial.println("[Backlight V4] ON (PWM=200)");
+    } else {
+      io_expander_write(CH32V003_REG_PWM, 0);    // PWM off = backlight off
+      Serial.println("[Backlight V4] OFF (PWM=0)");
+    }
   }
-  tca_write(TCA_REG_OUTPUT, current_tca_state);
 }
 
+// ============================================================================
+// IO EXPANDER INITIALIZATION — version-aware
+// V3: TCA9554 reset sequence with staged power-on
+// V4: CH32V003 direction config + all outputs high + PWM init
+// ============================================================================
 static void init_expander() {
   // Use board-detected I2C pins (EXPA_I2C_SDA and EXPA_I2C_SCL are auto-configured)
   Wire.begin(EXPA_I2C_SDA, EXPA_I2C_SCL, 400000);
   delay(50);
   
-  // Configure EXIO1-5 as outputs
-  // Bit pattern: 1=input, 0=output
-  // We need EXIO1(bit0), EXIO2(bit1), EXIO3(bit2), EXIO5(bit4) as outputs
-  // 0xE1 = 0b11100001 = EXIO1,2,3,5 as outputs, EXIO4,6,7,8 as inputs
-  tca_write(TCA_REG_CONFIG, 0xE1);
-  
-  // Power-on sequence
-  tca_write(TCA_REG_OUTPUT, 0x00);  // All low - reset INCLUDING touch
-  delay(50);
-  tca_write(TCA_REG_OUTPUT, 0x08);  // LCD reset high
-  delay(50);
-  tca_write(TCA_REG_OUTPUT, 0x0C);  // Backlight on
-  current_tca_state = 0x0C;  // Track state
-  delay(50);
-  tca_write(TCA_REG_OUTPUT, 0x0E);  // Touch reset high - ENABLE TOUCH
-  current_tca_state = 0x0E;  // Track state
-  delay(150);  // Delay for GT911 to initialize
+  if (isTouchLCDv3()) {
+    // ---- V3: TCA9554 at 0x20 ----
+    // Configure EXIO1-5 as outputs
+    // Bit pattern: 1=input, 0=output
+    // 0xE1 = 0b11100001 = EXIO1,2,3,5 as outputs, EXIO4,6,7,8 as inputs
+    io_expander_write(TCA9554_REG_CONFIG, 0xE1);
+    
+    // Power-on sequence (same as before — proven working on V3)
+    io_expander_write(TCA9554_REG_OUTPUT, 0x00);  // All low - reset INCLUDING touch
+    delay(50);
+    io_expander_write(TCA9554_REG_OUTPUT, 0x08);   // LCD reset high (bit 2... wait)
+    delay(50);
+    io_expander_write(TCA9554_REG_OUTPUT, 0x0C);   // + Backlight on
+    current_io_output_state = 0x0C;  // Track state
+    delay(50);
+    io_expander_write(TCA9554_REG_OUTPUT, 0x0E);   // + Touch reset high - ENABLE TOUCH
+    current_io_output_state = 0x0E;  // Track state
+    delay(150);  // Delay for GT911 to initialize
+    
+    Serial.println("  IO Expander: TCA9554 @ 0x20 (V3)");
+    Serial.printf("  Output state: 0x%02X\n", current_io_output_state);
+    
+  } else if (isTouchLCDv4()) {
+    // ---- V4: CH32V003 at 0x24 ----
+    // Direction: 1=output, 0=input (OPPOSITE of TCA9554!)
+    // Outputs: EXIO1(TP_RST), EXIO3(LCD_RST), EXIO4(SDCS), EXIO5(SYS_EN), EXIO6(BEE)
+    // Inputs:  EXIO0(charger), EXIO2(TP_INT), EXIO7(RTC_INT)
+    // Mask:    0b01111010 = 0x7A
+    io_expander_write(CH32V003_REG_DIR, CH32V003_DIR_MASK);
+    
+    // Set all GPIO outputs HIGH (LCD on, touch reset released, etc.)
+    io_expander_write(CH32V003_REG_OUTPUT, 0xFF);
+    current_io_output_state = 0xFF;
+    
+    // Set initial backlight brightness via hardware PWM
+    io_expander_write(CH32V003_REG_PWM, 200);  // ~78% — comfortable default
+    delay(150);  // GT911 init time
+    
+    Serial.println("  IO Expander: CH32V003 @ 0x24 (V4)");
+    Serial.printf("  Direction mask: 0x%02X\n", CH32V003_DIR_MASK);
+    Serial.printf("  Output state: 0x%02X\n", current_io_output_state);
+    Serial.println("  Backlight: Hardware PWM initialized (duty=200)");
+  }
 }
 
 // LVGL flush callback
@@ -258,14 +309,14 @@ void setup() {
   
   // ========================================================================
   // STEP 2: CONDITIONAL DISPLAY INITIALIZATION
-  // Only initialize display hardware if we're on Touch LCD board
+  // Only initialize display hardware if we're on Touch LCD board (V3 or V4)
   // ========================================================================
   
   if (hasDisplay()) {
     Serial.println("\n🖥️  DISPLAY INITIALIZATION (Touch LCD Board)");
     Serial.println("════════════════════════════════════════");
     
-    // Initialize I2C expander for backlight/reset control
+    // Initialize IO expander for backlight/reset control (V3 or V4)
     init_expander();
     
     
@@ -284,21 +335,44 @@ void setup() {
         1 /* hsync_polarity */, 10 /* hsync_front_porch */, 8 /* hsync_pulse_width */, 50 /* hsync_back_porch */,
         1 /* vsync_polarity */, 10 /* vsync_front_porch */, 8 /* vsync_pulse_width */, 20 /* vsync_back_porch */);
     
+    // Version-aware display rotation: V3=0, V4=2 (180°)
+    int rotation = getDisplayRotation();
     gfx = new Arduino_RGB_Display(
-        480 /* width */, 480 /* height */, rgbpanel, 0 /* rotation */, true /* auto_flush */,
+        480 /* width */, 480 /* height */, rgbpanel, rotation /* rotation */, true /* auto_flush */,
         bus, GFX_NOT_DEFINED /* RST */, st7701_type1_init_operations, sizeof(st7701_type1_init_operations));
-    Serial.println("✅ RGB panel objects created");
+    Serial.printf("✅ RGB panel objects created (rotation=%d)\n", rotation);
     
     // Initialize display
     gfx->begin();
     gfx->fillScreen(BLACK);
     Serial.println("✅ Display initialized");
     
-    // Initialize touch controller with board-detected pins
-    touch.setPins(-1, TOUCH_RST);  // TOUCH_RST is auto-configured
-    if (!touch.begin(Wire, GT911_SLAVE_ADDRESS_L, TOUCH_SDA, TOUCH_SCL)) {
-      Serial.println("❌ GT911 touch initialization failed!");
-      while (1) delay(1000);
+    // ================================================================
+    // TOUCH CONTROLLER INIT — version-aware
+    // V3: GPIO16 as INT, fixed GT911 address 0x5D
+    // V4: No direct INT GPIO, probe GT911 at 0x5D then 0x14
+    // ================================================================
+    if (isTouchLCDv3()) {
+      // V3: Direct GPIO16 interrupt, fixed address 0x5D
+      touch.setPins(-1, 16);  // INT on GPIO16
+      if (!touch.begin(Wire, GT911_SLAVE_ADDRESS_L, TOUCH_SDA, TOUCH_SCL)) {
+        Serial.println("❌ GT911 touch initialization failed (V3)!");
+        while (1) delay(1000);
+      }
+    } else if (isTouchLCDv4()) {
+      // V4: Touch RST/INT managed by CH32V003, no direct GPIO
+      touch.setPins(-1, -1);
+      
+      // GT911 address depends on INT level during CH32V003 reset sequence — probe both
+      bool touch_ok = touch.begin(Wire, GT911_SLAVE_ADDRESS_L, TOUCH_SDA, TOUCH_SCL);
+      if (!touch_ok) {
+        Serial.println("  GT911 not at 0x5D, trying 0x14...");
+        touch_ok = touch.begin(Wire, GT911_I2C_ADDR_H, TOUCH_SDA, TOUCH_SCL);
+      }
+      if (!touch_ok) {
+        Serial.println("❌ GT911 touch initialization failed (V4)!");
+        while (1) delay(1000);
+      }
     }
     Serial.println("✅ GT911 touch controller initialized");
     
@@ -346,7 +420,7 @@ void setup() {
   }
   
   // ========================================================================
-  // STEP 3: INITIALIZE SUBSYSTEMS (common to both boards)
+  // STEP 3: INITIALIZE SUBSYSTEMS (common to all boards)
   // ========================================================================
   
   Serial.println("\n🔧 SUBSYSTEM INITIALIZATION");
@@ -417,9 +491,11 @@ void setup() {
   // Control manager works in both modes (sends commands, doesn't update display directly)
   controlMgr->setup();
   
-  // NEW: Initialize screen manager with backlight control (only if display present)
+  // ========================================================================
+  // SCREEN MANAGER — pass version-aware IO write function
+  // ========================================================================
   if (hasDisplay()) {
-    screenMgr->begin(control_backlight, tca_write);
+    screenMgr->begin(control_backlight, io_expander_write);
   } else {
     // Still initialize screen manager but with null callbacks (no hardware control)
     screenMgr->begin(nullptr, nullptr);
@@ -585,7 +661,7 @@ void loop() {
   static unsigned long last_can_process = 0;
   
   // ============================================================================
-  // CONDITIONAL DISPLAY UPDATES (only on Touch LCD board)
+  // CONDITIONAL DISPLAY UPDATES (only on Touch LCD board — V3 or V4)
   // ============================================================================
   if (hasDisplay()) {
     // ✅ PRIORITY 1: LVGL timer handler (MUST be called frequently)
