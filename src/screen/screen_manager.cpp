@@ -289,15 +289,21 @@ void ScreenManager::calculatePWMTiming() {
 void ScreenManager::setHardwareBrightness(uint8_t percent) {
     if (!io_write || !use_hardware_pwm) return;
     
-    // Map 0–100% to CH32V003 PWM duty (0–247)
-    // INVERTED: CH32V003 PWM pulls AP3032 FB pin LOW via R40
-    // Higher duty = more pull-down = DIMMER
-    // So 100% brightness = duty 0, 0% brightness = duty 247
-    uint8_t duty = CH32V003_PWM_MAX - (uint8_t)(((uint16_t)percent * CH32V003_PWM_MAX) / 100);
+    // V4 CH32V003 PWM → R40 → AP3032 FB pin
+    // Higher duty = more FB pull-down = DIMMER
+    // But the response is non-linear: duty 0-80 all look equally bright
+    // because AP3032 is at full current. Visible dimming starts ~duty 80.
+    // Map 0-100% to the useful visible range for natural-feeling control:
+    //   100% → duty 30  (brightest with slight headroom)
+    //   0%   → duty 240 (very dim but not fully off — turnScreenOff handles that)
+    static const uint8_t DUTY_BRIGHT = 30;   // 100% brightness
+    static const uint8_t DUTY_DIM    = 240;  // 0% brightness
+    
+    uint8_t duty = DUTY_DIM - (uint8_t)(((uint16_t)percent * (DUTY_DIM - DUTY_BRIGHT)) / 100);
     io_write(CH32V003_REG_PWM, duty);
     
-    Serial.printf("[Dimming V4] Brightness: %d%% → PWM duty: %d/%d (inverted)\n", 
-                  percent, duty, CH32V003_PWM_MAX);
+    Serial.printf("[Dimming V4] Brightness: %d%% → PWM duty: %d (range %d–%d)\n", 
+                  percent, duty, DUTY_BRIGHT, DUTY_DIM);
 }
 
 // ============================================================================

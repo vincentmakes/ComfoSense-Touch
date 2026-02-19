@@ -117,9 +117,10 @@ static void io_expander_write(uint8_t reg, uint8_t val) {
 // BACKLIGHT CONTROL — version-aware
 // V3: Toggle BL_EN bit (bit 1) in TCA9554 output register
 // V4: Write PWM duty to CH32V003 register 0x05
-// INVERTED: 0=full brightness, 247=off (PWM pulls AP3032 FB low)
-// ~80% brightness = 247 - (80*247/100) = 247 - 198 = 49
-#define V4_PWM_DEFAULT_DUTY  49   // ~80% brightness (inverted scale)
+// INVERTED: Higher duty = more FB pull-down = DIMMER
+// Useful visible range: duty 30 (bright) to 240 (dim)
+// 80% brightness = 240 - (80 * 210 / 100) = 72
+#define V4_PWM_DEFAULT_DUTY  72   // ~80% brightness
 // ============================================================================
 static void control_backlight(bool on) {
   if (isTouchLCDv3()) {
