@@ -47,9 +47,9 @@ This means this display can be used also by people who are not interested in the
 1. Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
 Watchout that Waveshare also has a 4.3in device which wouldn't work for this project, both from a power and lack of CAN transceiver pov.
 > [!IMPORTANT]  
->Important to note that since the publication of this firmware, Waveshare has published a Rev 4. of the board. This firmware only works with Rev 3. so far: the differences in hardware and pins are quite significant between the two boards.
+> Both **Rev 3** and **Rev 4** of the Waveshare board are supported by this firmware. The firmware automatically detects the board version at startup and configures pins, I/O expander, touch controller and backlight accordingly. No code changes are needed — just flash and go.
 
-2. Optionnally: two SMD resistors, size 0402 (0R or a wire and a 100k value) in order for the dimming feature to work (see Dimming section for more details.)
+2. Optionally (Rev 3 only): two SMD resistors, size 0402 (0R or a wire and a 100k value) in order for the dimming feature to work. **Rev 4 does not require any hardware modification** — it has a dedicated CH32V003 chip that handles backlight PWM natively. See the Dimming section for more details.
 
 3. For the Bridge, this device is ideal: https://www.waveshare.com/esp32-s3-rs485-can.htm . This firmware is fully compatible with it and requires few adjustments of the PINs in twai_wrapper and main.cpp to be fully functional.
 
@@ -71,7 +71,7 @@ pio run -e esp32s3
 pio run -t upload -e esp32s3
 pio device monitor -b 115200
 ```
-That's it ! Check further below for the mounting bracket to install it on the wall and options for dimming the screen (requires hardware changes)
+That's it ! Check further below for the mounting bracket to install it on the wall and options for dimming the screen (Rev 3 requires hardware changes, Rev 4 works out of the box)
 
 ## Physical Mounting on the wall
 
@@ -115,7 +115,7 @@ This has several benefits over the touch screen device :
         3. more energy efficient since no screen, which means less strain on the ComfoAir unit  
         4. it has an external antenna port available - for when the wifi coverage is not optimal   
 
-The current firmware is fully compatible: simply set the Remote Client mode to false in secrets.h and disable the night time modes and dimming features. The firmware will automatically detect the board and adjust the pins accordingly.
+The current firmware is fully compatible: simply set the Remote Client mode to false in secrets.h and disable the night time modes and dimming features. The firmware will automatically detect the board type (Touch LCD Rev 3, Touch LCD Rev 4, or RS485-CAN) and adjust pins and features accordingly — a single firmware binary works across all three hardware variants.
 
 ### Version 2 of the packaging ###
 To install it: Pop out the board from the DIN case, remove the LED in the middle, and lower the two other LED untill they are 20mm above the PCB.  
@@ -154,29 +154,38 @@ Here's an example in boost mode with the timer just started at 20min.
 Additional automation should be done through Home Assistant (such as changing fan speed depending on sensor data, time of the day, etc)
 
 ### Dimming the screen
+
+Dimming allows you to reduce the screen brightness to a comfortable level. It can be enabled in `secrets.h` by switching the DIMMING flag to true: `#define DIMMING true`
+
+#### Rev 4 — No hardware modification needed
+> [!NOTE]
+> Rev 4 boards include a CH32V003 RISC-V microcontroller that provides native hardware PWM for backlight control. Simply enable the dimming flag in `secrets.h` and the firmware handles everything automatically. The brightness range is smooth and flicker-free across the full 0–100% range.
+
+#### Rev 3 — Hardware modification required
 > [!IMPORTANT] 
->Dimming of the screen is an option which can be enabled in secrets.h by switching the DIMMING flag to true:  #define DIMMING true
->Additionnally, it requires hardware modifications by adding a size 0402 100k resistor in the R36 location and  putting a 0R resistor in R40 location.
->Those are really tiny resistors which might be challenging without a microscope. More details on the location in the two pictures below
+> On Rev 3 boards, dimming requires hardware modifications by adding a size 0402 100k resistor in the R36 location and putting a 0R resistor in R40 location.
+> Those are really tiny resistors which might be challenging without a microscope. More details on the location in the two pictures below.
+>
+> The firmware uses software PWM at 60Hz through the TCA9554 I/O expander (EXIO5) to drive the AP3032 backlight controller's FB pin.
 
 > [!NOTE]
-> The schematics from waveshare shows few things which I think are not correct. 
+> The schematics from Waveshare shows few things which I think are not correct. 
 > 1. It shows this can be controlled via a PWM from GPIO42. Tracing it physically, I can confirm that my board which is a v3.0 uses EXIO5 instead just like v1 and v2.
 > 2.  The datasheet from the AP3032 even suggest a 10k/100nF RC low pass filter but they are using a much higher frequency (25kHz) which might not work with the I2C expander - or would impact the performance of the whole system. We are running the PWM at 60Hz in our case and 0R actually works. I've tried higher values, up to 220k but this was not very successful.
 > 
 > Confirmed by Waveshare in the following issue: https://github.com/waveshareteam/ESP32-display-support/issues/30
-> 1. Future version of this board will include a dedicated chip to handle the dimming so I'm guessing no more resistor to solder
-> 2. Reducing R36 to 68k might help with the range of brightness (not tested yet)
+> 1. Rev 4 of this board now includes a dedicated chip (CH32V003) to handle the dimming — no more resistor to solder
+> 2. On Rev 3, reducing R36 to 68k might help with the range of brightness (not tested yet)
 
 
-**High level view**  
+**High level view (Rev 3 only)**  
 
 ![ESP32-S3-LCD-4-details-intro](https://github.com/user-attachments/assets/a9e630cc-98de-408f-b94d-9fdce430dc17)
 
 
 
 
-**Detailed location for installing new resistors**  
+**Detailed location for installing new resistors (Rev 3 only)**  
 
 <img width="806" height="605" alt="R40_R36_location" src="https://github.com/user-attachments/assets/a0437215-9b4b-4e60-8c90-fb25a2a443de" />
 
@@ -185,7 +194,7 @@ Additional automation should be done through Home Assistant (such as changing fa
 
 There's a feature to shutdown the screen during the night (or any given window) which can be set in secrets.h
 During that window, the screen can come back to life with a simple tap and will remain on for 30s.
-This mode is not linked to the dimming feature and can be used without hardware modification.
+This mode is not linked to the dimming feature and can be used without hardware modification on both Rev 3 and Rev 4.
 
 ### Remote Client Mode
 
@@ -199,8 +208,8 @@ The diagram below illustrates the architecture of the two modes
 
 ### Power
 I have found in a service manual that the Comfonet can deliver 12V at up to 400mA which is 4.8W
-Our device consumes at best 1.2W (5V at 230mA measured at full brightness) which means it can be connected directly in place of the ComfoSense C67.
-At minimum brightness I'm operating at, I have measured 5V at 110mA which is 0.55W
+Our device consumes at best 1.2W (5V at 230mA measured at full brightness on Rev 3) which means it can be connected directly in place of the ComfoSense C67.
+At minimum brightness I'm operating at, I have measured 5V at 110mA which is 0.55W. Rev 4 has similar power characteristics thanks to the same AP3032 backlight driver.
 
 <img width="902" height="309" alt="Screenshot 2025-10-11 at 14 16 59" src="https://github.com/user-attachments/assets/860e895b-08bd-40b6-a3f8-3b2253ed920b" />
 (source: https://zehnderamerica.com/resources/comfoair-q-installer-manual/)
@@ -234,14 +243,24 @@ Getting something displayed on those Waveshare devices was extremly challenging 
 1. There's no examples using PlatformIO configuration, only Arduino ones 
 2. The documentation exists, but one has to dig through it thoroughly at hardware level in order to get the accurate information and in some cases below it's simply incorrect.
 
+#### Rev 3 — TCA9554 I/O Expander
 The LCD screen is driven via I/O extender using a TCA9554 chip from TI. Looking at the schematic we can see that the Pin A0, A1 and A2 are at ground. From TI documentation of the chip we can deduct that the address is 0x20 (0x2Y where Y is the Hex conversion of A2/A1/A0 which in our case is 0b000)
 
 <img width="527" height="275" alt="Screenshot 2025-10-09 095513" src="https://github.com/user-attachments/assets/e492b7da-d0ac-4080-be31-0fbfc6d7e133" />
+
+#### Rev 4 — CH32V003 RISC-V MCU
+Rev 4 replaces the TCA9554 with a CH32V003F4U6 RISC-V microcontroller at I2C address 0x24. This chip manages GPIO, hardware PWM for backlight, battery ADC and interrupt handling. The register map is different from the TCA9554 (output register at 0x02, direction at 0x03 with inverted sense). The firmware automatically handles these differences.
+
+The GT911 touch controller on Rev 4 has no OTP (One-Time Programmable) configuration — the firmware writes the 480×480 resolution and touch parameters to the GT911 at every boot. Rev 3 boards have OTP-programmed GT911 chips that work out of the box. The display uses LVGL-based 180° rotation on Rev 4 (hardware rotation causes rendering artifacts with partial updates).
+
+#### Pin Configuration (both revisions)
 
 
 
 The schematics also displays a table with all the PINs which is different from the generic one on the Wiki page: https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-4/ESP32-S3-Touch-LCD-4_V3.0.pdf
 I have used the working Arduino examples as a reference as some PINs are not referenced correctly in the schematics nor in the Wiki Page (GX Pins seems correct but RX and BX are not) and this has caused me a lot of headaches.
+
+The RGB panel pin assignments are identical between Rev 3 and Rev 4. The key differences are in I2C, CAN and touch pin routing — the firmware's `board_config.h` handles this automatically via runtime detection.
 
 
 ```cpp Arduino_DataBus *bus = new Arduino_SWSPI(
@@ -257,7 +276,7 @@ Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(
     1 /* vsync_polarity */, 10 /* vsync_front_porch */, 8 /* vsync_pulse_width */, 20 /* vsync_back_porch */);
  ```
 
-If you have a different version, you would need to double check those items and adjust main.cpp if necessary.
+If you have a different version, you would need to double check those items and adjust main.cpp if necessary. Note that the firmware's `board_config.h` handles pin differences between Rev 3 (TCA9554 @ 0x20, I2C SDA=15/SCL=7) and Rev 4 (CH32V003 @ 0x24, I2C SDA=15/SCL=7, CAN TX=6/RX=0) automatically.
 
 From a refreshing of sensor data and dropdown menu, only this exact pattern works and make the display refresh the screen properly (What I've called "Strategy 5" in the code - after trying 4 other different ways)
 
