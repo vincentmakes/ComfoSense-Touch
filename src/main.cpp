@@ -308,6 +308,26 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
 // ============================================================================
 
 void setup() {
+  // ========================================================================
+  // EMERGENCY: Silence CH32V003 buzzer IMMEDIATELY on power-up!
+  // The CH32V003 powers up with all outputs HIGH, including BEE_EN (bit 6),
+  // which drives the buzzer. The factory firmware silences it instantly because
+  // setup() goes straight to I2C writes. We must do the same — before Serial,
+  // before delay, before ANYTHING. This adds ~5ms at boot.
+  // ========================================================================
+  Wire.begin(15, 7);  // Touch LCD I2C pins — same as factory
+  Wire.beginTransmission(0x24);  // CH32V003 address
+  Wire.write(0x02);              // Output register
+  Wire.write(0xBF);              // All HIGH except bit 6 (buzzer OFF)
+  Wire.endTransmission();
+  Wire.beginTransmission(0x24);
+  Wire.write(0x03);              // Direction register
+  Wire.write(0x3A);              // Factory mask — BEE_EN as input (can't buzz)
+  Wire.endTransmission();
+  Wire.end();
+  // If this board isn't V4, these writes are harmless (no device at 0x24).
+  // ========================================================================
+  
   Serial.begin(115200);
   delay(500);
   
