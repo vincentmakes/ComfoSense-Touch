@@ -1,5 +1,9 @@
 # Zehnder Comfoair Q350 MQTT bridge + Touch Screen
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/vincentmakes)  
+
+# Important Update - 19.02.2026
+The firmware now works out of the box with the Rev4 version of the Waveshare LCD. It's a significant upgrade since this new board doesn't require any hardware modification to dim the screen. The new firmware still works with Rev3 and RS485-CAN Boards - no changes there.
+
 ## Introduction
 This project is inspired by the work of many others who successfully managed to replace the hardware bridge from Zehnder called "Comfoconnect LAN C" by an ESP32 + CAN transceiver, namely those ones in particular : https://github.com/vekexasia/comfoair-esp32 & https://github.com/dardhal/comfoair-esp32 and leveraging the excellent work from Michael Arnauts on mapping the CAN frames : https://github.com/michaelarnauts/aiocomfoconnect
 
