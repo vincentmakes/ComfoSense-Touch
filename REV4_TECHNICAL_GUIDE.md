@@ -86,57 +86,38 @@ Wire.endTransmission();
 
 The CH32V003 powers up with all outputs HIGH (0xFF). Bit 6 (BEE_EN) being HIGH drives the buzzer continuously. The ESP32 bootloader takes 500–800ms to load firmware from flash before any user code executes. During this time the buzzer screams.
 
-### The solution: three layers of defense
+### The solution: two layers of defense
 
-**Layer 1 — Global constructor (before `setup()`)**
+**Layer 1 — First line of `setup()`**
 
-A C++ global constructor with priority 200 runs approximately 100ms before `setup()`. It attempts to silence the buzzer via I2C with retries, in case the CH32V003 hasn't booted yet:
-
-```cpp
-static void __attribute__((constructor(200))) silence_buzzer_early() {
-    Wire.begin(15, 7);
-    for (int attempt = 0; attempt < 5; attempt++) {
-        Wire.beginTransmission(0x24);
-        Wire.write(0x02);           // Output register
-        Wire.write(0xBF);           // All HIGH except bit 6 (buzzer OFF)
-        uint8_t err = Wire.endTransmission();
-        if (err == 0) {
-            Wire.beginTransmission(0x24);
-            Wire.write(0x03);       // Direction register
-            Wire.write(0x3A);       // BEE_EN as input (can't drive buzzer)
-            Wire.endTransmission();
-            break;
-        }
-        delayMicroseconds(2000);
-    }
-    Wire.end();
-}
-```
-
-**Layer 2 — First line of `setup()`**
-
-Identical retry logic as backup, in case the constructor's `Wire.begin()` failed on a particular boot path:
+The very first code in `setup()` silences the buzzer via simple I2C writes — before Serial, before delay, before anything:
 
 ```cpp
 void setup() {
-    Wire.begin(15, 7);
-    for (int attempt = 0; attempt < 5; attempt++) {
-        Wire.beginTransmission(0x24);
-        Wire.write(0x02); Wire.write(0xBF);
-        if (Wire.endTransmission() == 0) {
-            Wire.beginTransmission(0x24);
-            Wire.write(0x03); Wire.write(0x3A);
-            Wire.endTransmission();
-            break;
-        }
-        delay(5);
-    }
+    Wire.begin(15, 7);  // Touch LCD I2C pins — same as factory
+    Wire.beginTransmission(0x24);  // CH32V003 address
+    Wire.write(0x02);              // Output register
+    Wire.write(0xBF);              // All HIGH except bit 6 (buzzer OFF)
+    Wire.endTransmission();
+    Wire.beginTransmission(0x24);
+    Wire.write(0x03);              // Direction register
+    Wire.write(0x3A);              // Factory mask — BEE_EN as input (can't buzz)
+    Wire.endTransmission();
     Wire.end();
+    // If this board isn't V4, these writes are harmless (no device at 0x24).
+
+    Serial.begin(115200);
     // ... rest of setup
 }
 ```
 
-**Layer 3 — Board detection in `initBoardConfig()`**
+> **Warning — keep this code simple!** The following patterns have been tested and **cause silent boot crashes** (no serial output, perpetual reboot loop):
+> - `__attribute__((constructor))` global constructors — the Arduino Wire library requires the runtime to be initialized, which only happens at `setup()` entry.
+> - `for` loop with retries around `Wire.beginTransmission()` — storing the `Wire.endTransmission()` return value in a local `uint8_t err` variable and looping causes a crash. Root cause unclear but reproducible. The straight-through writes without error checking work reliably.
+>
+> The simple, proven pattern above adds ~5ms at boot and works on every power cycle tested.
+
+**Layer 2 — Board detection in `initBoardConfig()`**
 
 When the CH32V003 is confirmed present via I2C probe, silence it again immediately before returning.
 
@@ -434,9 +415,16 @@ void backlight_on(uint8_t percent) {
 
 void setup() {
     // ---- Step 0: Silence buzzer IMMEDIATELY ----
+    // Keep this simple — no loops, no error checking (causes crashes on ESP32-S3)
     Wire.begin(I2C_SDA, I2C_SCL);
-    ch32_write(REG_OUTPUT, 0xBF);     // Bit 6 (buzzer) LOW
-    ch32_write(REG_DIRECTION, 0x3A);  // BEE_EN as input (safe)
+    Wire.beginTransmission(CH32V003_ADDR);
+    Wire.write(REG_OUTPUT);
+    Wire.write(0xBF);                    // Bit 6 (buzzer) LOW
+    Wire.endTransmission();
+    Wire.beginTransmission(CH32V003_ADDR);
+    Wire.write(REG_DIRECTION);
+    Wire.write(0x3A);                    // BEE_EN as input (safe)
+    Wire.endTransmission();
 
     Serial.begin(115200);
     delay(500);
@@ -567,6 +555,10 @@ Baud rate: **50 kbps** (ComfoNet standard). Use the ESP-IDF TWAI driver with inc
 
 ## 8. Common Pitfalls and Lessons Learned
 
+### Keep early I2C writes simple — no loops or error handling
+
+At the very start of `setup()`, before Serial is initialized, certain code patterns cause silent boot crashes on the ESP32-S3. Specifically, wrapping `Wire.beginTransmission()` / `Wire.endTransmission()` in a `for` loop with a return value check (`uint8_t err = Wire.endTransmission(); if (err == 0) break;`) causes a perpetual reboot. The root cause is unclear but reproducible. Use straight-through I2C writes without error checking for the early buzzer silencing.
+
 ### `Wire.end()` corrupts SensorLib I2C handle
 
 If you call `Wire.end()` (e.g., during board detection) and then `Wire.begin()` again, the global `Wire` object works but SensorLib's internally cached I2C handle becomes a dangling pointer. Any SensorLib function that writes to the bus (like `setMaxTouchPoint()`) will crash with `EXCVADDR: 0x0000000c`. Use raw `Wire.beginTransmission()` calls instead.
@@ -618,6 +610,7 @@ For anyone porting to the Rev 4 board, here is the minimum viable initialization
 
 void setup() {
     // 1. Silence buzzer (FIRST THING — before Serial!)
+    //    Keep this simple — no loops, no error checking (retries cause crashes)
     Wire.begin(15, 7);
     Wire.beginTransmission(0x24);
     Wire.write(0x02); Wire.write(0xBF);  // Output: buzzer OFF
@@ -625,6 +618,7 @@ void setup() {
     Wire.beginTransmission(0x24);
     Wire.write(0x03); Wire.write(0x3A);  // Direction: factory safe mask
     Wire.endTransmission();
+    Wire.end();
 
     Serial.begin(115200);
     delay(100);
