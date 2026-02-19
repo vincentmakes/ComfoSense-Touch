@@ -107,6 +107,22 @@ inline BoardType detectBoard() {
     Wire.beginTransmission(CH32V003_I2C_ADDR);
     uint8_t ch32_error = Wire.endTransmission();
     
+    // CRITICAL: If CH32V003 found, silence buzzer IMMEDIATELY!
+    // CH32V003 powers up with outputs HIGH (0xFF), BEE_EN (bit 6) = HIGH = buzzer ON.
+    // We must clear it before doing anything else to prevent startup beep.
+    if (ch32_error == 0) {
+        // Set output register: 0xBF = all HIGH except bit 6 (buzzer OFF)
+        Wire.beginTransmission(CH32V003_I2C_ADDR);
+        Wire.write(CH32V003_REG_OUTPUT);  // 0x02
+        Wire.write(0xBF);                  // Buzzer OFF immediately
+        Wire.endTransmission();
+        // Also set direction: 0x3A = factory mask (BEE_EN as INPUT = can't buzz)
+        Wire.beginTransmission(CH32V003_I2C_ADDR);
+        Wire.write(CH32V003_REG_DIR);     // 0x03
+        Wire.write(0x3A);                  // BEE_EN as input, TP_RST+LCD_RST+SDCS+SYS_EN as output
+        Wire.endTransmission();
+    }
+    
     // Look for TCA9554 at 0x20 (V3 IO expander)
     Wire.beginTransmission(TCA9554_I2C_ADDR);
     uint8_t tca_lcd_error = Wire.endTransmission();

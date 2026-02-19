@@ -47,7 +47,7 @@ void ScreenManager::begin(void (*backlightControlFn)(bool on),
     
     // Set initial IO output state based on board version
     if (isTouchLCDv4()) {
-        io_output_state = 0xBF;  // V4: CH32V003 starts with all high
+        io_output_state = 0xBF;  // V4: CH32V003 all high EXCEPT BEE_EN (bit 6)
     }
     Serial.printf("IO Output State: 0x%02X\n", io_output_state);
     
@@ -289,11 +289,14 @@ void ScreenManager::calculatePWMTiming() {
 void ScreenManager::setHardwareBrightness(uint8_t percent) {
     if (!io_write || !use_hardware_pwm) return;
     
-    // Map 0–100% to 0–247 (CH32V003 safe maximum)
-    uint8_t duty = (uint8_t)(((uint16_t)percent * CH32V003_PWM_MAX) / 100);
+    // Map 0–100% to CH32V003 PWM duty (0–247)
+    // INVERTED: CH32V003 PWM pulls AP3032 FB pin LOW via R40
+    // Higher duty = more pull-down = DIMMER
+    // So 100% brightness = duty 0, 0% brightness = duty 247
+    uint8_t duty = CH32V003_PWM_MAX - (uint8_t)(((uint16_t)percent * CH32V003_PWM_MAX) / 100);
     io_write(CH32V003_REG_PWM, duty);
     
-    Serial.printf("[Dimming V4] Brightness: %d%% → PWM duty: %d/%d\n", 
+    Serial.printf("[Dimming V4] Brightness: %d%% → PWM duty: %d/%d (inverted)\n", 
                   percent, duty, CH32V003_PWM_MAX);
 }
 
@@ -477,9 +480,9 @@ void ScreenManager::turnScreenOff() {
     Serial.println("[Screen] Turning OFF");
     
     if (use_hardware_pwm) {
-        // ---- V4: Hardware PWM — just set duty to 0 ----
+        // ---- V4: Hardware PWM — set duty to max (inverted: max = off) ----
         if (io_write) {
-            io_write(CH32V003_REG_PWM, 0);
+            io_write(CH32V003_REG_PWM, CH32V003_PWM_MAX);
         }
         
     } else {

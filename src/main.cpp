@@ -116,7 +116,10 @@ static void io_expander_write(uint8_t reg, uint8_t val) {
 // ============================================================================
 // BACKLIGHT CONTROL — version-aware
 // V3: Toggle BL_EN bit (bit 1) in TCA9554 output register
-// V4: Write PWM duty to CH32V003 register 0x05 (0=off, 200=normal)
+// V4: Write PWM duty to CH32V003 register 0x05
+// INVERTED: 0=full brightness, 247=off (PWM pulls AP3032 FB low)
+// ~80% brightness = 247 - (80*247/100) = 247 - 198 = 49
+#define V4_PWM_DEFAULT_DUTY  49   // ~80% brightness (inverted scale)
 // ============================================================================
 static void control_backlight(bool on) {
   if (isTouchLCDv3()) {
@@ -134,10 +137,10 @@ static void control_backlight(bool on) {
     // V4: Backlight is controlled via dedicated PWM register (0x05)
     // NOT a bit in the GPIO output register!
     if (on) {
-      io_expander_write(CH32V003_REG_PWM, 200);  // Restore default brightness
-      Serial.println("[Backlight V4] ON (PWM=200)");
+      io_expander_write(CH32V003_REG_PWM, V4_PWM_DEFAULT_DUTY);  // Restore default brightness
+      Serial.printf("[Backlight V4] ON (PWM=%d, inverted)\n", V4_PWM_DEFAULT_DUTY);
     } else {
-      io_expander_write(CH32V003_REG_PWM, 0);    // PWM off = backlight off
+      io_expander_write(CH32V003_REG_PWM, CH32V003_PWM_MAX);  // Max duty = backlight off (inverted)
       Serial.println("[Backlight V4] OFF (PWM=0)");
     }
   }
@@ -182,22 +185,24 @@ static void init_expander() {
     // ensuring TP_RST goes HIGH (releasing GT911) at the exact moment
     // the direction register enables it.
     
-    // Step 1: Set output state FIRST — all HIGH (TP_RST released, LCD_RST released)
-    io_expander_write(CH32V003_REG_OUTPUT, 0xFF);
-    current_io_output_state = 0xFF;
+    // Step 1: Set output state FIRST — all HIGH except buzzer (BEE_EN LOW)
+    // Setting BEE_EN LOW before direction register enables it as output
+    // prevents any buzzer activation during init
+    io_expander_write(CH32V003_REG_OUTPUT, 0xBF);  // 0xFF with bit 6 (BEE) OFF
+    current_io_output_state = 0xBF;
     
     // Step 2: THEN set direction — which pins are outputs
     // 0x7A = EXIO1(TP_RST), EXIO3(LCD_RST), EXIO4(SDCS), EXIO5(SYS_EN), EXIO6(BEE) as outputs
     io_expander_write(CH32V003_REG_DIR, CH32V003_DIR_MASK);
     
     // Step 3: Set initial backlight brightness via hardware PWM
-    io_expander_write(CH32V003_REG_PWM, 200);  // ~78% — comfortable default
+    io_expander_write(CH32V003_REG_PWM, V4_PWM_DEFAULT_DUTY);  // ~80% brightness (inverted)
     delay(150);  // GT911 boot time after TP_RST release
     
     Serial.println("  IO Expander: CH32V003 @ 0x24 (V4)");
     Serial.printf("  Output: 0x%02X → Direction: 0x%02X (factory sequence)\n", 
                   current_io_output_state, CH32V003_DIR_MASK);
-    Serial.println("  Backlight: Hardware PWM initialized (duty=200)");
+    Serial.printf("  Backlight: Hardware PWM initialized (duty=%d, inverted)\n", V4_PWM_DEFAULT_DUTY);
   }
 }
 
@@ -229,8 +234,8 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   // Update last seen time whenever we detect touch
   if (finger_detected_now) {
     last_touch_seen = now;
-    // Apply rotation to match display (rotation=2 = 180°)
-    // Factory demo: touchX = width - x, touchY = height - y
+    // LVGL 9.1.0's lv_display_set_rotation rotates rendering output but does NOT
+    // auto-transform touch input coordinates. Manual flip needed for V4 (180°).
     if (getDisplayRotation() == 2) {
       last_x = (SCREEN_WIDTH - 1) - x[0];
       last_y = (SCREEN_HEIGHT - 1) - y[0];
@@ -340,12 +345,14 @@ void setup() {
       delay(50);
       
       // Factory sequence: reg 0x02 = 0xFF (output), reg 0x03 = 0x3A (direction)
-      io_expander_write(CH32V003_REG_OUTPUT, 0xFF);
-      current_io_output_state = 0xFF;
+      // BUT: We set bit 6 (BEE_EN) LOW from the start to prevent buzzer activation
+      // when direction later changes to 0x7A (making BEE_EN an output)
+      io_expander_write(CH32V003_REG_OUTPUT, 0xBF);  // 0xFF with bit 6 (buzzer) OFF
+      current_io_output_state = 0xBF;
       io_expander_write(CH32V003_REG_DIR, 0x3A);  // Factory mask, NOT 0x7A
       
       Serial.println("  IO Expander: CH32V003 @ 0x24 (V4)");
-      Serial.printf("  Output: 0xFF → Direction: 0x3A (factory exact)\n");
+      Serial.printf("  Output: 0xBF → Direction: 0x3A (factory + buzzer off)\n");
       
       // Step 2: Touch init — BEFORE display, matching factory
       // Factory does: Wire.begin → delay(100) → i2c_scan → setPins(-1,-1) → begin
@@ -523,11 +530,13 @@ void setup() {
       Wire.begin(EXPA_I2C_SDA, EXPA_I2C_SCL, 400000);
       
       // Set backlight and buzzer NOW (after touch init is safe)
-      io_expander_write(CH32V003_REG_PWM, 200);  // Backlight on
-      // Update direction to include BEE_EN as output for buzzer control
-      io_expander_write(CH32V003_REG_DIR, CH32V003_DIR_MASK);  // 0x7A
-      current_io_output_state &= ~(1 << V4_BIT_BEE_EN);  // Buzzer off
+      io_expander_write(CH32V003_REG_PWM, V4_PWM_DEFAULT_DUTY);  // Backlight on (inverted)
+      // CRITICAL: Ensure buzzer bit is LOW in output BEFORE changing direction
+      // to include BEE_EN as output — prevents any buzzer pulse
+      current_io_output_state &= ~(1 << V4_BIT_BEE_EN);  // Buzzer off in output first
       io_expander_write(CH32V003_REG_OUTPUT, current_io_output_state);
+      // Now safe to make BEE_EN an output pin
+      io_expander_write(CH32V003_REG_DIR, CH32V003_DIR_MASK);  // 0x7A
       
       Serial.println("Creating RGB panel objects...");
       
@@ -551,12 +560,15 @@ void setup() {
         1 /* hsync_polarity */, 10 /* hsync_front_porch */, 8 /* hsync_pulse_width */, 50 /* hsync_back_porch */,
         1 /* vsync_polarity */, 10 /* vsync_front_porch */, 8 /* vsync_pulse_width */, 20 /* vsync_back_porch */);
     
-    // Version-aware display rotation: V3=0, V4=2 (180°)
-    int rotation = getDisplayRotation();
+    // CRITICAL: Always use rotation=0 for Arduino_RGB_Display!
+    // Software rotation in the RGB driver causes artifacts with LVGL partial rendering
+    // (dark lines over changing elements, remnant lines after closing menus).
+    // Instead, rotation is handled by LVGL's display rotation which works correctly
+    // with partial rendering mode.
     gfx = new Arduino_RGB_Display(
-        480 /* width */, 480 /* height */, rgbpanel, rotation /* rotation */, true /* auto_flush */,
+        480 /* width */, 480 /* height */, rgbpanel, 0 /* rotation - ALWAYS 0 */, true /* auto_flush */,
         bus, GFX_NOT_DEFINED /* RST */, st7701_type1_init_operations, sizeof(st7701_type1_init_operations));
-    Serial.printf("✅ RGB panel objects created (rotation=%d)\n", rotation);
+    Serial.println("✅ RGB panel objects created (rotation=0, LVGL handles orientation)");
     
     // Initialize display
     gfx->begin();
@@ -592,6 +604,13 @@ void setup() {
     lv_display_t *disp = lv_display_create(SCREEN_WIDTH, SCREEN_HEIGHT);
     lv_display_set_flush_cb(disp, lvgl_flush_cb);
     lv_display_set_buffers(disp, lv_buf1, lv_buf2, lv_buf_pixels * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    
+    // V4 needs 180° rotation — handle in LVGL, not Arduino_GFX
+    // LVGL rotation works correctly with partial rendering (no dark line artifacts)
+    if (getDisplayRotation() == 2) {
+      lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_180);
+      Serial.println("✅ LVGL display rotation set to 180° (V4)");
+    }
     
     // Create LVGL touch input device (only if touch init succeeded)
     if (touch_initialized) {
