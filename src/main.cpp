@@ -100,6 +100,7 @@ extern "C" {
 
 // Global touch input device for manual polling
 static lv_indev_t *global_touch_indev = nullptr;
+static bool touch_initialized = false;
 
 // ============================================================================
 // IO EXPANDER ABSTRACTION
@@ -176,23 +177,26 @@ static void init_expander() {
     
   } else if (isTouchLCDv4()) {
     // ---- V4: CH32V003 at 0x24 ----
-    // Direction: 1=output, 0=input (OPPOSITE of TCA9554!)
-    // Outputs: EXIO1(TP_RST), EXIO3(LCD_RST), EXIO4(SDCS), EXIO5(SYS_EN), EXIO6(BEE)
-    // Inputs:  EXIO0(charger), EXIO2(TP_INT), EXIO7(RTC_INT)
-    // Mask:    0b01111010 = 0x7A
-    io_expander_write(CH32V003_REG_DIR, CH32V003_DIR_MASK);
+    // MUST match factory demo sequence: OUTPUT first, then DIRECTION
+    // This latches output values before enabling pins as outputs,
+    // ensuring TP_RST goes HIGH (releasing GT911) at the exact moment
+    // the direction register enables it.
     
-    // Set all GPIO outputs HIGH (LCD on, touch reset released, etc.)
+    // Step 1: Set output state FIRST — all HIGH (TP_RST released, LCD_RST released)
     io_expander_write(CH32V003_REG_OUTPUT, 0xFF);
     current_io_output_state = 0xFF;
     
-    // Set initial backlight brightness via hardware PWM
+    // Step 2: THEN set direction — which pins are outputs
+    // 0x7A = EXIO1(TP_RST), EXIO3(LCD_RST), EXIO4(SDCS), EXIO5(SYS_EN), EXIO6(BEE) as outputs
+    io_expander_write(CH32V003_REG_DIR, CH32V003_DIR_MASK);
+    
+    // Step 3: Set initial backlight brightness via hardware PWM
     io_expander_write(CH32V003_REG_PWM, 200);  // ~78% — comfortable default
-    delay(150);  // GT911 init time
+    delay(150);  // GT911 boot time after TP_RST release
     
     Serial.println("  IO Expander: CH32V003 @ 0x24 (V4)");
-    Serial.printf("  Direction mask: 0x%02X\n", CH32V003_DIR_MASK);
-    Serial.printf("  Output state: 0x%02X\n", current_io_output_state);
+    Serial.printf("  Output: 0x%02X → Direction: 0x%02X (factory sequence)\n", 
+                  current_io_output_state, CH32V003_DIR_MASK);
     Serial.println("  Backlight: Hardware PWM initialized (duty=200)");
   }
 }
@@ -225,8 +229,15 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
   // Update last seen time whenever we detect touch
   if (finger_detected_now) {
     last_touch_seen = now;
-    last_x = x[0];
-    last_y = y[0];
+    // Apply rotation to match display (rotation=2 = 180°)
+    // Factory demo: touchX = width - x, touchY = height - y
+    if (getDisplayRotation() == 2) {
+      last_x = (SCREEN_WIDTH - 1) - x[0];
+      last_y = (SCREEN_HEIGHT - 1) - y[0];
+    } else {
+      last_x = x[0];
+      last_y = y[0];
+    }
     
     // NEW: Notify screen manager of touch (for NTM wake)
     if (screenMgr) {
@@ -316,13 +327,218 @@ void setup() {
     Serial.println("\n🖥️  DISPLAY INITIALIZATION (Touch LCD Board)");
     Serial.println("════════════════════════════════════════");
     
-    // Initialize IO expander for backlight/reset control (V3 or V4)
-    init_expander();
+    if (isTouchLCDv4()) {
+      // ================================================================
+      // V4: MUST match factory init sequence EXACTLY
+      // Factory order: CH32V003 init → touch init → display init
+      // Critical: Touch BEFORE display. gfx->begin() may interfere.
+      // ================================================================
+      
+      // Step 1: CH32V003 init — match factory registers exactly
+      // Factory uses 100kHz, writes output THEN direction, mask 0x3A
+      Wire.begin(EXPA_I2C_SDA, EXPA_I2C_SCL);  // 100kHz default like factory
+      delay(50);
+      
+      // Factory sequence: reg 0x02 = 0xFF (output), reg 0x03 = 0x3A (direction)
+      io_expander_write(CH32V003_REG_OUTPUT, 0xFF);
+      current_io_output_state = 0xFF;
+      io_expander_write(CH32V003_REG_DIR, 0x3A);  // Factory mask, NOT 0x7A
+      
+      Serial.println("  IO Expander: CH32V003 @ 0x24 (V4)");
+      Serial.printf("  Output: 0xFF → Direction: 0x3A (factory exact)\n");
+      
+      // Step 2: Touch init — BEFORE display, matching factory
+      // Factory does: Wire.begin → delay(100) → i2c_scan → setPins(-1,-1) → begin
+      Wire.begin(EXPA_I2C_SDA, EXPA_I2C_SCL);  // Re-init like factory does
+      delay(100);  // Factory delay
+      
+      Serial.println("  [V4] I2C bus scan:");
+      uint8_t gt911_found_addr = 0;
+      for (uint8_t addr = 0x08; addr < 0x78; addr++) {
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() == 0) {
+          Serial.printf("    0x%02X — %s\n", addr,
+            addr == 0x24 ? "CH32V003" :
+            addr == 0x51 ? "PCF8563 RTC" :
+            addr == 0x5D ? "GT911 (0x5D)" :
+            addr == 0x14 ? "GT911 (0x14)" :
+            "unknown");
+          if (addr == 0x5D || addr == 0x14) gt911_found_addr = addr;
+        }
+      }
+      
+      touch.setPins(-1, -1);
+      
+      bool touch_ok = false;
+      if (gt911_found_addr) {
+        Serial.printf("  GT911 found at 0x%02X — attempting init...\n", gt911_found_addr);
+        touch_ok = touch.begin(Wire, gt911_found_addr, TOUCH_SDA, TOUCH_SCL);
+      }
+      if (!touch_ok) {
+        touch_ok = touch.begin(Wire, GT911_SLAVE_ADDRESS_L, TOUCH_SDA, TOUCH_SCL);
+      }
+      if (!touch_ok) {
+        Serial.println("  GT911 not at 0x5D, trying 0x14...");
+        touch_ok = touch.begin(Wire, GT911_I2C_ADDR_H, TOUCH_SDA, TOUCH_SCL);
+      }
+      
+      if (touch_ok) {
+        Serial.println("✅ GT911 touch controller initialized (V4)");
+        touch_initialized = true;
+        
+        // Read current GT911 config
+        uint8_t gt_a = gt911_found_addr ? gt911_found_addr : 0x5D;
+        uint8_t cfg_header[6];
+        Wire.beginTransmission(gt_a);
+        Wire.write(0x80); Wire.write(0x47);
+        Wire.endTransmission(false);
+        Wire.requestFrom(gt_a, (uint8_t)6);
+        for (int i = 0; i < 6 && Wire.available(); i++) cfg_header[i] = Wire.read();
+        uint16_t rx = cfg_header[1]|(cfg_header[2]<<8), ry = cfg_header[3]|(cfg_header[4]<<8);
+        Serial.printf("  Config: ver=0x%02X, X=%d, Y=%d, touches=%d\n", 
+                      cfg_header[0], rx, ry, cfg_header[5]);
+        
+        // Manual reloadConfig: replicate what setMaxTouchPoint()+reloadConfig() does
+        // without using SensorLib (which crashes due to stale I2C handle from Wire.end())
+        // Read entire 186-byte config, patch Touch_Number + resolution, write back.
+        bool need_config_update = (rx == 0 || ry == 0 || cfg_header[5] == 0);
+        
+        if (need_config_update) {
+          Serial.println("  Config needs update — performing manual reloadConfig...");
+          
+          // Read full config (186 bytes: 0x8047 to 0x8100)
+          uint8_t full_cfg[186];
+          memset(full_cfg, 0, sizeof(full_cfg));
+          for (uint16_t offset = 0; offset < 184; offset += 28) {
+            uint8_t chunk = min((uint16_t)28, (uint16_t)(184 - offset));
+            uint16_t reg = 0x8047 + offset;
+            Wire.beginTransmission(gt_a);
+            Wire.write((uint8_t)(reg >> 8));
+            Wire.write((uint8_t)(reg & 0xFF));
+            Wire.endTransmission(false);
+            Wire.requestFrom(gt_a, chunk);
+            for (uint8_t i = 0; i < chunk && Wire.available(); i++) {
+              full_cfg[offset + i] = Wire.read();
+            }
+          }
+          
+          Serial.printf("  Raw config[0-9]: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X\n",
+                        full_cfg[0],full_cfg[1],full_cfg[2],full_cfg[3],full_cfg[4],
+                        full_cfg[5],full_cfg[6],full_cfg[7],full_cfg[8],full_cfg[9]);
+          
+          // Patch config: set resolution and touch count
+          // Offset 0 = Config_Version (0x8047)
+          full_cfg[0] = cfg_header[0] + 1;  // Increment version so GT911 accepts it
+          if (full_cfg[0] == 0) full_cfg[0] = 1;
+          // Offset 1-2 = X_Output_Max (0x8048-49, little-endian)
+          full_cfg[1] = 0xE0; full_cfg[2] = 0x01;  // 480
+          // Offset 3-4 = Y_Output_Max (0x804A-4B, little-endian)
+          full_cfg[3] = 0xE0; full_cfg[4] = 0x01;  // 480
+          // Offset 5 = Touch_Number (0x804C)
+          full_cfg[5] = 5;
+          // Offset 6 = Module_Switch1 (0x804D) — set INT trigger mode
+          if (full_cfg[6] == 0) full_cfg[6] = 0x0D;  // X2Y | INT rising
+          
+          // Calculate checksum over bytes 0-183 (config area 0x8047-0x80FE)
+          uint8_t checksum = 0;
+          for (int i = 0; i < 184; i++) checksum += full_cfg[i];
+          checksum = (~checksum) + 1;
+          full_cfg[184] = checksum;   // 0x80FF
+          full_cfg[185] = 0x01;       // 0x8100 config_fresh flag
+          
+          // Write full config back in chunks
+          for (uint16_t offset = 0; offset < 186; offset += 28) {
+            uint8_t chunk = min((uint16_t)28, (uint16_t)(186 - offset));
+            uint16_t reg = 0x8047 + offset;
+            Wire.beginTransmission(gt_a);
+            Wire.write((uint8_t)(reg >> 8));
+            Wire.write((uint8_t)(reg & 0xFF));
+            Wire.write(&full_cfg[offset], chunk);
+            Wire.endTransmission();
+          }
+          
+          delay(100);  // GT911 processes config
+          
+          // Verify config was applied
+          Wire.beginTransmission(gt_a);
+          Wire.write(0x80); Wire.write(0x47);
+          Wire.endTransmission(false);
+          Wire.requestFrom(gt_a, (uint8_t)6);
+          for (int i = 0; i < 6 && Wire.available(); i++) cfg_header[i] = Wire.read();
+          rx = cfg_header[1]|(cfg_header[2]<<8); ry = cfg_header[3]|(cfg_header[4]<<8);
+          Serial.printf("  After update: ver=0x%02X, X=%d, Y=%d, touches=%d, cksum=0x%02X\n", 
+                        cfg_header[0], rx, ry, cfg_header[5], checksum);
+        }
+        
+        // Touch test — 3 seconds with detailed logging
+        // First clear any stale status from begin()
+        Wire.beginTransmission(gt_a);
+        Wire.write(0x81); Wire.write(0x4E); Wire.write(0x00);
+        Wire.endTransmission();
+        delay(50);  // Let GT911 process
+        
+        Serial.println("  Touch test (3s) — tap the screen now...");
+        unsigned long test_start = millis();
+        bool got_touch = false;
+        uint8_t last_status = 0xFF;
+        int reads = 0;
+        while (millis() - test_start < 3000) {
+          Wire.beginTransmission(gt_a);
+          Wire.write(0x81); Wire.write(0x4E);
+          Wire.endTransmission(false);
+          Wire.requestFrom(gt_a, (uint8_t)1);
+          uint8_t status = Wire.available() ? Wire.read() : 0;
+          reads++;
+          if (status != last_status) {
+            Serial.printf("  Status 0x814E = 0x%02X (read #%d, t=%lums)\n", 
+                          status, reads, millis() - test_start);
+            last_status = status;
+          }
+          if ((status & 0x80) && (status & 0x0F) > 0) {
+            uint8_t num = status & 0x0F;
+            Wire.beginTransmission(gt_a);
+            Wire.write(0x81); Wire.write(0x4F);
+            Wire.endTransmission(false);
+            uint8_t tp[6];
+            Wire.requestFrom(gt_a, (uint8_t)6);
+            for (int i = 0; i < 6 && Wire.available(); i++) tp[i] = Wire.read();
+            Serial.printf("  ✅ TOUCH! n=%d, X=%d, Y=%d\n", 
+                          num, tp[1]|(tp[2]<<8), tp[3]|(tp[4]<<8));
+            got_touch = true;
+          }
+          // Always clear status
+          Wire.beginTransmission(gt_a);
+          Wire.write(0x81); Wire.write(0x4E); Wire.write(0x00);
+          Wire.endTransmission();
+          if (got_touch) break;
+          delay(20);
+        }
+        Serial.printf("  Test: %d reads, touch=%s\n", reads, got_touch ? "YES" : "NO");
+      } else {
+        Serial.println("⚠️  GT911 touch init failed (V4) — continuing without touch");
+      }
+      
+      // Step 3: NOW init display (after touch is working)
+      // Need 400kHz for display SPI init
+      Wire.begin(EXPA_I2C_SDA, EXPA_I2C_SCL, 400000);
+      
+      // Set backlight and buzzer NOW (after touch init is safe)
+      io_expander_write(CH32V003_REG_PWM, 200);  // Backlight on
+      // Update direction to include BEE_EN as output for buzzer control
+      io_expander_write(CH32V003_REG_DIR, CH32V003_DIR_MASK);  // 0x7A
+      current_io_output_state &= ~(1 << V4_BIT_BEE_EN);  // Buzzer off
+      io_expander_write(CH32V003_REG_OUTPUT, current_io_output_state);
+      
+      Serial.println("Creating RGB panel objects...");
+      
+    } else {
+      // V3: Original sequence — init_expander then display
+      init_expander();
     
+      Serial.println("Creating RGB panel objects...");
+    }
     
-    // Create display objects NOW (after board detection, before display init)
-    // This ensures GPIO17/18/21 are only configured on Touch LCD board
-    Serial.println("Creating RGB panel objects...");
+    // Create display objects (common for V3 and V4)
     bus = new Arduino_SWSPI(
         GFX_NOT_DEFINED /* DC */, 42 /* CS */,
         2 /* SCK */, 1 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
@@ -347,34 +563,17 @@ void setup() {
     gfx->fillScreen(BLACK);
     Serial.println("✅ Display initialized");
     
-    // ================================================================
-    // TOUCH CONTROLLER INIT — version-aware
-    // V3: GPIO16 as INT, fixed GT911 address 0x5D
-    // V4: No direct INT GPIO, probe GT911 at 0x5D then 0x14
-    // ================================================================
+    // V3 touch init (after display, same as original)
     if (isTouchLCDv3()) {
-      // V3: Direct GPIO16 interrupt, fixed address 0x5D
-      touch.setPins(-1, 16);  // INT on GPIO16
+      touch.setPins(-1, 16);
       if (!touch.begin(Wire, GT911_SLAVE_ADDRESS_L, TOUCH_SDA, TOUCH_SCL)) {
         Serial.println("❌ GT911 touch initialization failed (V3)!");
         while (1) delay(1000);
       }
-    } else if (isTouchLCDv4()) {
-      // V4: Touch RST/INT managed by CH32V003, no direct GPIO
-      touch.setPins(-1, -1);
-      
-      // GT911 address depends on INT level during CH32V003 reset sequence — probe both
-      bool touch_ok = touch.begin(Wire, GT911_SLAVE_ADDRESS_L, TOUCH_SDA, TOUCH_SCL);
-      if (!touch_ok) {
-        Serial.println("  GT911 not at 0x5D, trying 0x14...");
-        touch_ok = touch.begin(Wire, GT911_I2C_ADDR_H, TOUCH_SDA, TOUCH_SCL);
-      }
-      if (!touch_ok) {
-        Serial.println("❌ GT911 touch initialization failed (V4)!");
-        while (1) delay(1000);
-      }
+      Serial.println("✅ GT911 touch controller initialized (V3)");
+      touch_initialized = true;
     }
-    Serial.println("✅ GT911 touch controller initialized");
+    Serial.println("✅ Touch init phase complete");
     
     // Allocate LVGL buffers in PSRAM
     lv_buf1 = (lv_color_t *)heap_caps_malloc(lv_buf_pixels * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
@@ -394,11 +593,16 @@ void setup() {
     lv_display_set_flush_cb(disp, lvgl_flush_cb);
     lv_display_set_buffers(disp, lv_buf1, lv_buf2, lv_buf_pixels * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
     
-    // Create LVGL touch input device
-    lv_indev_t *indev = lv_indev_create();
-    lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
-    lv_indev_set_read_cb(indev, lvgl_touch_read_cb);
-    global_touch_indev = indev;
+    // Create LVGL touch input device (only if touch init succeeded)
+    if (touch_initialized) {
+      lv_indev_t *indev = lv_indev_create();
+      lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
+      lv_indev_set_read_cb(indev, lvgl_touch_read_cb);
+      global_touch_indev = indev;
+      Serial.println("✅ LVGL touch input registered");
+    } else {
+      Serial.println("⚠️  LVGL touch input SKIPPED (touch not available)");
+    }
     
     Serial.println("✅ LVGL initialized");
     

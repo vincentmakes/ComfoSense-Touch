@@ -57,8 +57,11 @@ enum BoardType {
 // Source: ESPhome PR #10071 (waveshare_io_ch32v003 component)
 //         + factory firmware binary string analysis
 // =============================================================================
-#define CH32V003_REG_DIR    0x02   // Direction: 1=output, 0=input (INVERTED vs TCA!)
-#define CH32V003_REG_OUTPUT 0x03   // GPIO output state
+// REGISTER MAP — confirmed by Waveshare factory demo (Arduino-v3.3.2):
+//   Wire.write(0x02); Wire.write(0xFF);   → OUTPUT register (all pins HIGH)
+//   Wire.write(0x03); Wire.write(0x3A);   → DIRECTION register (output mask)
+#define CH32V003_REG_OUTPUT 0x02   // GPIO output state
+#define CH32V003_REG_DIR    0x03   // Direction: 1=output, 0=input (INVERTED vs TCA!)
 #define CH32V003_REG_INPUT  0x04   // GPIO input state
 #define CH32V003_REG_PWM    0x05   // Backlight PWM duty (0–255, safe max 247)
 #define CH32V003_REG_ADC    0x06   // Battery ADC (2 bytes, little-endian, 10-bit)

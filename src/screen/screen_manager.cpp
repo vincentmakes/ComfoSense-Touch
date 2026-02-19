@@ -47,7 +47,7 @@ void ScreenManager::begin(void (*backlightControlFn)(bool on),
     
     // Set initial IO output state based on board version
     if (isTouchLCDv4()) {
-        io_output_state = 0xFF;  // V4: CH32V003 starts with all high
+        io_output_state = 0xBF;  // V4: CH32V003 starts with all high
     }
     Serial.printf("IO Output State: 0x%02X\n", io_output_state);
     
