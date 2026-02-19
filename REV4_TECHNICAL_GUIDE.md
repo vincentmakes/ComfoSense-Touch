@@ -88,9 +88,9 @@ The CH32V003 powers up with all outputs HIGH (0xFF). Bit 6 (BEE_EN) being HIGH d
 
 ### The solution: two layers of defense
 
-**Layer 1 — First line of `setup()`**
+**Layer 1 — First line of `setup()` — simple straight-through writes**
 
-The very first code in `setup()` silences the buzzer via simple I2C writes — before Serial, before delay, before anything:
+The very first code in `setup()` silences the buzzer with simple I2C writes — before Serial, before delay, before anything:
 
 ```cpp
 void setup() {
@@ -111,11 +111,11 @@ void setup() {
 }
 ```
 
-> **Warning — keep this code simple!** The following patterns have been tested and **cause silent boot crashes** (no serial output, perpetual reboot loop):
-> - `__attribute__((constructor))` global constructors — the Arduino Wire library requires the runtime to be initialized, which only happens at `setup()` entry.
-> - `for` loop with retries around `Wire.beginTransmission()` — storing the `Wire.endTransmission()` return value in a local `uint8_t err` variable and looping causes a crash. Root cause unclear but reproducible. The straight-through writes without error checking work reliably.
+> **Critical — the following patterns cause silent boot crashes on the ESP32-S3 (no serial output, perpetual reboot loop). Do NOT use them:**
+> - **`__attribute__((constructor))` global constructors** — the Arduino Wire library requires the runtime to be initialized, which hasn't happened yet before `setup()`.
+> - **`for` loop with retries** around `Wire.beginTransmission()` / `Wire.endTransmission()` — storing the return value in a local variable and looping causes a crash. Root cause unclear but reproducible across multiple boards. The straight-through writes without error checking work reliably.
 >
-> The simple, proven pattern above adds ~5ms at boot and works on every power cycle tested.
+> The simple pattern above adds ~5ms at boot. On non-V4 boards, the writes harmlessly NACK (no device at 0x24).
 
 **Layer 2 — Board detection in `initBoardConfig()`**
 
@@ -415,16 +415,9 @@ void backlight_on(uint8_t percent) {
 
 void setup() {
     // ---- Step 0: Silence buzzer IMMEDIATELY ----
-    // Keep this simple — no loops, no error checking (causes crashes on ESP32-S3)
     Wire.begin(I2C_SDA, I2C_SCL);
-    Wire.beginTransmission(CH32V003_ADDR);
-    Wire.write(REG_OUTPUT);
-    Wire.write(0xBF);                    // Bit 6 (buzzer) LOW
-    Wire.endTransmission();
-    Wire.beginTransmission(CH32V003_ADDR);
-    Wire.write(REG_DIRECTION);
-    Wire.write(0x3A);                    // BEE_EN as input (safe)
-    Wire.endTransmission();
+    ch32_write(REG_OUTPUT, 0xBF);     // Bit 6 (buzzer) LOW
+    ch32_write(REG_DIRECTION, 0x3A);  // BEE_EN as input (safe)
 
     Serial.begin(115200);
     delay(500);
@@ -555,9 +548,9 @@ Baud rate: **50 kbps** (ComfoNet standard). Use the ESP-IDF TWAI driver with inc
 
 ## 8. Common Pitfalls and Lessons Learned
 
-### Keep early I2C writes simple — no loops or error handling
+### Early I2C writes must be simple — no loops, no constructors
 
-At the very start of `setup()`, before Serial is initialized, certain code patterns cause silent boot crashes on the ESP32-S3. Specifically, wrapping `Wire.beginTransmission()` / `Wire.endTransmission()` in a `for` loop with a return value check (`uint8_t err = Wire.endTransmission(); if (err == 0) break;`) causes a perpetual reboot. The root cause is unclear but reproducible. Use straight-through I2C writes without error checking for the early buzzer silencing.
+At the very start of `setup()`, before Serial is initialized, two patterns cause silent boot crashes on the ESP32-S3: (1) `__attribute__((constructor))` global constructors that call `Wire.begin()` before the Arduino runtime is ready, and (2) `for` loops with `Wire.endTransmission()` return value checking. Use only simple, straight-through I2C writes for the buzzer silencing at boot. See Section 2 for the proven pattern.
 
 ### `Wire.end()` corrupts SensorLib I2C handle
 
@@ -610,7 +603,7 @@ For anyone porting to the Rev 4 board, here is the minimum viable initialization
 
 void setup() {
     // 1. Silence buzzer (FIRST THING — before Serial!)
-    //    Keep this simple — no loops, no error checking (retries cause crashes)
+    //    Simple writes only — loops and constructors crash the ESP32-S3
     Wire.begin(15, 7);
     Wire.beginTransmission(0x24);
     Wire.write(0x02); Wire.write(0xBF);  // Output: buzzer OFF
