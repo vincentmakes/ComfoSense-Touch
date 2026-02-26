@@ -699,9 +699,15 @@ void setup() {
     comfo->setTimeManager(timeMgr);
   #endif
   
+  // Link data managers to ComfoAir (for CAN → display routing in normal mode)
+  comfo->setSensorDataManager(sensorData);
+  comfo->setFilterDataManager(filterData);
+  comfo->setErrorDataManager(errorData);
+  comfo->setControlManager(controlMgr);
+
   // Link ComfoAir to control manager (for sending commands)
   controlMgr->setComfoAir(comfo);
-  
+
   // Link MQTT to control manager for remote client mode
   #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
     if (mqtt) {
