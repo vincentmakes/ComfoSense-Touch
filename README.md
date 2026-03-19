@@ -48,14 +48,14 @@ This means this display can be used also by people who are not interested in the
 
 ## What to use : Hardware Components
 
-1. Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4
+1. Specifically the Waveshare ESP32S3 4 inch Touch display Dev Board (contains an embedded CAN transceiver): https://www.waveshare.com/esp32-s3-touch-lcd-4.htm?&aff_id=142371
 Watchout that Waveshare also has a 4.3in device which wouldn't work for this project, both from a power and lack of CAN transceiver pov.
 > [!IMPORTANT]  
 > Both **Rev 3** and **Rev 4** of the Waveshare board are supported by this firmware. The firmware automatically detects the board version at startup and configures pins, I/O expander, touch controller and backlight accordingly. No code changes are needed — just flash and go.
 
 2. Optionally (Rev 3 only): two SMD resistors, size 0402 (0R or a wire and a 100k value) in order for the dimming feature to work. **Rev 4 does not require any hardware modification** — it has a dedicated CH32V003 chip that handles backlight PWM natively. See the Dimming section for more details.
 
-3. For the Bridge, this device is ideal: https://www.waveshare.com/esp32-s3-rs485-can.htm . This firmware is fully compatible with it and requires few adjustments of the PINs in twai_wrapper and main.cpp to be fully functional.
+3. For the Bridge, this device is ideal: https://www.waveshare.com/esp32-s3-rs485-can.htm&aff_id=142371 . This firmware is fully compatible with it and requires few adjustments of the PINs in twai_wrapper and main.cpp to be fully functional.
 
 
 
