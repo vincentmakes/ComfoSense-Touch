@@ -1,0 +1,435 @@
+views:
+  - title: Ventilation
+    path: ventilation
+    icon: mdi:air-filter
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: heading
+            heading: System Status
+            heading_style: title
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.mvhr_operating_mode
+                name: Mode
+                icon: mdi:cog
+                color: cyan
+              - type: tile
+                entity: input_select.mvhr_ventilation_speed
+                name: Fan Speed
+                icon: mdi:fan
+                color: cyan
+              - type: tile
+                entity: sensor.mvhr_power_consumption
+                name: Power
+                icon: mdi:flash
+                color: amber
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.mvhr_bypass_activation_mode
+                name: Bypass Mode
+                icon: mdi:swap-horizontal
+                color: teal
+              - type: tile
+                entity: sensor.mvhr_target_temp
+                name: Target Temp
+                icon: mdi:thermometer-check
+                color: orange
+              - type: tile
+                entity: sensor.mvhr_running_mean_outdoor_temp_rmot
+                name: RMOT
+                icon: mdi:thermometer-lines
+                color: blue
+          - type: custom:entity-progress-card
+            entity: sensor.mvhr_remaining_days_filter_replacement
+            name: Filter Life
+            unit: days
+            decimal: 0
+            min_value: 0
+            max_value: 180
+            bar_size: large
+            layout: horizontal
+            force_circular_background: true
+            custom_theme:
+              - min: 0
+                max: 10
+                color: red
+              - min: 10
+                max: 30
+                color: orange
+              - min: 30
+                max: 180
+                color: green
+      - type: vertical-stack
+        cards:
+          - type: heading
+            heading: Air Temperatures
+            heading_style: title
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.mvhr_outdoor_air_temperature
+                name: Outdoor
+                icon: mdi:weather-partly-cloudy
+                color: blue
+              - type: tile
+                entity: sensor.mvhr_pre_heater_temp_after
+                name: After Pre-Heater
+                icon: mdi:arrow-right
+                color: blue
+              - type: tile
+                entity: sensor.mvhr_post_heater_temp_after
+                name: Supply to Rooms
+                icon: mdi:home-import-outline
+                color: red
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.mvhr_extract_air_temperature
+                name: Extract (Rooms)
+                icon: mdi:home-export-outline
+                color: red
+              - type: tile
+                entity: sensor.mvhr_exhaust_air_temperature
+                name: Exhaust Out
+                icon: mdi:arrow-right
+                color: blue
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              title: Temperature (24h)
+              show_states: false
+            graph_span: 24h
+            series:
+              - entity: sensor.mvhr_outdoor_air_temperature
+                name: Outdoor
+                color: '#42a5f5'
+                group_by:
+                  func: avg
+                  duration: 5min
+                stroke_width: 2
+              - entity: sensor.mvhr_post_heater_temp_after
+                name: Supply
+                color: '#ef5350'
+                group_by:
+                  func: avg
+                  duration: 5min
+                stroke_width: 2
+              - entity: sensor.mvhr_extract_air_temperature
+                name: Extract
+                color: '#ff9800'
+                group_by:
+                  func: avg
+                  duration: 5min
+                stroke_width: 2
+              - entity: sensor.mvhr_exhaust_air_temperature
+                name: Exhaust
+                color: '#78909c'
+                group_by:
+                  func: avg
+                  duration: 5min
+                stroke_width: 2
+            apex_config:
+              chart:
+                height: 200
+              stroke:
+                curve: smooth
+              yaxis:
+                title:
+                  text: °C
+      - type: vertical-stack
+        cards:
+          - type: heading
+            heading: Humidity
+            heading_style: title
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.mvhr_outdoor_air_humidity
+                name: Outdoor
+                icon: mdi:water-outline
+                color: blue
+              - type: tile
+                entity: sensor.mvhr_supply_air_humidity
+                name: Supply
+                icon: mdi:water-outline
+                color: teal
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.mvhr_extract_air_humidity
+                name: Extract
+                icon: mdi:water
+                color: orange
+              - type: tile
+                entity: sensor.mvhr_exhaust_air_humidity
+                name: Exhaust
+                icon: mdi:water
+                color: blue
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              title: Humidity (24h)
+              show_states: false
+            graph_span: 24h
+            series:
+              - entity: sensor.mvhr_outdoor_air_humidity
+                name: Outdoor
+                color: '#42a5f5'
+                group_by:
+                  func: avg
+                  duration: 5min
+                stroke_width: 2
+              - entity: sensor.mvhr_supply_air_humidity
+                name: Supply
+                color: '#26a69a'
+                group_by:
+                  func: avg
+                  duration: 5min
+                stroke_width: 2
+              - entity: sensor.mvhr_extract_air_humidity
+                name: Extract
+                color: '#ff9800'
+                group_by:
+                  func: avg
+                  duration: 5min
+                stroke_width: 2
+              - entity: sensor.mvhr_exhaust_air_humidity
+                name: Exhaust
+                color: '#78909c'
+                group_by:
+                  func: avg
+                  duration: 5min
+                stroke_width: 2
+            apex_config:
+              chart:
+                height: 200
+              stroke:
+                curve: smooth
+              yaxis:
+                title:
+                  text: '%'
+                min: 0
+                max: 100
+      - type: vertical-stack
+        cards:
+          - type: heading
+            heading: Fan Performance
+            heading_style: title
+          - type: horizontal-stack
+            cards:
+              - type: gauge
+                entity: sensor.mvhr_supply_fan_flow
+                name: Supply Flow
+                min: 0
+                max: 400
+                needle: true
+                severity:
+                  green: 100
+                  yellow: 50
+                  red: 0
+                unit: m³/h
+              - type: gauge
+                entity: sensor.mvhr_exhaust_fan_flow
+                name: Exhaust Flow
+                min: 0
+                max: 400
+                needle: true
+                severity:
+                  green: 100
+                  yellow: 50
+                  red: 0
+                unit: m³/h
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.mvhr_supply_fan_duty
+                name: Supply Duty
+                icon: mdi:percent
+                color: cyan
+              - type: tile
+                entity: sensor.mvhr_supply_fan_speed
+                name: Supply RPM
+                icon: mdi:sine-wave
+                color: cyan
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.mvhr_exhaust_fan_duty
+                name: Exhaust Duty
+                icon: mdi:percent
+                color: indigo
+              - type: tile
+                entity: sensor.mvhr_exhaust_fan_speed
+                name: Exhaust RPM
+                icon: mdi:sine-wave
+                color: indigo
+          - type: custom:apexcharts-card
+            header:
+              show: true
+              title: Airflow (24h)
+              show_states: false
+            graph_span: 24h
+            series:
+              - entity: sensor.mvhr_supply_fan_flow
+                name: Supply
+                color: '#26c6da'
+                group_by:
+                  func: avg
+                  duration: 5min
+                stroke_width: 2
+              - entity: sensor.mvhr_exhaust_fan_flow
+                name: Exhaust
+                color: '#5c6bc0'
+                group_by:
+                  func: avg
+                  duration: 5min
+                stroke_width: 2
+            apex_config:
+              chart:
+                height: 200
+              stroke:
+                curve: smooth
+              yaxis:
+                title:
+                  text: m³/h
+                min: 0
+          - type: conditional
+            conditions:
+              - entity: input_select.mvhr_ventilation_speed
+                state: '1'
+            card:
+              type: horizontal-stack
+              cards:
+                - type: gauge
+                  entity: sensor.mvhr_supply_fan_deviation
+                  name: Exhaust Fan Health
+                  min: -20
+                  max: 120
+                  needle: true
+                  severity:
+                    green: -20
+                    yellow: 60
+                    red: 85
+                  unit: '%'
+                - type: tile
+                  entity: sensor.mvhr_supply_fan_speed
+                  name: Current RPM
+                  icon: mdi:sine-wave
+                  color: indigo
+          - type: conditional
+            conditions:
+              - entity: input_select.mvhr_ventilation_speed
+                state: '1'
+            card:
+              type: custom:apexcharts-card
+              header:
+                show: true
+                title: Exhaust Fan RPM (5 days · Speed 1)
+                show_states: true
+                colorize_states: true
+              graph_span: 3d
+              series:
+                - entity: sensor.mvhr_supply_fan_speed
+                  name: RPM
+                  color: '#5c6bc0'
+                  group_by:
+                    func: avg
+                    duration: 30min
+                  stroke_width: 2
+              apex_config:
+                chart:
+                  height: 220
+                stroke:
+                  curve: smooth
+                yaxis:
+                  title:
+                    text: rpm
+                  min: 1200
+                  max: 2100
+                annotations:
+                  yaxis:
+                    - 'y': 1600
+                      borderColor: '#2e7d32'
+                      strokeDashArray: 4
+                      label:
+                        text: Baseline (1600)
+                        borderColor: '#2e7d32'
+                        style:
+                          color: '#fff'
+                          background: '#2e7d32'
+                    - 'y': 1900
+                      borderColor: '#c62828'
+                      strokeDashArray: 4
+                      label:
+                        text: Alert (1900)
+                        borderColor: '#c62828'
+                        style:
+                          color: '#fff'
+                          background: '#c62828'
+      - type: vertical-stack
+        cards:
+          - type: heading
+            heading: Heat Recovery & Energy
+            heading_style: title
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.mvhr_avoided_heating_power
+                name: Avoided Heating
+                icon: mdi:fire
+                color: deep-orange
+              - type: tile
+                entity: sensor.mvhr_avoided_cooling_power
+                name: Avoided Cooling
+                icon: mdi:snowflake
+                color: light-blue
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.mvhr_ytd_avoided_heating_energy
+                name: Heating Saved YTD
+                icon: mdi:counter
+                color: deep-orange
+              - type: tile
+                entity: sensor.mvhr_energy_consumption_ytd
+                name: Consumed YTD
+                icon: mdi:lightning-bolt
+                color: amber
+          - type: heading
+            heading: Pre-Heater (Frost Protection)
+            heading_style: subtitle
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.mvhr_pre_heater_temp_before
+                name: Before
+                icon: mdi:thermometer
+                color: blue
+              - type: tile
+                entity: sensor.mvhr_pre_heater_temp_after
+                name: After
+                icon: mdi:thermometer
+                color: teal
+              - type: tile
+                entity: sensor.mvhr_pre_heater_humidity_after
+                name: Humidity After
+                icon: mdi:water-percent
+                color: teal
+          - type: heading
+            heading: Post-Heater (Supply Reheat)
+            heading_style: subtitle
+          - type: horizontal-stack
+            cards:
+              - type: tile
+                entity: sensor.mvhr_post_heater_temp_before
+                name: Before
+                icon: mdi:thermometer
+                color: orange
+              - type: tile
+                entity: sensor.mvhr_post_heater_temp_after
+                name: After
+                icon: mdi:thermometer
+                color: red
