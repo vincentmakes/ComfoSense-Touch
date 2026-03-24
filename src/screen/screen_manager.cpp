@@ -436,7 +436,10 @@ void ScreenManager::turnScreenOn() {
     if (use_hardware_pwm) {
         // ---- V4: Hardware PWM — just set brightness ----
         setHardwareBrightness(current_brightness);
-        
+
+        // Defensive: never let buzzer bit creep into tracked output state
+        io_output_state &= ~(1 << V4_BIT_BEE_EN);
+
     } else {
         // ---- V3: Software PWM + backlight bit ----
         
@@ -490,7 +493,10 @@ void ScreenManager::turnScreenOff() {
         if (io_write) {
             io_write(CH32V003_REG_PWM, CH32V003_PWM_MAX);
         }
-        
+
+        // Defensive: never let buzzer bit creep into tracked output state
+        io_output_state &= ~(1 << V4_BIT_BEE_EN);
+
     } else {
         // ---- V3: Stop software PWM + clear backlight bit ----
         

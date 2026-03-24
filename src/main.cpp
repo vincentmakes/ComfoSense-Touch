@@ -310,22 +310,46 @@ static void lvgl_touch_read_cb(lv_indev_t *indev, lv_indev_data_t *data) {
 
 void setup() {
   // ========================================================================
-  // EMERGENCY: Silence CH32V003 buzzer IMMEDIATELY on power-up!
+  // Silence CH32V003 buzzer IMMEDIATELY on power-up!
   // The CH32V003 powers up with all outputs HIGH, including BEE_EN (bit 6),
   // which drives the buzzer. The factory firmware silences it instantly because
   // setup() goes straight to I2C writes. We must do the same — before Serial,
   // before delay, before ANYTHING. This adds ~5ms at boot.
   // ========================================================================
-  Wire.begin(15, 7);  // Touch LCD I2C pins — same as factory
-  Wire.beginTransmission(0x24);  // CH32V003 address
-  Wire.write(0x02);              // Output register
-  Wire.write(0xBF);              // All HIGH except bit 6 (buzzer OFF)
+  // Attempt 1 — immediate (CH32V003 may still be booting)
+  Wire.begin(15, 7);
+  Wire.beginTransmission(0x24);
+  Wire.write(0x02); Wire.write(0xBF);  // Output: all HIGH except bit 6 (buzzer OFF)
   Wire.endTransmission();
   Wire.beginTransmission(0x24);
-  Wire.write(0x03);              // Direction register
-  Wire.write(0x3A);              // Factory mask — BEE_EN as input (can't buzz)
+  Wire.write(0x03); Wire.write(0x3A);  // Direction: BEE_EN as input (can't buzz)
   Wire.endTransmission();
   Wire.end();
+
+  delay(50);  // Give CH32V003 time to finish its own boot
+
+  // Attempt 2 — CH32V003 likely ready by now
+  Wire.begin(15, 7);
+  Wire.beginTransmission(0x24);
+  Wire.write(0x02); Wire.write(0xBF);
+  Wire.endTransmission();
+  Wire.beginTransmission(0x24);
+  Wire.write(0x03); Wire.write(0x3A);
+  Wire.endTransmission();
+  Wire.end();
+
+  delay(50);
+
+  // Attempt 3 — final safety
+  Wire.begin(15, 7);
+  Wire.beginTransmission(0x24);
+  Wire.write(0x02); Wire.write(0xBF);
+  Wire.endTransmission();
+  Wire.beginTransmission(0x24);
+  Wire.write(0x03); Wire.write(0x3A);
+  Wire.endTransmission();
+  Wire.end();
+
   // If this board isn't V4, these writes are harmless (no device at 0x24).
   // ========================================================================
   
@@ -931,6 +955,20 @@ void loop() {
     
     // ✅ NEW: Screen manager loop (handles NTM state transitions)
     if (screenMgr) screenMgr->loop();
+        // ✅ BUZZER SAFETY NET (V4 only) — uncomment to enable
+    // Re-asserts BEE_EN=LOW every 5 seconds. If the emergency boot silencing
+    // failed (CH32V003 not ready, I2C glitch), this guarantees recovery.
+    // Since the buzzer is never intentionally activated, this is always safe.
+    if (isTouchLCDv4()) {
+       static unsigned long last_buzzer_check = 0;
+       unsigned long now_ms = millis();
+       if (now_ms - last_buzzer_check >= 5000) {
+       last_buzzer_check = now_ms;
+         current_io_output_state &= ~(1 << V4_BIT_BEE_EN);
+         io_expander_write(CH32V003_REG_OUTPUT, current_io_output_state);
+       }
+     }
+
   }
   
   // ============================================================================

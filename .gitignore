@@ -6,3 +6,5 @@
 src/secrets.h
 .DS_Store
 .vscode/*
+lib/lvgl/*
+.vscode/extensions.json
