@@ -327,7 +327,7 @@ namespace comfoair {
       
       // Initialize: schedule first slow data request ~8s after boot
       if (!slow_data_request_initialized) {
-        last_slow_data_request = millis() - 600000 + 8000;  // Trigger in ~8s
+        last_slow_data_request = millis() - 14400000 + 8000;  // Trigger in ~8s, then every 4 hours
         slow_data_request_initialized = true;
       }
 
@@ -351,7 +351,7 @@ namespace comfoair {
               slow_data_step++;
             }
           }
-        } else if (slow_data_request_initialized && now_ms - last_slow_data_request >= 600000) {
+        } else if (slow_data_request_initialized && now_ms - last_slow_data_request >= 14400000) {  // 4 hours
           // Time to start a new cycle
           Serial.println("ComfoAir: Starting slow data request cycle (non-blocking)...");
           requestFilterDays();
@@ -426,10 +426,21 @@ namespace comfoair {
                         */
           
           // Publish to MQTT - use local copies
+          // Only retain key state topics (fan_speed, temps, humidity, filter, errors)
+          // Retaining ALL topics floods the broker with disk writes and can slow command delivery
           if (mqtt) {
             sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decoded_name);
             sprintf(mqttTopicValBuf, "%s", decoded_val);
-            mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf, true);  // retained: client gets latest on reconnect
+            bool retain = (strcmp(decoded_name, "fan_speed") == 0 ||
+                           strcmp(decoded_name, "extract_air_temp") == 0 ||
+                           strcmp(decoded_name, "outdoor_air_temp") == 0 ||
+                           strcmp(decoded_name, "extract_air_humidity") == 0 ||
+                           strcmp(decoded_name, "outdoor_air_humidity") == 0 ||
+                           strcmp(decoded_name, "temp_profile") == 0 ||
+                           strcmp(decoded_name, "remaining_days_filter_replacement") == 0 ||
+                           strcmp(decoded_name, "error_overheating") == 0 ||
+                           strcmp(decoded_name, "alarm_filter") == 0);
+            mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf, retain);
           }
           // âœ… DEBUG: Check routing logic
          // Serial.println("  â†’ Checking sensor data routing...");
