@@ -933,7 +933,11 @@ void setup() {
 void loop() {
   static unsigned long last_touch_read = 0;
   static unsigned long last_can_process = 0;
-  
+
+  // Early MQTT drain — process pending messages BEFORE LVGL blocks (10-50ms redraws)
+  // This halves max latency between MQTT reads and prevents buffer overflow
+  if (wifi && wifi->isConnected() && mqtt) mqtt->loop();
+
   // ============================================================================
   // CONDITIONAL DISPLAY UPDATES (only on Touch LCD board — V3 or V4)
   // ============================================================================

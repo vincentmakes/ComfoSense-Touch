@@ -73,6 +73,12 @@ char mqttTopicValBuf[30];
 char otherBuf[30];
 
 // Track last published MQTT values — only publish on change to reduce broker load
+// Every HEARTBEAT_INTERVAL_MS, clear the map to force-republish ALL values
+#include <map>
+#include <string>
+static std::map<std::string, std::string> lastPublishedValues;
+static unsigned long lastHeartbeatTime = 0;
+static const unsigned long HEARTBEAT_INTERVAL_MS = 10000;  // Force-republish all values every 10s
 
 
 namespace comfoair {
@@ -437,22 +443,36 @@ namespace comfoair {
                         strlen(decoded_name));
                         */
           
-          // Publish to MQTT
-          // Only retain key state topics (fan_speed, temps, humidity, filter, errors)
-          // Retaining ALL topics floods the broker with disk writes and can slow command delivery
+          // Publish to MQTT — only when value CHANGES (reduces broker load ~95%)
+          // CAN bus sends the same values many times per second; publishing every one
+          // overwhelms PubSubClient on remote clients (512-byte buffer, 1 msg/loop).
+          // Periodic heartbeat (clear map every 10s) ensures HA/clients recover from missed publishes.
           if (mqtt) {
-            sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decoded_name);
-            sprintf(mqttTopicValBuf, "%s", decoded_val);
-            bool retain = (strcmp(decoded_name, "fan_speed") == 0 ||
-                           strcmp(decoded_name, "extract_air_temp") == 0 ||
-                           strcmp(decoded_name, "outdoor_air_temp") == 0 ||
-                           strcmp(decoded_name, "extract_air_humidity") == 0 ||
-                           strcmp(decoded_name, "outdoor_air_humidity") == 0 ||
-                           strcmp(decoded_name, "temp_profile") == 0 ||
-                           strcmp(decoded_name, "remaining_days_filter_replacement") == 0 ||
-                           strcmp(decoded_name, "error_overheating") == 0 ||
-                           strcmp(decoded_name, "alarm_filter") == 0);
-            mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf, retain);
+            // Heartbeat: clear the map periodically so ALL values get republished
+            unsigned long now_pub = millis();
+            if (now_pub - lastHeartbeatTime >= HEARTBEAT_INTERVAL_MS) {
+              lastHeartbeatTime = now_pub;
+              lastPublishedValues.clear();
+            }
+
+            std::string nameKey(decoded_name);
+            std::string newVal(decoded_val);
+            auto it = lastPublishedValues.find(nameKey);
+            if (it == lastPublishedValues.end() || it->second != newVal) {
+              lastPublishedValues[nameKey] = newVal;
+              sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decoded_name);
+              sprintf(mqttTopicValBuf, "%s", decoded_val);
+              bool retain = (strcmp(decoded_name, "fan_speed") == 0 ||
+                             strcmp(decoded_name, "extract_air_temp") == 0 ||
+                             strcmp(decoded_name, "outdoor_air_temp") == 0 ||
+                             strcmp(decoded_name, "extract_air_humidity") == 0 ||
+                             strcmp(decoded_name, "outdoor_air_humidity") == 0 ||
+                             strcmp(decoded_name, "temp_profile") == 0 ||
+                             strcmp(decoded_name, "remaining_days_filter_replacement") == 0 ||
+                             strcmp(decoded_name, "error_overheating") == 0 ||
+                             strcmp(decoded_name, "alarm_filter") == 0);
+              mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf, retain);
+            }
           }
           // âœ… DEBUG: Check routing logic
          // Serial.println("  â†’ Checking sensor data routing...");
