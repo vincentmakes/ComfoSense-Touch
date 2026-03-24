@@ -300,18 +300,9 @@ namespace comfoair {
         Serial.println(" MQTT disabled - skipping subscriptions");
       }
       
-      // ✅ Request slow-changing data at startup (after 8 seconds)
-      // Filter days, target temp, bypass status, and operating mode change very slowly
-      Serial.println("ComfoAir: Waiting 8s before requesting slow-changing data...");
-      delay(8000);
-      requestFilterDays();
-      delay(2000);
-      requestTargetTemp();
-      delay(2000);
-      requestBypassStatus();
-      delay(2000);
-      requestOperatingMode();
-      delay(2000);
+      // Slow-changing data will be requested non-blocking after 8 seconds
+      // (handled by state machine in loop())
+      Serial.println("ComfoAir: Slow-changing data will be requested ~8s after boot (non-blocking)");
 
     #endif
   }
@@ -334,23 +325,39 @@ namespace comfoair {
       static unsigned long last_slow_data_request = 0;
       static bool slow_data_request_initialized = false;
       
-      // Initialize on first loop to prevent immediate request after startup
+      // Initialize: schedule first slow data request ~8s after boot
       if (!slow_data_request_initialized) {
-        last_slow_data_request = millis();
+        last_slow_data_request = millis() - 600000 + 8000;  // Trigger in ~8s
         slow_data_request_initialized = true;
       }
-      
-      if (millis() - last_slow_data_request >= 600000) {  // 14400000ms = 4 hours - 3600000 =1 hr
-        Serial.println("ComfoAir: 30min slow-changing data request...");
-        requestFilterDays();
-           delay(2000);
-        requestTargetTemp();
-           delay(2000);
-        requestBypassStatus();
-           delay(2000);
-        requestOperatingMode();
-           delay(2000);
-        last_slow_data_request = millis();
+
+      // Non-blocking slow data requests: one request every 2s via state machine
+      {
+        unsigned long now_ms = millis();
+        if (slow_data_step > 0) {
+          // State machine in progress — send next request after 2s gap
+          if (now_ms - last_slow_data_step_time >= 2000) {
+            switch (slow_data_step) {
+              case 1: requestTargetTemp(); break;
+              case 2: requestBypassStatus(); break;
+              case 3: requestOperatingMode(); break;
+            }
+            last_slow_data_step_time = now_ms;
+            if (slow_data_step >= 3) {
+              slow_data_step = 0;  // Cycle complete
+              last_slow_data_request = now_ms;
+              Serial.println("ComfoAir: Slow data request cycle complete");
+            } else {
+              slow_data_step++;
+            }
+          }
+        } else if (slow_data_request_initialized && now_ms - last_slow_data_request >= 600000) {
+          // Time to start a new cycle
+          Serial.println("ComfoAir: Starting slow data request cycle (non-blocking)...");
+          requestFilterDays();
+          last_slow_data_step_time = now_ms;
+          slow_data_step = 1;
+        }
       }
       
       CAN_FRAME incoming;

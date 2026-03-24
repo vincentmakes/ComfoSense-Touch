@@ -20,6 +20,7 @@ WiFiClient wifiClient;
 
   void MQTT::setup() {
     this->client.setServer(MQTT_HOST, MQTT_PORT);
+    this->client.setSocketTimeout(2);  // Cap TCP operations at 2s (default 15s blocks main loop)
     this->client.setCallback([this](char* topic, unsigned char* payload, unsigned int length){
       Serial.println("-------new message from broker-----");
       Serial.print("channel:");

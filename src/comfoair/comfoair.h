@@ -53,6 +53,10 @@ namespace comfoair {
       
       // Handle device time response
       void handleDeviceTimeResponse(uint32_t device_seconds);
+
+      // Non-blocking slow data request state machine
+      uint8_t slow_data_step = 0;
+      unsigned long last_slow_data_step_time = 0;
   };
 }
 
