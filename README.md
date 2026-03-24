@@ -57,6 +57,10 @@ Watchout that Waveshare also has a 4.3in device which wouldn't work for this pro
 
 3. For the Bridge, this device is ideal: https://www.waveshare.com/esp32-s3-rs485-can.htm&aff_id=142371 . This firmware is fully compatible with it and requires few adjustments of the PINs in twai_wrapper and main.cpp to be fully functional.
 
+## Home Assistant Dashboard
+Having this setup will allow you to consume all the sensor data coming from the ComfoAir and display that in a HA Dashboard, like this one.  
+
+<img width="1375" height="680" alt="Screenshot 2026-03-19 at 19 04 09" src="https://github.com/user-attachments/assets/33675fd5-1cd1-4d7a-a215-ed56c2348054" />
 
 
 ## How to use : Flashing the firmware in the ESP32 development board
