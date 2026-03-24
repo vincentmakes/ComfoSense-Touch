@@ -89,7 +89,7 @@ WiFiClient wifiClient;
       std::string s = it->first;
       Serial.print("Subscribing to: ");
       Serial.println(s.c_str());
-      client.subscribe(s.c_str());
+      client.subscribe(s.c_str(), 1);  // QoS 1: broker guarantees delivery
     }
   }
 
