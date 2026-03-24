@@ -72,6 +72,11 @@ char mqttTopicMsgBuf[30];
 char mqttTopicValBuf[30];
 char otherBuf[30];
 
+// Track last published MQTT values — only publish on change to reduce broker load
+#include <map>
+#include <string>
+static std::map<std::string, std::string> lastPublishedValues;
+
 
 namespace comfoair {
   ComfoAir::ComfoAir() : 
@@ -425,22 +430,28 @@ namespace comfoair {
                         strlen(decoded_name));
                         */
           
-          // Publish to MQTT - use local copies
-          // Only retain key state topics (fan_speed, temps, humidity, filter, errors)
-          // Retaining ALL topics floods the broker with disk writes and can slow command delivery
+          // Publish to MQTT - only when value CHANGES (reduces broker load dramatically)
+          // CAN bus sends the same values many times per second; publishing every one
+          // floods the broker and can cause the client to drop messages (e.g. fan_speed updates)
           if (mqtt) {
-            sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decoded_name);
-            sprintf(mqttTopicValBuf, "%s", decoded_val);
-            bool retain = (strcmp(decoded_name, "fan_speed") == 0 ||
-                           strcmp(decoded_name, "extract_air_temp") == 0 ||
-                           strcmp(decoded_name, "outdoor_air_temp") == 0 ||
-                           strcmp(decoded_name, "extract_air_humidity") == 0 ||
-                           strcmp(decoded_name, "outdoor_air_humidity") == 0 ||
-                           strcmp(decoded_name, "temp_profile") == 0 ||
-                           strcmp(decoded_name, "remaining_days_filter_replacement") == 0 ||
-                           strcmp(decoded_name, "error_overheating") == 0 ||
-                           strcmp(decoded_name, "alarm_filter") == 0);
-            mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf, retain);
+            std::string nameKey(decoded_name);
+            std::string newVal(decoded_val);
+            auto it = lastPublishedValues.find(nameKey);
+            if (it == lastPublishedValues.end() || it->second != newVal) {
+              lastPublishedValues[nameKey] = newVal;
+              sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decoded_name);
+              sprintf(mqttTopicValBuf, "%s", decoded_val);
+              bool retain = (strcmp(decoded_name, "fan_speed") == 0 ||
+                             strcmp(decoded_name, "extract_air_temp") == 0 ||
+                             strcmp(decoded_name, "outdoor_air_temp") == 0 ||
+                             strcmp(decoded_name, "extract_air_humidity") == 0 ||
+                             strcmp(decoded_name, "outdoor_air_humidity") == 0 ||
+                             strcmp(decoded_name, "temp_profile") == 0 ||
+                             strcmp(decoded_name, "remaining_days_filter_replacement") == 0 ||
+                             strcmp(decoded_name, "error_overheating") == 0 ||
+                             strcmp(decoded_name, "alarm_filter") == 0);
+              mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf, retain);
+            }
           }
           // âœ… DEBUG: Check routing logic
          // Serial.println("  â†’ Checking sensor data routing...");
