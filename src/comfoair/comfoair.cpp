@@ -123,6 +123,16 @@ namespace comfoair {
       Serial.println("ComfoAir: sendCommand() called in Remote Client Mode - command ignored");
       return false;
     #else
+      // Track sent speed for dedup — prevents HA echoes from overriding
+      // touch-initiated commands (e.g. user presses 1→2→3, HA echo for "2"
+      // would otherwise override "3")
+      if (strncmp(command, "ventilation_level_", 18) == 0) {
+        uint8_t speed = command[18] - '0';
+        if (speed <= 3) {
+          last_sent_fan_speed = speed;
+          last_fan_speed_command_time = millis();
+        }
+      }
       return comfoMessage.sendCommand(command);
     #endif
   }
