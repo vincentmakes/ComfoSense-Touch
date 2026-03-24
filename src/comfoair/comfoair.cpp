@@ -327,7 +327,7 @@ namespace comfoair {
       
       // Initialize: schedule first slow data request ~8s after boot
       if (!slow_data_request_initialized) {
-        last_slow_data_request = millis() - 14400000 + 8000;  // Trigger in ~8s, then every 4 hours
+        last_slow_data_request = millis() - 600000 + 8000;  // Trigger in ~8s, then every 10 min
         slow_data_request_initialized = true;
       }
 
@@ -351,7 +351,7 @@ namespace comfoair {
               slow_data_step++;
             }
           }
-        } else if (slow_data_request_initialized && now_ms - last_slow_data_request >= 14400000) {  // 4 hours
+        } else if (slow_data_request_initialized && now_ms - last_slow_data_request >= 600000) {  // 10 min
           // Time to start a new cycle
           Serial.println("ComfoAir: Starting slow data request cycle (non-blocking)...");
           requestFilterDays();
