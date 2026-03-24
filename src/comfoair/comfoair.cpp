@@ -73,10 +73,14 @@ char mqttTopicValBuf[30];
 char otherBuf[30];
 
 // Track last published MQTT values — only publish on change to reduce broker load
-// Every HEARTBEAT_INTERVAL_MS, clear the map to force-republish ALL values
-#include <map>
-#include <string>
-static std::map<std::string, std::string> lastPublishedValues;
+// Zero heap allocation: fixed arrays with strcmp (no std::map/std::string)
+#define MAX_PUBLISHED_TOPICS 24
+struct LastPublishedEntry {
+  char name[40];
+  char value[30];
+};
+static LastPublishedEntry lastPublished[MAX_PUBLISHED_TOPICS];
+static uint8_t lastPublishedCount = 0;
 static unsigned long lastHeartbeatTime = 0;
 static const unsigned long HEARTBEAT_INTERVAL_MS = 10000;  // Force-republish all values every 10s
 
@@ -444,22 +448,40 @@ namespace comfoair {
                         */
           
           // Publish to MQTT — only when value CHANGES (reduces broker load ~95%)
-          // CAN bus sends the same values many times per second; publishing every one
-          // overwhelms PubSubClient on remote clients (512-byte buffer, 1 msg/loop).
-          // Periodic heartbeat (clear map every 10s) ensures HA/clients recover from missed publishes.
+          // Uses fixed arrays (zero heap allocation) to avoid ESP32 malloc fragmentation
+          // that was causing TWAI RX queue overflow and dropped CAN frames.
+          // Heartbeat: reset count every 10s to force-republish ALL values.
           if (mqtt) {
-            // Heartbeat: clear the map periodically so ALL values get republished
             unsigned long now_pub = millis();
             if (now_pub - lastHeartbeatTime >= HEARTBEAT_INTERVAL_MS) {
               lastHeartbeatTime = now_pub;
-              lastPublishedValues.clear();
+              lastPublishedCount = 0;  // Reset → forces republish of all values
             }
 
-            std::string nameKey(decoded_name);
-            std::string newVal(decoded_val);
-            auto it = lastPublishedValues.find(nameKey);
-            if (it == lastPublishedValues.end() || it->second != newVal) {
-              lastPublishedValues[nameKey] = newVal;
+            // Linear scan of fixed array (tiny — ~20 entries max)
+            bool found = false;
+            bool changed = true;
+            for (uint8_t i = 0; i < lastPublishedCount; i++) {
+              if (strcmp(lastPublished[i].name, decoded_name) == 0) {
+                found = true;
+                if (strcmp(lastPublished[i].value, decoded_val) == 0) {
+                  changed = false;  // Same value — skip publish
+                } else {
+                  strncpy(lastPublished[i].value, decoded_val, sizeof(lastPublished[i].value) - 1);
+                  lastPublished[i].value[sizeof(lastPublished[i].value) - 1] = '\0';
+                }
+                break;
+              }
+            }
+            if (!found && lastPublishedCount < MAX_PUBLISHED_TOPICS) {
+              strncpy(lastPublished[lastPublishedCount].name, decoded_name, sizeof(lastPublished[0].name) - 1);
+              lastPublished[lastPublishedCount].name[sizeof(lastPublished[0].name) - 1] = '\0';
+              strncpy(lastPublished[lastPublishedCount].value, decoded_val, sizeof(lastPublished[0].value) - 1);
+              lastPublished[lastPublishedCount].value[sizeof(lastPublished[0].value) - 1] = '\0';
+              lastPublishedCount++;
+            }
+
+            if (changed) {
               sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decoded_name);
               sprintf(mqttTopicValBuf, "%s", decoded_val);
               bool retain = (strcmp(decoded_name, "fan_speed") == 0 ||
