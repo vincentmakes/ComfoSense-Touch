@@ -84,13 +84,36 @@ WiFiClient wifiClient;
   }
 
   void MQTT::subscribeToTopics() {
-    std::map<std::string, std::function<void(char*, uint8_t*, unsigned int)>>::iterator it;
-    for (it=callbackMap.begin(); it!=callbackMap.end(); ++it) {
-      std::string s = it->first;
-      Serial.print("Subscribing to: ");
-      Serial.println(s.c_str());
-      client.subscribe(s.c_str(), 1);  // QoS 1: broker guarantees delivery
+    int count = 0;
+    int failed = 0;
+    for (auto it = callbackMap.begin(); it != callbackMap.end(); ++it) {
+      const char* topic = it->first.c_str();
+
+      // Retry each subscription up to 3 times
+      bool ok = false;
+      for (int attempt = 0; attempt < 3 && !ok; attempt++) {
+        ok = client.subscribe(topic, 1);
+        if (!ok) {
+          // Let TCP stack flush before retrying
+          delay(10);
+          client.loop();
+        }
+      }
+
+      if (!ok) {
+        Serial.print("SUBSCRIBE FAILED: ");
+        Serial.println(topic);
+        failed++;
+      }
+      count++;
+
+      // Yield every 4 subscriptions to let TCP stack breathe
+      if (count % 4 == 0) {
+        delay(5);
+        client.loop();  // Process any incoming SUBACK/retained messages
+      }
     }
+    Serial.printf("MQTT: Subscribed to %d topics (%d failed)\n", count, failed);
   }
 
 } // namespace comfoair
