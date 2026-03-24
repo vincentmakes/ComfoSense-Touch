@@ -12,7 +12,7 @@ namespace comfoair {
       void subscribeTo(const char* topic, MQTT_CALLBACK_SIGNATURE);
       void setup();
       void loop();
-      void writeToTopic(const char* topic,const char* payload);
+      void writeToTopic(const char* topic, const char* payload, bool retained = false);
 
     private:
       PubSubClient client;

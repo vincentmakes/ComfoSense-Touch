@@ -3,6 +3,7 @@
 #include "../ui/GUI.h"
 #include "../mqtt/mqtt.h"
 #include "../secrets.h"
+#include "../board_config.h"  // For hasDisplay()
 
 // C wrapper functions to interface with C GUI events
 extern "C" {
@@ -408,8 +409,9 @@ void ControlManager::sendTempProfileCommand(uint8_t profile) {
 extern "C" {
 
 void GUI_update_fan_speed_display_from_cpp(uint8_t speed, bool boost) {
+    if (!hasDisplay()) return;
     Serial.printf("GUI: Updating fan speed display - speed=%d, boost=%d\n", speed, boost);
-    
+
     // 1. Hide all fan speed images first
     lv_obj_set_style_opa(GUI_Image__screen__fanspeed0, LV_OPA_0, 0);
     lv_obj_set_style_opa(GUI_Image__screen__fanspeed1, LV_OPA_0, 0);
@@ -452,15 +454,17 @@ void GUI_update_fan_speed_display_from_cpp(uint8_t speed, bool boost) {
 }
 
 void GUI_update_temp_profile_display_from_cpp(uint8_t profile) {
+    if (!hasDisplay()) return;
     // Temperature profile display update logic
     Serial.printf("GUI: Update temp profile display to %d\n", profile);
     // TODO: Implement temperature profile display updates if needed
 }
 
 void GUI_update_boost_timer_display(int minutes_remaining) {
+    if (!hasDisplay()) return;
     // FEATURE 2: Display minutes remaining in centerfan placeholder
     // Small font, white color, no background
-    
+
     if (minutes_remaining > 0) {
         char timer_text[4];
         if (minutes_remaining > 99) minutes_remaining = 99;  // Cap at 99

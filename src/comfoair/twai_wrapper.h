@@ -143,7 +143,13 @@ public:
             }
             
             if (alerts & TWAI_ALERT_TX_FAILED) {
-                Serial.println("E (Alert) TWAI: Alert 1024");
+                Serial.println("E (Alert) TWAI: TX failed");
+            }
+            if (alerts & TWAI_ALERT_RX_QUEUE_FULL) {
+                Serial.println("[TWAI] RX QUEUE FULL — frames dropped!");
+            }
+            if (alerts & TWAI_ALERT_RX_FIFO_OVERRUN) {
+                Serial.println("[TWAI] RX FIFO OVERRUN — hardware overflow!");
             }
         }
         

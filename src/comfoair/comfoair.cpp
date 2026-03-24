@@ -72,6 +72,18 @@ char mqttTopicMsgBuf[30];
 char mqttTopicValBuf[30];
 char otherBuf[30];
 
+// Track last published MQTT values — only publish on change to reduce broker load
+// Zero heap allocation: fixed arrays with strcmp (no std::map/std::string)
+#define MAX_PUBLISHED_TOPICS 24
+struct LastPublishedEntry {
+  char name[40];
+  char value[30];
+};
+static LastPublishedEntry lastPublished[MAX_PUBLISHED_TOPICS];
+static uint8_t lastPublishedCount = 0;
+static unsigned long lastHeartbeatTime = 0;
+static const unsigned long HEARTBEAT_INTERVAL_MS = 10000;  // Force-republish all values every 10s
+
 
 namespace comfoair {
   ComfoAir::ComfoAir() : 
@@ -118,6 +130,16 @@ namespace comfoair {
       Serial.println("ComfoAir: sendCommand() called in Remote Client Mode - command ignored");
       return false;
     #else
+      // Track sent speed for dedup — prevents HA echoes from overriding
+      // touch-initiated commands (e.g. user presses 1→2→3, HA echo for "2"
+      // would otherwise override "3")
+      if (strncmp(command, "ventilation_level_", 18) == 0) {
+        uint8_t speed = command[18] - '0';
+        if (speed <= 3) {
+          last_sent_fan_speed = speed;
+          last_fan_speed_command_time = millis();
+        }
+      }
       return comfoMessage.sendCommand(command);
     #endif
   }
@@ -327,7 +349,7 @@ namespace comfoair {
       
       // Initialize: schedule first slow data request ~8s after boot
       if (!slow_data_request_initialized) {
-        last_slow_data_request = millis() - 600000 + 8000;  // Trigger in ~8s
+        last_slow_data_request = millis() - 600000 + 8000;  // Trigger in ~8s, then every 10 min
         slow_data_request_initialized = true;
       }
 
@@ -351,7 +373,7 @@ namespace comfoair {
               slow_data_step++;
             }
           }
-        } else if (slow_data_request_initialized && now_ms - last_slow_data_request >= 600000) {
+        } else if (slow_data_request_initialized && now_ms - last_slow_data_request >= 600000) {  // 10 min
           // Time to start a new cycle
           Serial.println("ComfoAir: Starting slow data request cycle (non-blocking)...");
           requestFilterDays();
@@ -363,11 +385,10 @@ namespace comfoair {
       CAN_FRAME incoming;
       while (CAN0.read(incoming)) {
         can_rx_count++;
-        
+
         // Report CAN RX rate every 10 seconds
         if (millis() - last_can_rx_report >= 10000) {
-          Serial.printf("[CAN] Received %d frames in last 10s (%.1f/sec)\n", 
-                        can_rx_count, can_rx_count / 10.0);
+          Serial.printf("[CAN] rx=%d in 10s (%.1f/sec)\n", can_rx_count, can_rx_count / 10.0);
           can_rx_count = 0;
           last_can_rx_report = millis();
         }
@@ -425,11 +446,54 @@ namespace comfoair {
                         strlen(decoded_name));
                         */
           
-          // Publish to MQTT - use local copies
+          // Publish to MQTT — only when value CHANGES (reduces broker load ~95%)
+          // Uses fixed arrays (zero heap allocation) to avoid ESP32 malloc fragmentation
+          // that was causing TWAI RX queue overflow and dropped CAN frames.
+          // Heartbeat: reset count every 10s to force-republish ALL values.
           if (mqtt) {
-            sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decoded_name);
-            sprintf(mqttTopicValBuf, "%s", decoded_val);
-            mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf);
+            unsigned long now_pub = millis();
+            if (now_pub - lastHeartbeatTime >= HEARTBEAT_INTERVAL_MS) {
+              lastHeartbeatTime = now_pub;
+              lastPublishedCount = 0;  // Reset → forces republish of all values
+            }
+
+            // Linear scan of fixed array (tiny — ~20 entries max)
+            bool found = false;
+            bool changed = true;
+            for (uint8_t i = 0; i < lastPublishedCount; i++) {
+              if (strcmp(lastPublished[i].name, decoded_name) == 0) {
+                found = true;
+                if (strcmp(lastPublished[i].value, decoded_val) == 0) {
+                  changed = false;  // Same value — skip publish
+                } else {
+                  strncpy(lastPublished[i].value, decoded_val, sizeof(lastPublished[i].value) - 1);
+                  lastPublished[i].value[sizeof(lastPublished[i].value) - 1] = '\0';
+                }
+                break;
+              }
+            }
+            if (!found && lastPublishedCount < MAX_PUBLISHED_TOPICS) {
+              strncpy(lastPublished[lastPublishedCount].name, decoded_name, sizeof(lastPublished[0].name) - 1);
+              lastPublished[lastPublishedCount].name[sizeof(lastPublished[0].name) - 1] = '\0';
+              strncpy(lastPublished[lastPublishedCount].value, decoded_val, sizeof(lastPublished[0].value) - 1);
+              lastPublished[lastPublishedCount].value[sizeof(lastPublished[0].value) - 1] = '\0';
+              lastPublishedCount++;
+            }
+
+            if (changed) {
+              sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decoded_name);
+              sprintf(mqttTopicValBuf, "%s", decoded_val);
+              bool retain = (strcmp(decoded_name, "fan_speed") == 0 ||
+                             strcmp(decoded_name, "extract_air_temp") == 0 ||
+                             strcmp(decoded_name, "outdoor_air_temp") == 0 ||
+                             strcmp(decoded_name, "extract_air_humidity") == 0 ||
+                             strcmp(decoded_name, "outdoor_air_humidity") == 0 ||
+                             strcmp(decoded_name, "temp_profile") == 0 ||
+                             strcmp(decoded_name, "remaining_days_filter_replacement") == 0 ||
+                             strcmp(decoded_name, "error_overheating") == 0 ||
+                             strcmp(decoded_name, "alarm_filter") == 0);
+              mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf, retain);
+            }
           }
           // âœ… DEBUG: Check routing logic
          // Serial.println("  â†’ Checking sensor data routing...");

@@ -4,10 +4,10 @@
   triggers:
   - entity_id: sensor.mvhr_speed_select_state
     trigger: state
-  conditions:
-    # Only trigger if changed by user, not by automation
-    - condition: template
-      value_template: "{{ trigger.from_state.context.user_id != none }}"
+  # No condition needed — the firmware has a 2-second dedup window that
+  # prevents HA echo loops. Adding conditions here (e.g. comparing to
+  # sensor.mvhr_supply_fan_user_speed) can cause commands to be silently
+  # blocked when the sensor value is stale or retained.
   actions:
   - data_template:
       topic: "{% if states('sensor.mvhr_speed_select_state') == '0' %}\n  comfoair/commands/ventilation_level_0\n{%

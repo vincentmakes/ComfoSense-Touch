@@ -932,8 +932,11 @@ void setup() {
 
 void loop() {
   static unsigned long last_touch_read = 0;
-  static unsigned long last_can_process = 0;
-  
+
+  // Early MQTT drain — process pending messages BEFORE LVGL blocks (10-50ms redraws)
+  // Only needed with display; headless loop is fast enough with the single mqtt->loop() below
+  if (hasDisplay() && wifi && wifi->isConnected() && mqtt) mqtt->loop();
+
   // ============================================================================
   // CONDITIONAL DISPLAY UPDATES (only on Touch LCD board — V3 or V4)
   // ============================================================================
@@ -975,12 +978,10 @@ void loop() {
   // CAN PROCESSING (only in non-remote client mode)
   // ============================================================================
   #if !defined(REMOTE_CLIENT_MODE) || !REMOTE_CLIENT_MODE
-    // ✅ PRIORITY 4: CAN processing throttled to 10ms (prevent flooding)
-    unsigned long now = millis();
-    if (now - last_can_process >= 10) {
-      if (comfo) comfo->loop();
-      last_can_process = now;
-    }
+    // No throttle — comfo->loop() drains all queued RX frames in a while loop.
+    // The old 10ms throttle let the 32-frame TWAI RX queue overflow during
+    // LVGL redraws (10-50ms), dropping CAN frames from the MVHR.
+    if (comfo) comfo->loop();
   #endif
   
   // ✅ PRIORITY 5: Manager loops (these handle batched updates)
