@@ -459,3 +459,6 @@ Note I made the decision to consider the bypass on when open factor to be 85 % o
 
 Note, as it is also the case for the fan speed set through MQTT, after the two hours have passed since setting the fan speed manually (or one hour for the bypass state), the MVHR unit should automatically fall back to auto mode for the given function (fan or bypass) with no need for human intervention.
 
+## Links
+
+[![Hypercommit](https://img.shields.io/badge/Hypercommit-DB2475)](https://hypercommit.com/comfosense-touch)
