@@ -933,13 +933,6 @@ void setup() {
 void loop() {
   static unsigned long last_touch_read = 0;
 
-  // ── Loop timing diagnostics (reported every 10s in web logs) ──
-  static unsigned long loop_count = 0;
-  static unsigned long loop_max_us = 0;
-  static unsigned long loop_total_us = 0;
-  static unsigned long loop_diag_time = 0;
-  unsigned long loop_start = micros();
-
   // Early MQTT drain — process pending messages BEFORE LVGL blocks (10-50ms redraws)
   // Only needed with display; headless loop is fast enough with the single mqtt->loop() below
   if (hasDisplay() && wifi && wifi->isConnected() && mqtt) mqtt->loop();
@@ -1014,21 +1007,6 @@ void loop() {
     if (timeMgr) timeMgr->loop();
   }
   
-  // ── Loop timing report (every 10s) ──
-  unsigned long loop_elapsed = micros() - loop_start;
-  loop_count++;
-  loop_total_us += loop_elapsed;
-  if (loop_elapsed > loop_max_us) loop_max_us = loop_elapsed;
-  unsigned long now_diag = millis();
-  if (now_diag - loop_diag_time >= 10000) {
-    Serial.printf("[LOOP] %lu iters in 10s | avg=%luus max=%luus\n",
-                  loop_count, loop_count ? loop_total_us / loop_count : 0, loop_max_us);
-    loop_count = 0;
-    loop_total_us = 0;
-    loop_max_us = 0;
-    loop_diag_time = now_diag;
-  }
-
   // Small delay to allow other tasks
   delay(1);
 

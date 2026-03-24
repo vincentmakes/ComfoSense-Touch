@@ -433,6 +433,9 @@ automation: !include automations.yaml
 
 First automation listens for changes to the created "input_select", which are triggered when choosing a different ventilation speed from the GUI using the drop down. It then runs an action (defined as a template) so that depending on the value chosen in the drop down, the MQTT topic published is the corredponding one.
 
+> [!IMPORTANT]
+> The speed select automation should **not** have any condition checking the current fan speed sensor. The firmware has a built-in 2-second dedup window that prevents HA echo loops (where HA sees a state change and echoes the command back). Adding conditions in the automation (e.g., comparing against `sensor.mvhr_supply_fan_user_speed`) can silently block commands when the sensor value is stale or retained.
+
 The second automation is to keep the selected ventilation speed in the drop down synced with the current ventilation speed (as you can still change things using the unit's physical interface and buttons). It listens to changes to the "sensor.mvhr_supply_fan_user_speed" entity, which shows the numerical value for the ventilation speed, and maps to the corresponding textual value in the drop down.
 
 When all these bits are added in the config, YAML files reloaded, all that remains to be done is adding the "input_select.mvhr_ventilation_speed" as any other entity to a Lovelace card in the GUI.

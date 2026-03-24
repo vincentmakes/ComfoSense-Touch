@@ -341,11 +341,6 @@ namespace comfoair {
       static bool first_message = true;
       static unsigned long last_can_rx_report = 0;
       static int can_rx_count = 0;
-      static int can_decoded_count = 0;
-      static int mqtt_published_count = 0;
-      static int mqtt_deduped_count = 0;
-      static unsigned long mqtt_publish_total_us = 0;
-      static unsigned long mqtt_publish_max_us = 0;
       
       // ✅ Request slow-changing data periodically (every 4 hours)
       // Filter days, target temp, bypass status, and operating mode change very slowly
@@ -390,30 +385,11 @@ namespace comfoair {
       CAN_FRAME incoming;
       while (CAN0.read(incoming)) {
         can_rx_count++;
-        
+
         // Report CAN RX rate every 10 seconds
         if (millis() - last_can_rx_report >= 10000) {
-          Serial.printf("[CAN] rx=%d decoded=%d pub=%d dedup=%d in 10s (%.1f/sec)\n",
-                        can_rx_count, can_decoded_count, mqtt_published_count, mqtt_deduped_count,
-                        can_rx_count / 10.0);
-          if (mqtt_published_count > 0) {
-            Serial.printf("[CAN] mqtt_pub avg=%luus max=%luus\n",
-                          mqtt_publish_total_us / mqtt_published_count, mqtt_publish_max_us);
-          }
-          // TWAI driver status — shows TX/RX queue usage
-          twai_status_info_t twai_status;
-          if (twai_get_status_info(&twai_status) == ESP_OK) {
-            Serial.printf("[TWAI] state=%d tx_err=%d rx_err=%d rx_missed=%d arb_lost=%d\n",
-                          twai_status.state, twai_status.tx_error_counter,
-                          twai_status.rx_error_counter, twai_status.rx_missed_count,
-                          twai_status.arb_lost_count);
-          }
+          Serial.printf("[CAN] rx=%d in 10s (%.1f/sec)\n", can_rx_count, can_rx_count / 10.0);
           can_rx_count = 0;
-          can_decoded_count = 0;
-          mqtt_published_count = 0;
-          mqtt_deduped_count = 0;
-          mqtt_publish_total_us = 0;
-          mqtt_publish_max_us = 0;
           last_can_rx_report = millis();
         }
         
@@ -430,7 +406,6 @@ namespace comfoair {
         memset(&this->decodedMessage, 0, sizeof(DecodedMessage));
         
         if (this->comfoMessage.decode(&this->canMessage, &this->decodedMessage)) {
-          can_decoded_count++;
           // âœ… Make local copies IMMEDIATELY after decode to prevent corruption
           char decoded_name[40];
           char decoded_val[15];
@@ -517,14 +492,7 @@ namespace comfoair {
                              strcmp(decoded_name, "remaining_days_filter_replacement") == 0 ||
                              strcmp(decoded_name, "error_overheating") == 0 ||
                              strcmp(decoded_name, "alarm_filter") == 0);
-              unsigned long pub_start = micros();
               mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf, retain);
-              unsigned long pub_us = micros() - pub_start;
-              mqtt_published_count++;
-              mqtt_publish_total_us += pub_us;
-              if (pub_us > mqtt_publish_max_us) mqtt_publish_max_us = pub_us;
-            } else {
-              mqtt_deduped_count++;
             }
           }
           // âœ… DEBUG: Check routing logic

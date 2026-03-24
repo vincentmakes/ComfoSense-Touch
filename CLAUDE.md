@@ -29,6 +29,8 @@ MVHR -> CAN -> ComfoAir::loop() decode -> MQTT publish + ControlManager update -
 ### Important: HA Echo Loop Prevention
 HA's MQTT integration echoes commands back when it sees state changes. The bridge has a 2-second dedup window (`last_sent_fan_speed` / `last_fan_speed_command_time` in comfoair.cpp) that prevents these echoes from creating infinite loops. **Both touch and MQTT command paths must update these dedup variables** — otherwise HA echoes from a previous speed change can override the current one (e.g., user presses 1->2->3, HA echo for "2" arrives and reverts to 2).
 
+**Do NOT add echo-prevention conditions in HA automations** (e.g., comparing `trigger.to_state.state` to a fan speed sensor). The firmware dedup handles this. HA-side conditions can silently block commands when the sensor value is stale or retained — this is especially problematic for `fan_speed` which is published with retain.
+
 ### MQTT Publishing
 - Always publish every decoded CAN value to MQTT (do NOT deduplicate/publish-on-change) — at QoS 0, HA can miss a single publish and never recover until the next change
 - Only retain key topics: `fan_speed`, temps, humidity, `temp_profile`, filter, errors
@@ -54,3 +56,5 @@ HA's MQTT integration echoes commands back when it sees state changes. The bridg
 - `sendCommand()` in message.cpp previously leaked `new std::vector` per call — use stack allocation instead
 - MQTT socket timeout must be low (2s) to avoid blocking main loop (default PubSubClient is 15s)
 - The LVGL memory pool is fixed at 128KB with no expansion — avoid unnecessary widget creation/destruction
+- **Headless mode (no display):** All GUI update functions (`GUI_update_fan_speed_display_from_cpp`, etc.) must guard with `if (!hasDisplay()) return;` — LVGL is not initialized in headless bridge mode and calling `lv_obj_*` on null pointers crashes
+- **MQTT subscriptions:** PubSubClient's `subscribe()` can silently fail when many subscriptions are sent in rapid succession (TCP write buffer overflow). `mqtt.cpp` retries failed subscriptions and yields between batches to prevent this
