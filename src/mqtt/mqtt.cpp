@@ -20,6 +20,7 @@ WiFiClient wifiClient;
 
   void MQTT::setup() {
     this->client.setServer(MQTT_HOST, MQTT_PORT);
+    this->client.setSocketTimeout(2);  // Cap TCP operations at 2s (default 15s blocks main loop)
     this->client.setCallback([this](char* topic, unsigned char* payload, unsigned int length){
       Serial.println("-------new message from broker-----");
       Serial.print("channel:");
@@ -37,30 +38,36 @@ WiFiClient wifiClient;
   }
 
   void MQTT::writeToTopic(const char* topic,const char* payload) {
-    this->ensureConnected();
+    if (!this->client.connected()) {
+      return;  // Skip publish when disconnected; data re-sent on next cycle
+    }
     this->client.publish(topic, payload);
   }
 
 // PRIVATE STUFF
 
   void MQTT::ensureConnected() {
-    // Loop until we're reconnected
-    while (!this->client.connected()) {
-        Serial.print("Attempting MQTT connection...");
-        // Create a random client ID
-        // Attempt to connect
-        String clientId = "ESP32Client-";
-        clientId += String(random(0xffff), HEX);
-        if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASS)) {
-            Serial.println("connected");
-            subscribeToTopics();
-        } else {
-            Serial.print("failed, rc=");
-            Serial.print(client.state());
-            Serial.println(" try again in 5 seconds");
-            // Wait 5 seconds before retrying
-            delay(5000);
-        }
+    if (this->client.connected()) {
+      return;
+    }
+
+    // Non-blocking: only attempt reconnection every 5 seconds
+    unsigned long now = millis();
+    if (now - lastReconnectAttempt < 5000) {
+      return;
+    }
+    lastReconnectAttempt = now;
+
+    Serial.print("Attempting MQTT connection...");
+    String clientId = "ESP32Client-";
+    clientId += String(random(0xffff), HEX);
+    if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASS)) {
+      Serial.println("connected");
+      subscribeToTopics();
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" will retry in 5 seconds");
     }
   }
 

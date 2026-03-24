@@ -184,6 +184,5 @@ const char* serverIndex =
 
   void OTA::loop() {
     server.handleClient();
-    delay(1);
   }
 }

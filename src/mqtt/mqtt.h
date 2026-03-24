@@ -17,6 +17,7 @@ namespace comfoair {
     private:
       PubSubClient client;
       std::map<std::string, std::function<void(char*, uint8_t*, unsigned int)>> callbackMap;
+      unsigned long lastReconnectAttempt = 0;
       void subscribeToTopics();
       void ensureConnected();
   };
