@@ -30,7 +30,7 @@ MVHR -> CAN -> ComfoAir::loop() decode -> MQTT publish + ControlManager update -
 HA's MQTT integration echoes commands back when it sees state changes. The bridge has a 2-second dedup window (`last_sent_fan_speed` / `last_fan_speed_command_time` in comfoair.cpp) that prevents these echoes from creating infinite loops. **Both touch and MQTT command paths must update these dedup variables** — otherwise HA echoes from a previous speed change can override the current one (e.g., user presses 1->2->3, HA echo for "2" arrives and reverts to 2).
 
 ### MQTT Publishing
-- Only publish state changes (value differs from last published) to avoid flooding the broker
+- Always publish every decoded CAN value to MQTT (do NOT deduplicate/publish-on-change) — at QoS 0, HA can miss a single publish and never recover until the next change
 - Only retain key topics: `fan_speed`, temps, humidity, `temp_profile`, filter, errors
 - Retaining ALL topics floods the broker with disk writes and slows command delivery
 
