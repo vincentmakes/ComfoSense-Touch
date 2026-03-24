@@ -429,7 +429,7 @@ namespace comfoair {
           if (mqtt) {
             sprintf(mqttTopicMsgBuf, "%s/%s", MQTT_PREFIX, decoded_name);
             sprintf(mqttTopicValBuf, "%s", decoded_val);
-            mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf);
+            mqtt->writeToTopic(mqttTopicMsgBuf, mqttTopicValBuf, true);  // retained: client gets latest on reconnect
           }
           // âœ… DEBUG: Check routing logic
          // Serial.println("  â†’ Checking sensor data routing...");
