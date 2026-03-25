@@ -19,7 +19,7 @@ ControlManager::ControlManager()
       mqtt(nullptr),
       current_fan_speed(2), 
       speed_before_boost(2),
-      current_temp_profile(0),
+      current_temp_profile(255),
       boost_timer_active(false),
       boost_end_time(0),
       last_timer_update(0),
@@ -41,7 +41,7 @@ void ControlManager::setup() {
     speed_before_boost = 2;
     boost_timer_active = false;
     boost_end_time = 0;
-    current_temp_profile = 0;
+    current_temp_profile = 255;
     
     #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
         Serial.println("ControlManager: Ready (Remote Client Mode - commands via MQTT)");
@@ -455,9 +455,15 @@ void GUI_update_fan_speed_display_from_cpp(uint8_t speed, bool boost) {
 
 void GUI_update_temp_profile_display_from_cpp(uint8_t profile) {
     if (!hasDisplay()) return;
-    // Temperature profile display update logic
     Serial.printf("GUI: Update temp profile display to %d\n", profile);
-    // TODO: Implement temperature profile display updates if needed
+
+    // profile: 0=NORMAL, 1=COOLING, 2=HEATING
+    // dropdown options: "NORMAL\nCOOLING\nHEATING" (indices 0, 1, 2)
+    if (profile > 2) return;
+
+    lv_dropdown_set_selected(GUI_Dropdown__screen__modedropdown, profile);
+    GUI_request_display_refresh();
+    lv_obj_invalidate(GUI_Dropdown__screen__modedropdown);
 }
 
 void GUI_update_boost_timer_display(int minutes_remaining) {
