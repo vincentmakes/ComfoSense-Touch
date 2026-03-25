@@ -46,10 +46,9 @@ namespace comfoair {
       TimeManager* timeManager;
       ErrorDataManager* errorManager;  // ← NEW
       
-      // ✅ Time-based deduplication (tracks SENT commands, not CAN state)
-      uint8_t last_sent_fan_speed;  // Last speed we SENT via command
-      unsigned long last_fan_speed_command_time;  // When we sent it
-      uint8_t current_fan_speed;  // Current speed from CAN (for display)
+      // Echo detection: ignore MQTT commands matching CAN-confirmed speed
+      unsigned long last_fan_speed_command_time;  // When we last sent a speed command
+      uint8_t current_fan_speed;  // CAN-confirmed MVHR speed (used for echo detection)
       
       // Handle device time response
       void handleDeviceTimeResponse(uint32_t device_seconds);

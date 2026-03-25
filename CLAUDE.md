@@ -27,7 +27,7 @@ MVHR -> CAN -> ComfoAir::loop() decode -> MQTT publish + ControlManager update -
 - Commands: `comfoair/commands/<command>` (e.g., `comfoair/commands/ventilation_level_2`) — received from HA
 
 ### Important: HA Echo Loop Prevention
-HA's MQTT integration echoes commands back when it sees state changes. The bridge has a 2-second dedup window (`last_sent_fan_speed` / `last_fan_speed_command_time` in comfoair.cpp) that prevents these echoes from creating infinite loops. **Both touch and MQTT command paths must update these dedup variables** — otherwise HA echoes from a previous speed change can override the current one (e.g., user presses 1->2->3, HA echo for "2" arrives and reverts to 2).
+HA's MQTT integration echoes commands back when it sees state changes. The bridge detects these echoes by comparing the requested speed against `current_fan_speed` (CAN-confirmed MVHR speed) within a 2-second window after the last command (`last_fan_speed_command_time` in comfoair.cpp). This approach is more robust than tracking `last_sent_fan_speed` because HA echoes always match the *current* MVHR speed, while rapid user sequences (1→2→1) won't be falsely deduped — the echo from step 1 can't poison the dedup state since it matches current CAN speed, not the last-sent value. **Both touch and MQTT command paths must update `last_fan_speed_command_time`** to enable echo detection.
 
 **Do NOT add echo-prevention conditions in HA automations** (e.g., comparing `trigger.to_state.state` to a fan speed sensor). The firmware dedup handles this. HA-side conditions can silently block commands when the sensor value is stale or retained — this is especially problematic for `fan_speed` which is published with retain.
 

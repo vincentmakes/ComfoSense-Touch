@@ -46,22 +46,24 @@ void printFrame2(CAN_FRAME *message)
     else if (strcmp(command, "ventilation_level_2") == 0) requested_speed = 2; \
     else if (strcmp(command, "ventilation_level_3") == 0) requested_speed = 3; \
     \
-    /* Check if this is a duplicate of the last command we sent */ \
+    /* Dedup: ignore if requested speed matches CAN-confirmed MVHR speed */ \
+    /* AND a command was sent recently (i.e. this is an HA echo).         */ \
+    /* Using current_fan_speed (not last_sent) so HA echoes can't poison  */ \
+    /* the dedup state when rapid 1→2→1 sequences are sent.               */ \
     unsigned long now = millis(); \
-    bool is_duplicate = (requested_speed != 255 && \
-                        requested_speed == this->last_sent_fan_speed && \
-                        now - this->last_fan_speed_command_time < 2000); /* 2 second window */ \
+    bool is_echo = (requested_speed != 255 && \
+                    requested_speed == this->current_fan_speed && \
+                    now - this->last_fan_speed_command_time < 2000); \
     \
-    if (is_duplicate) { \
-      Serial.printf("    Duplicate ignored - just sent speed %d %lu ms ago\n", \
+    if (is_echo) { \
+      Serial.printf("    Echo ignored - MVHR already at speed %d (cmd %lu ms ago)\n", \
                     requested_speed, now - this->last_fan_speed_command_time); \
     } else { \
       Serial.printf("  Sending command to MVHR\n"); \
       this->comfoMessage.sendCommand(command); \
       \
-      /* Track this command */ \
+      /* Track command time for echo detection */ \
       if (requested_speed != 255) { \
-        this->last_sent_fan_speed = requested_speed; \
         this->last_fan_speed_command_time = now; \
       } \
     } \
@@ -92,7 +94,6 @@ namespace comfoair {
     controlManager(nullptr),
     timeManager(nullptr),
     errorManager(nullptr),
-    last_sent_fan_speed(255),
     last_fan_speed_command_time(0),
     current_fan_speed(255) {}  // â† Time-based deduplication
 
@@ -130,13 +131,10 @@ namespace comfoair {
       Serial.println("ComfoAir: sendCommand() called in Remote Client Mode - command ignored");
       return false;
     #else
-      // Track sent speed for dedup — prevents HA echoes from overriding
-      // touch-initiated commands (e.g. user presses 1→2→3, HA echo for "2"
-      // would otherwise override "3")
+      // Track command time for echo detection — prevents HA echoes
       if (strncmp(command, "ventilation_level_", 18) == 0) {
         uint8_t speed = command[18] - '0';
         if (speed <= 3) {
-          last_sent_fan_speed = speed;
           last_fan_speed_command_time = millis();
         }
       }
@@ -287,21 +285,20 @@ namespace comfoair {
             Serial.println(otherBuf);
 
             
-            // Check for duplicate
+            // Dedup: ignore if speed matches CAN-confirmed MVHR speed (HA echo)
             uint8_t requested_speed = _2[0] - 48;
             unsigned long now = millis();
-            bool is_duplicate = (requested_speed <= 3 && 
-                                requested_speed == this->last_sent_fan_speed && 
-                                now - this->last_fan_speed_command_time < 2000);
-            
-            if (is_duplicate) {
-              Serial.printf(" Duplicate ignored - just sent speed %d %lu ms ago\n", 
+            bool is_echo = (requested_speed <= 3 &&
+                            requested_speed == this->current_fan_speed &&
+                            now - this->last_fan_speed_command_time < 2000);
+
+            if (is_echo) {
+              Serial.printf("    Echo ignored - MVHR already at speed %d (cmd %lu ms ago)\n",
                             requested_speed, now - this->last_fan_speed_command_time);
 
             } else {
               Serial.printf("  Sending command to MVHR\n");
 
-              this->last_sent_fan_speed = requested_speed;
               this->last_fan_speed_command_time = now;
               return this->comfoMessage.sendCommand(otherBuf);
             }
