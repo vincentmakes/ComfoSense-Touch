@@ -223,6 +223,15 @@ namespace comfoair {
     #endif
   }
 
+  void ComfoAir::requestTempProfile() {
+    #if defined(REMOTE_CLIENT_MODE) && REMOTE_CLIENT_MODE
+      Serial.println("ComfoAir: requestTempProfile() not supported in Remote Client Mode");
+    #else
+      Serial.println("ComfoAir: Requesting temp profile via CAN...");
+      comfoMessage.requestTempProfile();
+    #endif
+  }
+
   void ComfoAir::setup() {
 
     
@@ -360,9 +369,10 @@ namespace comfoair {
               case 1: requestTargetTemp(); break;
               case 2: requestBypassStatus(); break;
               case 3: requestOperatingMode(); break;
+              case 4: requestTempProfile(); break;
             }
             last_slow_data_step_time = now_ms;
-            if (slow_data_step >= 3) {
+            if (slow_data_step >= 4) {
               slow_data_step = 0;  // Cycle complete
               last_slow_data_request = now_ms;
               Serial.println("ComfoAir: Slow data request cycle complete");

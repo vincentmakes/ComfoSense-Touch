@@ -35,6 +35,7 @@ namespace comfoair {
       void requestTargetTemp();        // PDOID 212 - Target temperature
       void requestBypassStatus();      // PDOID 66  - Bypass activation mode
       void requestOperatingMode();     // PDOID 49  - Operating mode
+      void requestTempProfile();       // PDOID 67  - Temperature profile
       
     private:
       CAN_FRAME canMessage;

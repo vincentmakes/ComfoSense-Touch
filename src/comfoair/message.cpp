@@ -557,7 +557,34 @@ namespace comfoair {
     } else {
       Serial.println("ComfoMessage: Operating mode request failed (no CAN ACK)");
     }
-    
+
+    return success;
+  }
+
+  // ============================================================================
+  // Request Temp Profile (PDOID 67)
+  // ============================================================================
+  bool ComfoMessage::requestTempProfile() {
+    Serial.println("ComfoMessage: Requesting temp profile (RTR for PDOID 67)");
+
+    // PDOID 67 = temp_profile
+    // CAN ID: (67 << 14) | 0x41 = 0x0010C041
+
+    CAN_FRAME rtr_message;
+    rtr_message.id = 0x0010C041;
+    rtr_message.extended = true;
+    rtr_message.rtr = true;
+    rtr_message.length = 0;
+    memset(rtr_message.data.byte, 0, 8);
+
+    bool success = CAN0.sendFrame(rtr_message);
+
+    if (success) {
+      Serial.println("ComfoMessage: Temp profile request sent (RTR to 0x0010C041)");
+    } else {
+      Serial.println("ComfoMessage: Temp profile request failed (no CAN ACK)");
+    }
+
     return success;
   }
 
