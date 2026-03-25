@@ -1,7 +1,10 @@
 # Zehnder Comfoair Q350 MQTT bridge + Touch Screen
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/vincentmakes)  
 
-# Important Update - 19.02.2026
+## Stable release - 25.03.2026
+The latest update has several improvements, ensuring clean processing of the CAN frames/commands and making sure that all necessary data is pulled at startup. Automation yaml in Home Assistant is also updated accordingly for the fan speed control. Tested on [Waveshare ESP32-S3-RS485 CAN](https://www.waveshare.com/esp32-s3-rs485-can.htm&aff_id=142371) as MQTT Bridge (server) and [Waveshare ESP32-S3-Touch Rev4](https://www.waveshare.com/esp32-s3-touch-lcd-4.htm?&aff_id=142371) as client display
+
+## Important Update - 19.02.2026
 The firmware now works out of the box with the Rev4 version of the Waveshare LCD. It's a significant upgrade since this new board doesn't require any hardware modification to dim the screen. The new firmware still works with Rev3 and RS485-CAN Boards - no changes there.
 
 ## Introduction
