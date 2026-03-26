@@ -6,6 +6,7 @@
 #include "board_config.h"
 #include "epaper_driver.h"
 #include "ui_ventilation.h"
+#include "ui_info_panel.h"
 
 // Shared library includes
 #include "comfoair/sensor_data.h"
@@ -33,6 +34,10 @@ static comfoair::TimeManager* timeMgr = nullptr;
 static lv_display_t* display = nullptr;
 static lv_indev_t* touch_indev = nullptr;
 static TouchDrvGT911 touch;
+
+// Weather state (updated from MQTT)
+static WeatherData weather = {};
+
 
 // Touch state
 static int16_t last_touch_x = 0;
@@ -102,6 +107,7 @@ static void on_wifi_icon_update(bool connected) {
 
 static void on_time_display_update(const char* time_str, const char* date_str) {
     ui_ventilation_update_time(time_str, date_str);
+    ui_info_panel_update_time(time_str, date_str);
 }
 
 // =============================================================================
@@ -155,6 +161,39 @@ static void setup_mqtt_subscriptions() {
     mqtt->subscribeTo(MQTT_PREFIX "/alarm_filter",
         [](char* topic, uint8_t* payload, unsigned int len) {
             errorData->updateAlarmFilter(atoi((char*)payload) != 0);
+        });
+
+    // Weather data from Home Assistant
+    // HA publishes weather entity attributes to MQTT topics
+    // Configure these topics in your HA MQTT automation
+    mqtt->subscribeTo(MQTT_PREFIX "/weather/condition",
+        [](char* topic, uint8_t* payload, unsigned int len) {
+            strncpy(weather.condition, (char*)payload, sizeof(weather.condition) - 1);
+            weather.condition[sizeof(weather.condition) - 1] = '\0';
+            weather.valid = true;
+            ui_info_panel_update_weather(weather);
+        });
+    mqtt->subscribeTo(MQTT_PREFIX "/weather/temperature",
+        [](char* topic, uint8_t* payload, unsigned int len) {
+            weather.temperature = atof((char*)payload);
+            weather.valid = true;
+            ui_info_panel_update_weather(weather);
+        });
+    mqtt->subscribeTo(MQTT_PREFIX "/weather/humidity",
+        [](char* topic, uint8_t* payload, unsigned int len) {
+            weather.humidity = atof((char*)payload);
+            ui_info_panel_update_weather(weather);
+        });
+    mqtt->subscribeTo(MQTT_PREFIX "/weather/wind_speed",
+        [](char* topic, uint8_t* payload, unsigned int len) {
+            weather.wind_speed = atof((char*)payload);
+            ui_info_panel_update_weather(weather);
+        });
+    mqtt->subscribeTo(MQTT_PREFIX "/weather/wind_bearing",
+        [](char* topic, uint8_t* payload, unsigned int len) {
+            strncpy(weather.wind_bearing, (char*)payload, sizeof(weather.wind_bearing) - 1);
+            weather.wind_bearing[sizeof(weather.wind_bearing) - 1] = '\0';
+            ui_info_panel_update_weather(weather);
         });
 }
 
@@ -278,6 +317,7 @@ void setup() {
     lv_obj_set_style_bg_color(screen, lv_color_make(255, 255, 255), 0);
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
     ui_ventilation_init(screen);
+    ui_info_panel_init(screen);
 
     // Wire touch events → ControlManager
     ui_ventilation_set_fan_speed_callback([](bool increase) {

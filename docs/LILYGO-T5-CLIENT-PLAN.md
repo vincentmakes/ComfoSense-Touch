@@ -194,22 +194,22 @@ The left panel essentially recreates the current 480x480 UI within ~480x540 (sli
 3. ~~Place in `shared/ComfoSense-Shared/` (invisible to existing build)~~ ✓
 4. ~~Verify existing `pio run` is unaffected~~ ✓
 
-### Phase 2: T5 basic firmware
-1. Add `[env:t5-epaper]` to `platformio.ini` (append only)
-2. Create `src_t5/main.cpp` with T5 setup
-3. Get e-paper driver working with LVGL (hello world)
-4. Wire up WiFi + MQTT using shared library
+### Phase 2: T5 basic firmware (DONE)
+1. ~~Add `[env:t5-epaper]` to `platformio.ini` (append only)~~ ✓
+2. ~~Create `src/t5/main.cpp` with T5 setup~~ ✓
+3. ~~Get e-paper driver (epdiy HL API) working with LVGL~~ ✓
+4. ~~Wire up WiFi + MQTT using shared library~~ ✓
 
-### Phase 3: Ventilation panel
-1. Build the left-half ventilation UI in LVGL (grayscale)
-2. Create grayscale fan icons
-3. Wire data managers → UI via callbacks
-4. Test touch controls (fan speed +/-, boost, mode)
+### Phase 3: Ventilation panel (DONE)
+1. ~~Build the left-half ventilation UI in LVGL (grayscale)~~ ✓
+2. ~~Convert all LCD images to grayscale (fan0-3, boost, +/-, WiFi, warning)~~ ✓
+3. ~~Wire data managers → UI via callbacks~~ ✓
+4. ~~Wire touch controls (fan speed +/-, boost, mode dropdown)~~ ✓
 
-### Phase 4: Info panel
-1. Add time/date display (right half)
-2. Add weather integration
-3. Implement refresh strategy (full/partial scheduling)
+### Phase 4: Info panel (DONE)
+1. ~~Add large time/date display (right half)~~ ✓
+2. ~~Add weather integration (MQTT from HA: condition, temp, humidity, wind)~~ ✓
+3. ~~Refresh strategy already in place (30min full refresh in epaper_driver)~~ ✓
 
 ### Phase 5: Polish
 1. Full refresh scheduling (every ~30 min) to prevent ghosting
