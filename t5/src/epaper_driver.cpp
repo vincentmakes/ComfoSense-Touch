@@ -1,12 +1,11 @@
 #include "epaper_driver.h"
 #include "board_config.h"
 #include <Arduino.h>
-#include "epdiy.h"
+#include "epd_driver.h"
 
 // =============================================================================
-// epdiy high-level state and framebuffer
+// Framebuffer (4bpp = 2 pixels per byte, managed by us)
 // =============================================================================
-static EpdiyHighlevelState hl;
 static uint8_t* epd_framebuffer = nullptr;
 
 // LVGL draw buffers (allocated in PSRAM)
@@ -31,7 +30,6 @@ static void epaper_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* 
     int32_t x2 = area->x2;
     int32_t y2 = area->y2;
     int32_t w = x2 - x1 + 1;
-    int32_t disp_w = epd_rotated_display_width();
 
     // Convert LVGL L8 (8-bit grayscale) to epdiy 4bpp framebuffer
     // epdiy stores 2 pixels per byte: high nibble = even pixel, low nibble = odd pixel
@@ -44,7 +42,7 @@ static void epaper_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* 
             uint8_t gray4 = gray >> 4;
 
             // Pack into 4bpp framebuffer
-            uint8_t* buf_ptr = &epd_framebuffer[y * disp_w / 2 + x / 2];
+            uint8_t* buf_ptr = &epd_framebuffer[y * (EPD_WIDTH / 2) + x / 2];
             if (x % 2) {
                 *buf_ptr = (*buf_ptr & 0x0F) | (gray4 << 4);
             } else {
@@ -61,17 +59,16 @@ static void epaper_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* 
 
     // When this is the last flush chunk, push the accumulated dirty area to display
     if (lv_display_flush_is_last(disp)) {
-        EpdRect update_area = {
-            .x = (int)dirty_x1,
-            .y = (int)dirty_y1,
-            .width = (int)(dirty_x2 - dirty_x1 + 1),
-            .height = (int)(dirty_y2 - dirty_y1 + 1)
+        Rect_t update_area = {
+            .x = dirty_x1,
+            .y = dirty_y1,
+            .width = dirty_x2 - dirty_x1 + 1,
+            .height = dirty_y2 - dirty_y1 + 1
         };
 
         epd_poweron();
-        epd_hl_update_area(&hl, MODE_GC16, epd_ambient_temperature(), update_area);
-        // Use powerdown (not poweroff) to keep touch controller alive
-        epd_powerdown();
+        epd_draw_grayscale_image(update_area, epd_framebuffer);
+        epd_poweroff();
 
         // Reset dirty tracking
         dirty_x1 = INT32_MAX;
@@ -87,25 +84,24 @@ static void epaper_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* 
 // Initialize e-paper display and LVGL
 // =============================================================================
 lv_display_t* epaper_init_display() {
-    Serial.println("EPaper: Initializing epdiy driver...");
+    Serial.println("EPaper: Initializing epd_driver...");
 
-    // Initialize epdiy with the T5 4.7" V2.3 board definition
-    epd_init(&epd_board_lilygo_t5_47, &ED047TC1, EPD_LUT_64K);
+    // Initialize the e-paper driver (LilyGo-EPD47 library)
+    epd_init();
 
-    // Initialize high-level API (manages framebuffer and waveforms)
-    hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
-    epd_framebuffer = epd_hl_get_framebuffer(&hl);
-
+    // Allocate framebuffer in PSRAM (4bpp = EPD_WIDTH * EPD_HEIGHT / 2 bytes)
+    size_t fb_size = EPD_WIDTH * EPD_HEIGHT / 2;
+    epd_framebuffer = (uint8_t*)ps_calloc(sizeof(uint8_t), fb_size);
     if (!epd_framebuffer) {
-        Serial.println("EPaper: ERROR - Failed to get framebuffer from epdiy!");
+        Serial.println("EPaper: ERROR - Failed to allocate framebuffer!");
         return nullptr;
     }
-    Serial.println("EPaper: epdiy initialized with high-level API");
+    Serial.printf("EPaper: Framebuffer allocated (%d bytes in PSRAM)\n", fb_size);
 
     // Clear display on boot (full refresh)
     epd_poweron();
-    epd_fullclear(&hl, epd_ambient_temperature());
-    epd_powerdown();
+    epd_clear();
+    epd_poweroff();
     last_full_refresh = millis();
 
     Serial.println("EPaper: Display cleared (full refresh)");
@@ -158,9 +154,11 @@ void epaper_check_full_refresh() {
         Serial.println("EPaper: Performing full refresh (ghosting prevention)");
 
         epd_poweron();
-        epd_fullclear(&hl, epd_ambient_temperature());
-        epd_hl_update_screen(&hl, MODE_GC16, epd_ambient_temperature());
-        epd_powerdown();
+        epd_clear();
+        // Redraw the entire framebuffer after clearing
+        Rect_t full = epd_full_screen();
+        epd_draw_grayscale_image(full, epd_framebuffer);
+        epd_poweroff();
 
         last_full_refresh = now;
         full_refresh_requested = false;
