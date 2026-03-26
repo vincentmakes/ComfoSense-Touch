@@ -14,54 +14,48 @@ We want to build a second ComfoAir remote client using a **LILYGO T5 4.7" V2.3 e
 
 ---
 
-## Recommendation: New Repo with Shared Library (via git submodule)
+## Approach: Mono-Repo with Separate PlatformIO Environments
 
-### Why not mono-repo?
-
-The current codebase has **deep hardware coupling** that makes a single-repo multi-environment approach more painful than helpful:
-
-| Aspect | Current (Touch LCD) | T5 E-Paper |
-|---|---|---|
-| Display | 480x480 RGB565 LCD (ST7701, parallel RGB) | 960x540 4-bit grayscale e-paper (ED047TC1) |
-| Touch | GT911 I2C (SDA=15, SCL=7) | GT911 I2C (different pins) |
-| Color depth | 16-bit RGB565 | 4-bit grayscale (16 shades) |
-| Refresh | 30 FPS partial | Full refresh ~2s, partial ~0.3s |
-| LVGL config | Animations, shadows, gradients | Simplified styles, animations kept but slower |
-| Board config | V3/V4 auto-detect, IO expander | Completely different pinout, no IO expander |
-| Screen manager | Backlight PWM, dimming, sleep | No backlight, e-paper retains image |
-| Assets | Color PNGs, RGB styles | Grayscale icons, high-contrast styles |
-
-The **only reusable code** is the data/networking layer, which is a clean subset.
+Single repo keeps everything together. The shared library lives in `shared/` (NOT `lib/`),
+which PlatformIO ignores by default — zero impact on the existing Touch LCD build.
+The T5 environment explicitly references it via `lib_extra_dirs = shared`.
 
 ### Proposed Structure
 
 ```
-ComfoSense-Shared/          (git submodule, shared library)
-  comfoair/
-    sensor_data.h/cpp        # SensorDataManager (stripped of GUI calls)
-    control_manager.h/cpp    # ControlManager (stripped of GUI calls)
-    filter_data.h/cpp        # FilterDataManager (stripped of GUI calls)
-    error_data.h/cpp         # ErrorDataManager (stripped of GUI calls)
-  mqtt/
-    mqtt.h/cpp               # MQTT client wrapper
-  wifi/
-    wifi.h/cpp               # WiFi + WiFiManager
-  time/
-    time_manager.h/cpp       # NTP time sync
-
-ComfoSense-Touch/            (existing repo, unchanged for now)
-  lib/ComfoSense-Shared/     (submodule)
-  src/                       (LCD-specific UI, board config, CAN, main.cpp)
-
-ComfoSense-T5/               (new repo)
-  lib/ComfoSense-Shared/     (submodule)
-  src/
-    main.cpp                 # T5-specific setup/loop
-    board_config.h           # T5 pin definitions
-    epaper_driver.cpp        # E-paper display driver + LVGL flush
-    ui/                      # New LVGL UI for 960x540 split layout
-    weather/                 # Weather data (new feature)
+ComfoSense-Touch/                    (single repo)
+  platformio.ini                     # Existing env untouched, T5 env appended
+  src/                               # Existing Touch LCD source (UNTOUCHED)
+    main.cpp
+    comfoair/                        # Original data managers (with direct GUI calls)
+    ui/
+    mqtt/
+    wifi/
+    ...
+  src_t5/                            # T5-specific source (separate directory)
+    main.cpp                         # T5 setup/loop, MQTT wiring, display callbacks
+    board_config.h                   # T5 pin definitions
+    epaper_driver.cpp                # E-paper display driver + LVGL flush
+    ui/                              # New LVGL UI for 960x540 split layout
+    weather/                         # Weather data (new feature)
+  shared/ComfoSense-Shared/          # Shared library (invisible to existing build)
+    library.json
+    comfoair/                        # Refactored data managers (callback pattern)
+      sensor_data.h/cpp
+      control_manager.h/cpp
+      filter_data.h/cpp
+      error_data.h/cpp
+    mqtt/mqtt.h/cpp                  # MQTT client (runtime config)
+    wifi/wifi.h/cpp                  # WiFi (runtime config)
+    time/time_manager.h/cpp          # NTP time sync
 ```
+
+### Why This Works Without Disturbing Existing Code
+
+1. **`shared/` is invisible**: PlatformIO only auto-scans `lib/` — `shared/` is ignored unless explicitly referenced via `lib_extra_dirs`
+2. **`src_t5/` is invisible**: The existing `[env:esp32s3]` compiles `src/` only. The T5 env uses a custom `build_src_dir` or `build_src_filter` pointing to `src_t5/`
+3. **No existing files modified**: The original `src/comfoair/*.cpp` files keep their direct LVGL calls. The shared library has its own copies with callbacks instead.
+4. **`pio run` unchanged**: Default env is `esp32s3`, compiles exactly as before
 
 ### Key Refactoring: Decouple Data Managers from GUI
 
@@ -194,16 +188,17 @@ The left panel essentially recreates the current 480x480 UI within ~480x540 (sli
 
 ## Implementation Phases
 
-### Phase 1: Extract shared library
-1. Create `ComfoSense-Shared` repo
-2. Copy + refactor data managers (add display callbacks, remove `#include "ui/GUI.h"`)
-3. Copy mqtt, wifi, time modules
-4. Wire ComfoSense-Touch to use shared lib (verify nothing breaks)
+### Phase 1: Create shared library (DONE)
+1. ~~Create shared library with refactored data managers (callback pattern)~~ ✓
+2. ~~Copy + refactor mqtt, wifi, time modules (runtime config)~~ ✓
+3. ~~Place in `shared/ComfoSense-Shared/` (invisible to existing build)~~ ✓
+4. ~~Verify existing `pio run` is unaffected~~ ✓
 
 ### Phase 2: T5 basic firmware
-1. Create `ComfoSense-T5` repo with PlatformIO for LILYGO T5 4.7"
-2. Get e-paper driver working with LVGL (just a hello world)
-3. Wire up WiFi + MQTT using shared library
+1. Add `[env:t5-epaper]` to `platformio.ini` (append only)
+2. Create `src_t5/main.cpp` with T5 setup
+3. Get e-paper driver working with LVGL (hello world)
+4. Wire up WiFi + MQTT using shared library
 
 ### Phase 3: Ventilation panel
 1. Build the left-half ventilation UI in LVGL (grayscale)
@@ -225,7 +220,7 @@ The left panel essentially recreates the current 480x480 UI within ~480x540 (sli
 
 ## Decisions Made
 
-- **Code sharing**: Shared git submodule (`ComfoSense-Shared`)
+- **Code sharing**: Mono-repo with `shared/ComfoSense-Shared/` (invisible to existing build via PlatformIO directory isolation)
 - **Weather**: Via MQTT from Home Assistant (subscribe to HA weather topics)
 - **Power**: USB-powered (always on) — no deep sleep complexity
 - **Hardware**: T5 4.7" V2.3 with touch (confirmed ESP32-S3 + GT911)
@@ -239,8 +234,8 @@ Since both boards use GT911, the touch read callback logic from `main.cpp` (line
 
 ## Verification
 
-- Phase 1: `pio run` on ComfoSense-Touch still builds and works identically after shared lib extraction
-- Phase 2: T5 displays test pattern on e-paper, connects to WiFi/MQTT
+- Phase 1: `pio run` (default env `esp32s3`) still builds identically ✓
+- Phase 2: `pio run -e t5-epaper` builds, T5 displays test pattern, connects to WiFi/MQTT
 - Phase 3: Fan speed changes from touch reflected in MQTT, MQTT state updates shown on screen
 - Phase 4: Time updates, weather displays correctly
 - Phase 5: Device survives 24h+ without ghosting (periodic full refresh working)
