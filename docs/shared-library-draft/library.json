@@ -1,0 +1,11 @@
+{
+    "name": "ComfoSense-Shared",
+    "version": "1.0.0",
+    "description": "Shared data managers, MQTT, WiFi, and time management for ComfoAir ventilation control projects",
+    "keywords": "comfoair, ventilation, mqtt, hvac",
+    "frameworks": "arduino",
+    "platforms": "espressif32",
+    "dependencies": {
+        "knolleary/PubSubClient": "*"
+    }
+}
