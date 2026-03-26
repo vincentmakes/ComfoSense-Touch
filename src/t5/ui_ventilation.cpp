@@ -1,4 +1,5 @@
 #include "ui_ventilation.h"
+#include "images/t5_images.h"
 #include <Arduino.h>
 
 // =============================================================================
@@ -25,9 +26,12 @@ static lv_obj_t* lbl_date = nullptr;
 static lv_obj_t* lbl_wifi = nullptr;
 static lv_obj_t* lbl_warning = nullptr;
 
-// Center — fan speed display
-static lv_obj_t* lbl_fan_speed = nullptr;     // Large number "0"-"3" or "B"
-static lv_obj_t* lbl_fan_label = nullptr;      // "FAN SPEED" or "BOOST"
+// Center — fan speed display (images from original LCD, converted to grayscale)
+static lv_obj_t* img_fan0 = nullptr;
+static lv_obj_t* img_fan1 = nullptr;
+static lv_obj_t* img_fan2 = nullptr;
+static lv_obj_t* img_fan3 = nullptr;
+static lv_obj_t* img_fanboost = nullptr;
 static lv_obj_t* lbl_boost_timer = nullptr;    // "18 min" during boost
 
 // Center — sensor readings
@@ -125,14 +129,17 @@ void ui_ventilation_init(lv_obj_t* parent) {
     lbl_date = create_label(top_bar, "--", &lv_font_montserrat_14, COLOR_DARK_GRAY);
     lv_obj_set_align(lbl_date, LV_ALIGN_BOTTOM_LEFT);
 
-    // WiFi icon (top-right) — using text symbol
-    lbl_wifi = create_label(top_bar, LV_SYMBOL_WIFI, &lv_font_montserrat_18, COLOR_LIGHT_GRAY);
+    // WiFi icon (top-right) — grayscale image from LCD version
+    lbl_wifi = lv_img_create(top_bar);
+    lv_img_set_src(lbl_wifi, &wifi_gray);
     lv_obj_set_align(lbl_wifi, LV_ALIGN_TOP_RIGHT);
+    lv_obj_set_style_img_opa(lbl_wifi, LV_OPA_30, 0); // Dim when disconnected
 
-    // Warning icon (right of filter, hidden by default)
-    lbl_warning = create_label(top_bar, LV_SYMBOL_WARNING, &lv_font_montserrat_18, COLOR_BLACK);
+    // Warning icon (right of WiFi, hidden by default) — grayscale image
+    lbl_warning = lv_img_create(top_bar);
+    lv_img_set_src(lbl_warning, &warning_gray);
     lv_obj_set_align(lbl_warning, LV_ALIGN_RIGHT_MID);
-    lv_obj_set_pos(lbl_warning, -30, 0);
+    lv_obj_set_pos(lbl_warning, -110, 0);
     lv_obj_add_flag(lbl_warning, LV_OBJ_FLAG_HIDDEN);
 
     // =====================================================================
@@ -147,20 +154,30 @@ void ui_ventilation_init(lv_obj_t* parent) {
     lv_obj_set_style_border_width(center, 0, 0);
     lv_obj_set_style_pad_all(center, 0, 0);
 
-    // Fan speed label ("FAN SPEED")
-    lbl_fan_label = create_label(center, "FAN SPEED", &lv_font_montserrat_14, COLOR_MID_GRAY);
-    lv_obj_set_align(lbl_fan_label, LV_ALIGN_TOP_MID);
-    lv_obj_set_pos(lbl_fan_label, 0, 5);
+    // Fan speed images (same images as LCD version, converted to grayscale)
+    // All stacked at same position, only one visible at a time
+    auto create_fan_img = [&](lv_obj_t* parent, const lv_image_dsc_t* src) -> lv_obj_t* {
+        lv_obj_t* img = lv_img_create(parent);
+        lv_img_set_src(img, src);
+        lv_obj_set_align(img, LV_ALIGN_TOP_MID);
+        lv_obj_set_pos(img, 0, 5);
+        lv_obj_set_style_img_opa(img, LV_OPA_0, 0); // Hidden by default
+        return img;
+    };
 
-    // Fan speed number (large)
-    lbl_fan_speed = create_label(center, "2", &lv_font_montserrat_48, COLOR_BLACK);
-    lv_obj_set_align(lbl_fan_speed, LV_ALIGN_TOP_MID);
-    lv_obj_set_pos(lbl_fan_speed, 0, 25);
+    img_fan0 = create_fan_img(center, &fan0_gray);
+    img_fan1 = create_fan_img(center, &fan1_gray);
+    img_fan2 = create_fan_img(center, &fan2_gray);
+    img_fan3 = create_fan_img(center, &fan3_gray);
+    img_fanboost = create_fan_img(center, &fanboost_gray);
 
-    // Boost timer (hidden by default)
-    lbl_boost_timer = create_label(center, "", &lv_font_montserrat_14, COLOR_DARK_GRAY);
+    // Show fan2 by default
+    lv_obj_set_style_img_opa(img_fan2, LV_OPA_COVER, 0);
+
+    // Boost timer label (overlaid on fan image, hidden by default)
+    lbl_boost_timer = create_label(center, "", &lv_font_montserrat_14, COLOR_BLACK);
     lv_obj_set_align(lbl_boost_timer, LV_ALIGN_TOP_MID);
-    lv_obj_set_pos(lbl_boost_timer, 0, 80);
+    lv_obj_set_pos(lbl_boost_timer, -90, 15);
     lv_obj_add_flag(lbl_boost_timer, LV_OBJ_FLAG_HIDDEN);
 
     // --- Sensor readings ---
@@ -222,11 +239,9 @@ void ui_ventilation_init(lv_obj_t* parent) {
     lv_obj_set_style_radius(btn_speed_minus, 6, 0);
     lv_obj_add_event_cb(btn_speed_minus, on_speed_minus_clicked, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t* lbl_minus = lv_label_create(btn_speed_minus);
-    lv_label_set_text(lbl_minus, LV_SYMBOL_MINUS);
-    lv_obj_set_style_text_font(lbl_minus, &lv_font_montserrat_28, 0);
-    lv_obj_set_style_text_color(lbl_minus, COLOR_BLACK, 0);
-    lv_obj_set_align(lbl_minus, LV_ALIGN_CENTER);
+    lv_obj_t* img_minus = lv_img_create(btn_speed_minus);
+    lv_img_set_src(img_minus, &minus_gray);
+    lv_obj_set_align(img_minus, LV_ALIGN_CENTER);
 
     // Speed plus button
     btn_speed_plus = lv_button_create(bottom_bar);
@@ -237,11 +252,9 @@ void ui_ventilation_init(lv_obj_t* parent) {
     lv_obj_set_style_radius(btn_speed_plus, 6, 0);
     lv_obj_add_event_cb(btn_speed_plus, on_speed_plus_clicked, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t* lbl_plus = lv_label_create(btn_speed_plus);
-    lv_label_set_text(lbl_plus, LV_SYMBOL_PLUS);
-    lv_obj_set_style_text_font(lbl_plus, &lv_font_montserrat_28, 0);
-    lv_obj_set_style_text_color(lbl_plus, COLOR_BLACK, 0);
-    lv_obj_set_align(lbl_plus, LV_ALIGN_CENTER);
+    lv_obj_t* img_plus = lv_img_create(btn_speed_plus);
+    lv_img_set_src(img_plus, &plus_gray);
+    lv_obj_set_align(img_plus, LV_ALIGN_CENTER);
 
     // Boost button
     btn_boost = lv_button_create(bottom_bar);
@@ -296,14 +309,28 @@ void ui_ventilation_update_sensors(const comfoair::SensorData& data) {
 }
 
 void ui_ventilation_update_fan_speed(uint8_t speed, bool boost) {
+    // Hide all fan images first
+    lv_obj_set_style_img_opa(img_fan0, LV_OPA_0, 0);
+    lv_obj_set_style_img_opa(img_fan1, LV_OPA_0, 0);
+    lv_obj_set_style_img_opa(img_fan2, LV_OPA_0, 0);
+    lv_obj_set_style_img_opa(img_fan3, LV_OPA_0, 0);
+    lv_obj_set_style_img_opa(img_fanboost, LV_OPA_0, 0);
+
+    // Show the appropriate image
+    lv_obj_t* active = nullptr;
     if (boost) {
-        lv_label_set_text(lbl_fan_speed, "B");
-        lv_label_set_text(lbl_fan_label, "BOOST ACTIVE");
+        active = img_fanboost;
     } else {
-        char buf[4];
-        snprintf(buf, sizeof(buf), "%d", speed);
-        lv_label_set_text(lbl_fan_speed, buf);
-        lv_label_set_text(lbl_fan_label, "FAN SPEED");
+        switch (speed) {
+            case 0: active = img_fan0; break;
+            case 1: active = img_fan1; break;
+            case 2: active = img_fan2; break;
+            case 3: active = img_fan3; break;
+        }
+    }
+
+    if (active) {
+        lv_obj_set_style_img_opa(active, LV_OPA_COVER, 0);
     }
 }
 
@@ -339,8 +366,8 @@ void ui_ventilation_update_warning(bool show_warning) {
 }
 
 void ui_ventilation_update_wifi(bool connected) {
-    lv_obj_set_style_text_color(lbl_wifi,
-        connected ? COLOR_BLACK : COLOR_LIGHT_GRAY, 0);
+    lv_obj_set_style_img_opa(lbl_wifi,
+        connected ? LV_OPA_COVER : LV_OPA_30, 0);
 }
 
 void ui_ventilation_update_time(const char* time_str, const char* date_str) {
