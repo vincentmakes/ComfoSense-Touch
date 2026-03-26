@@ -18,6 +18,7 @@ void ui_info_panel_init(lv_obj_t* parent);
 
 // Display update functions
 void ui_info_panel_update_time(const char* time_str, const char* date_str);
+void ui_info_panel_update_wifi(bool connected);
 void ui_info_panel_update_weather(const WeatherData& data);
 
 #endif // T5_UI_INFO_PANEL_H

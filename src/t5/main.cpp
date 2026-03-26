@@ -102,7 +102,7 @@ static void on_warning_display_update(bool show) {
 }
 
 static void on_wifi_icon_update(bool connected) {
-    ui_ventilation_update_wifi(connected);
+    ui_info_panel_update_wifi(connected);
 }
 
 static void on_time_display_update(const char* time_str, const char* date_str) {

@@ -20,10 +20,7 @@ static const lv_color_t COLOR_LIGHT_GRAY = lv_color_make(200, 200, 200);
 // Widget references
 // =============================================================================
 
-// Top status bar
-static lv_obj_t* lbl_time = nullptr;
-static lv_obj_t* lbl_date = nullptr;
-static lv_obj_t* lbl_wifi = nullptr;
+// Top status bar (warning only — time/date/WiFi moved to info panel)
 static lv_obj_t* lbl_warning = nullptr;
 
 // Center — fan speed display (images from original LCD, converted to grayscale)
@@ -108,11 +105,11 @@ void ui_ventilation_init(lv_obj_t* parent) {
     lv_obj_set_style_radius(panel, 0, 0);
 
     // =====================================================================
-    // TOP STATUS BAR (time, date, wifi, warning)
+    // TOP STATUS BAR (warning icon only — time/date/WiFi on info panel)
     // =====================================================================
     lv_obj_t* top_bar = lv_obj_create(panel);
     lv_obj_remove_flag(top_bar, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(top_bar, PANEL_WIDTH - 2 * PANEL_MARGIN, 65);
+    lv_obj_set_size(top_bar, PANEL_WIDTH - 2 * PANEL_MARGIN, 40);
     lv_obj_set_align(top_bar, LV_ALIGN_TOP_MID);
     lv_obj_set_style_bg_opa(top_bar, LV_OPA_0, 0);
     lv_obj_set_style_border_width(top_bar, 1, 0);
@@ -121,25 +118,10 @@ void ui_ventilation_init(lv_obj_t* parent) {
     lv_obj_set_style_pad_all(top_bar, 4, 0);
     lv_obj_set_style_radius(top_bar, 0, 0);
 
-    // Time (large, top-left)
-    lbl_time = create_label(top_bar, "00:00", &lv_font_montserrat_28, COLOR_BLACK);
-    lv_obj_set_align(lbl_time, LV_ALIGN_TOP_LEFT);
-
-    // Date (smaller, below time)
-    lbl_date = create_label(top_bar, "--", &lv_font_montserrat_14, COLOR_DARK_GRAY);
-    lv_obj_set_align(lbl_date, LV_ALIGN_BOTTOM_LEFT);
-
-    // WiFi icon (top-right) — grayscale image from LCD version
-    lbl_wifi = lv_img_create(top_bar);
-    lv_img_set_src(lbl_wifi, &wifi_gray);
-    lv_obj_set_align(lbl_wifi, LV_ALIGN_TOP_RIGHT);
-    lv_obj_set_style_img_opa(lbl_wifi, LV_OPA_30, 0); // Dim when disconnected
-
-    // Warning icon (right of WiFi, hidden by default) — grayscale image
+    // Warning icon (hidden by default) — grayscale image
     lbl_warning = lv_img_create(top_bar);
     lv_img_set_src(lbl_warning, &warning_gray);
     lv_obj_set_align(lbl_warning, LV_ALIGN_RIGHT_MID);
-    lv_obj_set_pos(lbl_warning, -110, 0);
     lv_obj_add_flag(lbl_warning, LV_OBJ_FLAG_HIDDEN);
 
     // =====================================================================
@@ -366,13 +348,14 @@ void ui_ventilation_update_warning(bool show_warning) {
 }
 
 void ui_ventilation_update_wifi(bool connected) {
-    lv_obj_set_style_img_opa(lbl_wifi,
-        connected ? LV_OPA_COVER : LV_OPA_30, 0);
+    // WiFi display moved to info panel — no-op here
+    (void)connected;
 }
 
 void ui_ventilation_update_time(const char* time_str, const char* date_str) {
-    lv_label_set_text(lbl_time, time_str);
-    lv_label_set_text(lbl_date, date_str);
+    // Time/date display moved to info panel — no-op here
+    (void)time_str;
+    (void)date_str;
 }
 
 // =============================================================================

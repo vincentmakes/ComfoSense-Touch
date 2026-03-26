@@ -1,4 +1,5 @@
 #include "ui_info_panel.h"
+#include "images/t5_images.h"
 #include <Arduino.h>
 
 // =============================================================================
@@ -23,6 +24,9 @@ static const lv_color_t COLOR_WHITE = lv_color_make(255, 255, 255);
 // Time display (large, centered)
 static lv_obj_t* lbl_time_large = nullptr;
 static lv_obj_t* lbl_date_full = nullptr;
+
+// WiFi icon
+static lv_obj_t* img_wifi = nullptr;
 
 // Weather section
 static lv_obj_t* lbl_weather_condition = nullptr;
@@ -103,6 +107,13 @@ void ui_info_panel_init(lv_obj_t* parent) {
     lv_obj_set_style_pad_all(time_section, 0, 0);
     lv_obj_set_style_radius(time_section, 0, 0);
 
+    // WiFi icon (top-right of time section)
+    img_wifi = lv_img_create(time_section);
+    lv_img_set_src(img_wifi, &wifi_gray);
+    lv_obj_set_align(img_wifi, LV_ALIGN_TOP_RIGHT);
+    lv_obj_set_pos(img_wifi, 0, 5);
+    lv_obj_set_style_img_opa(img_wifi, LV_OPA_30, 0); // Dim when disconnected
+
     // Large time display
     lbl_time_large = create_label(time_section, "00:00",
                                    &lv_font_montserrat_48, COLOR_BLACK);
@@ -167,6 +178,11 @@ void ui_info_panel_init(lv_obj_t* parent) {
 void ui_info_panel_update_time(const char* time_str, const char* date_str) {
     lv_label_set_text(lbl_time_large, time_str);
     lv_label_set_text(lbl_date_full, date_str);
+}
+
+void ui_info_panel_update_wifi(bool connected) {
+    lv_obj_set_style_img_opa(img_wifi,
+        connected ? LV_OPA_COVER : LV_OPA_30, 0);
 }
 
 void ui_info_panel_update_weather(const WeatherData& data) {
