@@ -1,5 +1,6 @@
 #include "ui_info_panel.h"
 #include "images/t5_images.h"
+#include "images/weather_icons.h"
 #include <Arduino.h>
 
 // =============================================================================
@@ -29,7 +30,7 @@ static lv_obj_t* lbl_date_full = nullptr;
 static lv_obj_t* img_wifi = nullptr;
 
 // Weather section
-static lv_obj_t* lbl_weather_icon = nullptr;      // Large weather symbol
+static lv_obj_t* img_weather_icon = nullptr;       // Material icon image
 static lv_obj_t* lbl_weather_condition = nullptr;
 static lv_obj_t* lbl_weather_temp = nullptr;
 static lv_obj_t* lbl_weather_humidity = nullptr;
@@ -37,43 +38,24 @@ static lv_obj_t* lbl_weather_wind = nullptr;
 static lv_obj_t* lbl_weather_label = nullptr;
 
 // =============================================================================
-// Weather condition mapping — icon + label
-// Uses ASCII art symbols that render well on e-paper at large font sizes.
-// These are standard ASCII/Latin characters, no special font needed.
+// Weather condition to readable label
 // =============================================================================
-struct WeatherDisplay {
-    const char* icon;       // Large character(s) for visual display
-    const char* label;      // Readable condition text
-};
-
-static WeatherDisplay get_weather_display(const char* condition) {
-    if (strcmp(condition, "sunny") == 0)
-        return {"*", "Sunny"};
-    if (strcmp(condition, "clear-night") == 0)
-        return {".", "Clear"};
-    if (strcmp(condition, "partlycloudy") == 0)
-        return {"~*", "Partly Cloudy"};
-    if (strcmp(condition, "cloudy") == 0)
-        return {"~~", "Cloudy"};
-    if (strcmp(condition, "rainy") == 0)
-        return {"'", "Rain"};
-    if (strcmp(condition, "pouring") == 0)
-        return {"''", "Heavy Rain"};
-    if (strcmp(condition, "snowy") == 0)
-        return {"+", "Snow"};
-    if (strcmp(condition, "snowy-rainy") == 0)
-        return {"'+", "Sleet"};
-    if (strcmp(condition, "fog") == 0)
-        return {"=", "Fog"};
-    if (strcmp(condition, "windy") == 0 || strcmp(condition, "windy-variant") == 0)
-        return {"~", "Windy"};
-    if (strcmp(condition, "lightning") == 0 || strcmp(condition, "lightning-rainy") == 0)
-        return {"/!", "Storm"};
-    if (strcmp(condition, "hail") == 0)
-        return {"o", "Hail"};
-    if (strcmp(condition, "exceptional") == 0)
-        return {"!", "Exceptional"};
-    return {"?", condition};
+static const char* get_weather_label(const char* condition) {
+    if (strcmp(condition, "sunny") == 0) return "Sunny";
+    if (strcmp(condition, "clear-night") == 0) return "Clear";
+    if (strcmp(condition, "partlycloudy") == 0) return "Partly Cloudy";
+    if (strcmp(condition, "cloudy") == 0) return "Cloudy";
+    if (strcmp(condition, "rainy") == 0) return "Rain";
+    if (strcmp(condition, "pouring") == 0) return "Heavy Rain";
+    if (strcmp(condition, "snowy") == 0) return "Snow";
+    if (strcmp(condition, "snowy-rainy") == 0) return "Sleet";
+    if (strcmp(condition, "fog") == 0) return "Fog";
+    if (strcmp(condition, "windy") == 0 || strcmp(condition, "windy-variant") == 0) return "Windy";
+    if (strcmp(condition, "lightning") == 0) return "Lightning";
+    if (strcmp(condition, "lightning-rainy") == 0) return "Storm";
+    if (strcmp(condition, "hail") == 0) return "Hail";
+    if (strcmp(condition, "exceptional") == 0) return "Exceptional";
+    return condition;
 }
 
 // =============================================================================
@@ -155,11 +137,11 @@ void ui_info_panel_init(lv_obj_t* parent) {
                                       &lv_font_montserrat_14, COLOR_MID_GRAY);
     lv_obj_set_align(lbl_weather_label, LV_ALIGN_TOP_LEFT);
 
-    // Large weather icon (right side, visually prominent)
-    lbl_weather_icon = create_label(weather_section, "?",
-                                     &lv_font_montserrat_48, COLOR_MID_GRAY);
-    lv_obj_set_align(lbl_weather_icon, LV_ALIGN_TOP_RIGHT);
-    lv_obj_set_pos(lbl_weather_icon, -10, 25);
+    // Weather icon (Material Symbols, 80x80 grayscale)
+    img_weather_icon = lv_img_create(weather_section);
+    lv_img_set_src(img_weather_icon, &weather_cloudy);  // Default icon
+    lv_obj_set_align(img_weather_icon, LV_ALIGN_TOP_RIGHT);
+    lv_obj_set_pos(img_weather_icon, -10, 15);
 
     // Condition text (e.g., "Partly Cloudy")
     lbl_weather_condition = create_label(weather_section, "--",
@@ -205,10 +187,12 @@ void ui_info_panel_update_wifi(bool connected) {
 void ui_info_panel_update_weather(const WeatherData& data) {
     if (!data.valid) return;
 
-    // Condition icon + text
-    WeatherDisplay wd = get_weather_display(data.condition);
-    lv_label_set_text(lbl_weather_icon, wd.icon);
-    lv_label_set_text(lbl_weather_condition, wd.label);
+    // Condition icon (Material Symbol) + text label
+    const lv_image_dsc_t* icon = get_weather_icon(data.condition);
+    if (icon) {
+        lv_img_set_src(img_weather_icon, icon);
+    }
+    lv_label_set_text(lbl_weather_condition, get_weather_label(data.condition));
 
     // Temperature
     char buf[16];
