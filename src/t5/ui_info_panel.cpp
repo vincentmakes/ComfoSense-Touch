@@ -29,6 +29,7 @@ static lv_obj_t* lbl_date_full = nullptr;
 static lv_obj_t* img_wifi = nullptr;
 
 // Weather section
+static lv_obj_t* lbl_weather_icon = nullptr;      // Large weather symbol
 static lv_obj_t* lbl_weather_condition = nullptr;
 static lv_obj_t* lbl_weather_temp = nullptr;
 static lv_obj_t* lbl_weather_humidity = nullptr;
@@ -36,33 +37,43 @@ static lv_obj_t* lbl_weather_wind = nullptr;
 static lv_obj_t* lbl_weather_label = nullptr;
 
 // =============================================================================
-// Weather condition to symbol mapping
+// Weather condition mapping — icon + label
+// Uses ASCII art symbols that render well on e-paper at large font sizes.
+// These are standard ASCII/Latin characters, no special font needed.
 // =============================================================================
-static const char* weather_symbol(const char* condition) {
-    // Map HA weather conditions to simple text representations
-    if (strcmp(condition, "sunny") == 0 || strcmp(condition, "clear-night") == 0)
-        return "CLEAR";
+struct WeatherDisplay {
+    const char* icon;       // Large character(s) for visual display
+    const char* label;      // Readable condition text
+};
+
+static WeatherDisplay get_weather_display(const char* condition) {
+    if (strcmp(condition, "sunny") == 0)
+        return {"*", "Sunny"};
+    if (strcmp(condition, "clear-night") == 0)
+        return {".", "Clear"};
     if (strcmp(condition, "partlycloudy") == 0)
-        return "PARTLY CLOUDY";
+        return {"~*", "Partly Cloudy"};
     if (strcmp(condition, "cloudy") == 0)
-        return "CLOUDY";
+        return {"~~", "Cloudy"};
     if (strcmp(condition, "rainy") == 0)
-        return "RAIN";
-    if (strcmp(condition, "snowy") == 0)
-        return "SNOW";
-    if (strcmp(condition, "fog") == 0)
-        return "FOG";
-    if (strcmp(condition, "windy") == 0 || strcmp(condition, "windy-variant") == 0)
-        return "WINDY";
-    if (strcmp(condition, "lightning") == 0 || strcmp(condition, "lightning-rainy") == 0)
-        return "STORM";
-    if (strcmp(condition, "hail") == 0)
-        return "HAIL";
-    if (strcmp(condition, "snowy-rainy") == 0)
-        return "SLEET";
+        return {"'", "Rain"};
     if (strcmp(condition, "pouring") == 0)
-        return "HEAVY RAIN";
-    return condition; // Fallback: show raw condition
+        return {"''", "Heavy Rain"};
+    if (strcmp(condition, "snowy") == 0)
+        return {"+", "Snow"};
+    if (strcmp(condition, "snowy-rainy") == 0)
+        return {"'+", "Sleet"};
+    if (strcmp(condition, "fog") == 0)
+        return {"=", "Fog"};
+    if (strcmp(condition, "windy") == 0 || strcmp(condition, "windy-variant") == 0)
+        return {"~", "Windy"};
+    if (strcmp(condition, "lightning") == 0 || strcmp(condition, "lightning-rainy") == 0)
+        return {"/!", "Storm"};
+    if (strcmp(condition, "hail") == 0)
+        return {"o", "Hail"};
+    if (strcmp(condition, "exceptional") == 0)
+        return {"!", "Exceptional"};
+    return {"?", condition};
 }
 
 // =============================================================================
@@ -144,29 +155,35 @@ void ui_info_panel_init(lv_obj_t* parent) {
                                       &lv_font_montserrat_14, COLOR_MID_GRAY);
     lv_obj_set_align(lbl_weather_label, LV_ALIGN_TOP_LEFT);
 
-    // Condition (e.g., "PARTLY CLOUDY")
+    // Large weather icon (right side, visually prominent)
+    lbl_weather_icon = create_label(weather_section, "?",
+                                     &lv_font_montserrat_48, COLOR_MID_GRAY);
+    lv_obj_set_align(lbl_weather_icon, LV_ALIGN_TOP_RIGHT);
+    lv_obj_set_pos(lbl_weather_icon, -10, 25);
+
+    // Condition text (e.g., "Partly Cloudy")
     lbl_weather_condition = create_label(weather_section, "--",
-                                          &lv_font_montserrat_28, COLOR_BLACK);
+                                          &lv_font_montserrat_18, COLOR_DARK_GRAY);
     lv_obj_set_align(lbl_weather_condition, LV_ALIGN_TOP_LEFT);
     lv_obj_set_pos(lbl_weather_condition, 0, 30);
 
-    // Temperature
+    // Temperature (large)
     lbl_weather_temp = create_label(weather_section, "-- C",
                                      &lv_font_montserrat_48, COLOR_BLACK);
     lv_obj_set_align(lbl_weather_temp, LV_ALIGN_TOP_LEFT);
-    lv_obj_set_pos(lbl_weather_temp, 0, 80);
+    lv_obj_set_pos(lbl_weather_temp, 0, 65);
 
     // Humidity
     lbl_weather_humidity = create_label(weather_section, "Humidity: --%",
                                          &lv_font_montserrat_18, COLOR_DARK_GRAY);
     lv_obj_set_align(lbl_weather_humidity, LV_ALIGN_TOP_LEFT);
-    lv_obj_set_pos(lbl_weather_humidity, 0, 150);
+    lv_obj_set_pos(lbl_weather_humidity, 0, 135);
 
     // Wind
     lbl_weather_wind = create_label(weather_section, "Wind: -- km/h",
                                      &lv_font_montserrat_18, COLOR_DARK_GRAY);
     lv_obj_set_align(lbl_weather_wind, LV_ALIGN_TOP_LEFT);
-    lv_obj_set_pos(lbl_weather_wind, 0, 180);
+    lv_obj_set_pos(lbl_weather_wind, 0, 165);
 
     Serial.println("UI: Info panel initialized");
 }
@@ -188,8 +205,10 @@ void ui_info_panel_update_wifi(bool connected) {
 void ui_info_panel_update_weather(const WeatherData& data) {
     if (!data.valid) return;
 
-    // Condition
-    lv_label_set_text(lbl_weather_condition, weather_symbol(data.condition));
+    // Condition icon + text
+    WeatherDisplay wd = get_weather_display(data.condition);
+    lv_label_set_text(lbl_weather_icon, wd.icon);
+    lv_label_set_text(lbl_weather_condition, wd.label);
 
     // Temperature
     char buf[16];
