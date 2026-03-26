@@ -5,6 +5,7 @@
 
 #include "board_config.h"
 #include "epaper_driver.h"
+#include "ui_ventilation.h"
 
 // Shared library includes
 #include "comfoair/sensor_data.h"
@@ -68,45 +69,39 @@ static void touch_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
 }
 
 // =============================================================================
-// Display callback wiring — connects shared library managers to LVGL
+// Display callback wiring — connects shared library managers to LVGL UI
 // =============================================================================
 
-// TODO (Phase 3): These will be replaced with actual LVGL widget updates
-// For now, just log to serial to verify data flow
-
 static void on_sensor_display_update(const comfoair::SensorData& d) {
-    Serial.printf("T5 Display: Inside %.1fC/%.0f%%, Outside %.1fC/%.0f%%\n",
-                  d.inside_temp, d.inside_humidity,
-                  d.outside_temp, d.outside_humidity);
+    ui_ventilation_update_sensors(d);
 }
 
 static void on_fan_speed_display_update(uint8_t speed, bool boost) {
-    Serial.printf("T5 Display: Fan speed=%d, boost=%s\n", speed, boost ? "YES" : "NO");
+    ui_ventilation_update_fan_speed(speed, boost);
 }
 
 static void on_temp_profile_display_update(uint8_t profile) {
-    const char* names[] = {"NORMAL", "COOLING", "HEATING"};
-    Serial.printf("T5 Display: Temp profile=%s\n", profile <= 2 ? names[profile] : "?");
+    ui_ventilation_update_temp_profile(profile);
 }
 
 static void on_boost_timer_display_update(int minutes) {
-    Serial.printf("T5 Display: Boost timer=%d min\n", minutes);
+    ui_ventilation_update_boost_timer(minutes);
 }
 
 static void on_filter_display_update(int days, bool has_data) {
-    Serial.printf("T5 Display: Filter=%d days %s\n", days, has_data ? "(live)" : "(dummy)");
+    ui_ventilation_update_filter(days, has_data);
 }
 
 static void on_warning_display_update(bool show) {
-    Serial.printf("T5 Display: Warning icon=%s\n", show ? "VISIBLE" : "hidden");
+    ui_ventilation_update_warning(show);
 }
 
 static void on_wifi_icon_update(bool connected) {
-    Serial.printf("T5 Display: WiFi=%s\n", connected ? "CONNECTED" : "disconnected");
+    ui_ventilation_update_wifi(connected);
 }
 
 static void on_time_display_update(const char* time_str, const char* date_str) {
-    Serial.printf("T5 Display: %s  %s\n", time_str, date_str);
+    ui_ventilation_update_time(time_str, date_str);
 }
 
 // =============================================================================
@@ -277,6 +272,24 @@ void setup() {
 
     // --- MQTT subscriptions ---
     setup_mqtt_subscriptions();
+
+    // --- Initialize ventilation panel UI ---
+    lv_obj_t* screen = lv_screen_active();
+    lv_obj_set_style_bg_color(screen, lv_color_make(255, 255, 255), 0);
+    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
+    ui_ventilation_init(screen);
+
+    // Wire touch events → ControlManager
+    ui_ventilation_set_fan_speed_callback([](bool increase) {
+        if (increase) controlMgr->increaseFanSpeed();
+        else controlMgr->decreaseFanSpeed();
+    });
+    ui_ventilation_set_boost_callback([]() {
+        controlMgr->activateBoost();
+    });
+    ui_ventilation_set_temp_profile_callback([](uint8_t profile) {
+        controlMgr->setTempProfile(profile);
+    });
 
     Serial.println("========================================");
     Serial.println("Setup complete — entering main loop");
