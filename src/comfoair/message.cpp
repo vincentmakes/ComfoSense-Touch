@@ -120,7 +120,18 @@ namespace comfoair {
     CMDIF(boost_30_min)
     CMDIF(boost_60_min)
     CMDIF(boost_end)
-    CMDIF(auto)
+    // "auto" must clear BOTH manual overrides: the fan-speed schedule
+    // (subunit 01 01, set by ventilation_level_X -> "limited_manual") and the
+    // operating-mode schedule (subunit 08 01, set by "manual" -> "unlimited_manual").
+    // Deleting an inactive schedule property is a harmless no-op, so sending both
+    // returns to auto regardless of how manual was entered. See issue #13.
+    if (strcmp(command, "auto") == 0) {
+      std::vector<uint8_t> speedReset CMD_auto_speed_reset;  // clear fan-speed override (01 01)
+      bool ok1 = this->send(speedReset.size(), speedReset.data());
+      std::vector<uint8_t> modeReset CMD_auto;               // clear operating-mode override (08 01)
+      bool ok2 = this->send(modeReset.size(), modeReset.data());
+      return ok1 && ok2;
+    } else
     CMDIF(manual)
     CMDIF(bypass_activate_1h)
     CMDIF(bypass_deactivate_1h)
