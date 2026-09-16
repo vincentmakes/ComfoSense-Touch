@@ -2,7 +2,7 @@
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/vincentmakes)  
 
 ## Stable release - 25.03.2026
-The latest update has several improvements, ensuring clean processing of the CAN frames/commands and making sure that all necessary data is pulled at startup. Automation yaml in Home Assistant is also updated accordingly for the fan speed control. Tested on [Waveshare ESP32-S3-RS485 CAN](https://www.waveshare.com/esp32-s3-rs485-can.htm&aff_id=142371) as MQTT Bridge (server) and [Waveshare ESP32-S3-Touch Rev4](https://www.waveshare.com/esp32-s3-touch-lcd-4.htm?&aff_id=142371) as client display (Works on both Rev3 and Rev4)
+The latest update has several improvements, ensuring clean processing of the CAN frames/commands and making sure that all necessary data is pulled at startup. Automation yaml in Home Assistant is also updated accordingly for the fan speed control. Tested on [Waveshare ESP32-S3-RS485 CAN](https://www.waveshare.com/esp32-s3-rs485-can.htm?&aff_id=142371) as MQTT Bridge (server) and [Waveshare ESP32-S3-Touch Rev4](https://www.waveshare.com/esp32-s3-touch-lcd-4.htm?&aff_id=142371) as client display (Works on both Rev3 and Rev4)
 
 
 
@@ -57,7 +57,7 @@ Watchout that Waveshare also has a 4.3in device which wouldn't work for this pro
 
 2. Optionally (Rev 3 only): two SMD resistors, size 0402 (0R or a wire and a 100k value) in order for the dimming feature to work. **Rev 4 does not require any hardware modification** — it has a dedicated CH32V003 chip that handles backlight PWM natively. See the Dimming section for more details.
 
-3. For the Bridge, this device is ideal: https://www.waveshare.com/esp32-s3-rs485-can.htm&aff_id=142371 . This firmware is fully compatible with it and requires few adjustments of the PINs in twai_wrapper and main.cpp to be fully functional.
+3. For the Bridge, this device is ideal: https://www.waveshare.com/esp32-s3-rs485-can.htm?&aff_id=142371 . This firmware is fully compatible with it and requires few adjustments of the PINs in twai_wrapper and main.cpp to be fully functional.
 
 ## Home Assistant Dashboard
 Having this setup will allow you to consume all the sensor data coming from the ComfoAir and display that in a HA Dashboard, like this one.  
