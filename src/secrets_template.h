@@ -89,7 +89,7 @@
 
 // Enable/disable Night Time Mode entirely
 // When disabled, screen stays on 24/7
-#define NTM_ENABLED true
+#define NTM_ENABLED false
 
 // Permanent Night Mode - screen is always in NTM (ignores time window)
 // Useful for installations where screen should normally be off
