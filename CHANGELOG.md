@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-09-24
+
+### Fixed
+- The CAN bus initialization log always printed
+  `Board: Waveshare ESP32-S3-Touch-LCD-4`, even on the headless
+  ESP32-S3-RS485-CAN board. It now prints the board detected by
+  `board_config.h` via a new `getBoardName()` helper. Log-only change; pins
+  and behavior were already correct per board.
+  Fixes [#21](https://github.com/vincentmakes/ComfoSense-Touch/issues/21).
+
 ## [1.5.1] - 2026-06-05
 
 ### Fixed
@@ -21,5 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Baseline release tracked from `main`.
 
+[1.5.2]: https://github.com/vincentmakes/ComfoSense-Touch/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/vincentmakes/ComfoSense-Touch/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/vincentmakes/ComfoSense-Touch/releases/tag/v1.5.0
