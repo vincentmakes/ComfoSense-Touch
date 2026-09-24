@@ -223,6 +223,16 @@ inline bool hasDisplay() {
 inline bool isTouchLCDv3() { return g_board_type == BOARD_TOUCH_LCD_V3; }
 inline bool isTouchLCDv4() { return g_board_type == BOARD_TOUCH_LCD_V4; }
 
+// Human-readable name of the detected board (for logging)
+inline const char* getBoardName() {
+    switch (g_board_type) {
+        case BOARD_TOUCH_LCD_V3: return "Waveshare ESP32-S3-Touch-LCD-4.0 V3";
+        case BOARD_TOUCH_LCD_V4: return "Waveshare ESP32-S3-Touch-LCD-4.0 V4";
+        case BOARD_RS485_CAN:    return "Waveshare ESP32-S3-RS485-CAN";
+        default:                 return "Unknown";
+    }
+}
+
 // V4 has hardware PWM dimming built into the CH32V003 — no software PWM needed
 inline bool hasHardwarePWM()      { return isTouchLCDv4(); }
 // V3 requires software PWM bit-banging via I2C (needs R36+R40 soldered)

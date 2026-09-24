@@ -249,10 +249,10 @@ namespace comfoair {
       // NORMAL MODE - INITIALIZE CAN BUS
       // ========================================================================
       Serial.println("\n=== CAN Bus Initialization ===");
-      Serial.println("Board: Waveshare ESP32-S3-Touch-LCD-4");
+      Serial.printf("Board: %s\n", getBoardName());
       Serial.println("Using native TWAI driver");
       
-      // CAN pins set in twai_wrapper.h (GPIO6 TX, GPIO0 RX)
+      // CAN pins depend on the detected board (getCAN_TX()/getCAN_RX() in board_config.h)
       if (!CAN0.begin(50000)) {
         Serial.println("CAN init FAILED!");
         return;
